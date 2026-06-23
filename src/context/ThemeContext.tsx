@@ -44,6 +44,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       </ThemeContext.Provider>
     )
   }
+  // rendering
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
