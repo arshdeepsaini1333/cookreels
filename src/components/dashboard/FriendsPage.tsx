@@ -605,7 +605,10 @@ function RightPanel() {
     fetch('/api/reels/trending')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.reels) setReels(shuffle(d.reels).slice(0, 3))
+        if (d?.reels) {
+          const reelList: TrendingReel[] = d.reels as TrendingReel[]
+          setReels(shuffle(reelList).slice(0, 3))
+        }
       })
       .catch(() => {})
       .finally(() => setReelLoading(false))
