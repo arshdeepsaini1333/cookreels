@@ -1,0 +1,706 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─── Enums ─────
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  MENTION
+  REEL_LIKE
+  REEL_COMMENT
+  RECIPE_LIKE
+  RECIPE_COMMENT
+}
+
+enum ActivityType {
+  COOKED
+  SAVED_RECIPE
+  LIKED_RECIPE
+  LIKED_REEL
+  POSTED_RECIPE
+  POSTED_REEL
+  STARTED_FOLLOWING
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_PAYMENT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+enum CampaignObjective {
+  VIEWS
+  LIKES
+  FOLLOWERS
+  WEBSITE_CLICKS
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONVERTED
+  DROPPED
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+
+// ─── User ───────
+
+model User {
+  id               String    @id @default(uuid())
+  firstName        String
+  lastName         String
+  username         String    @unique
+  email            String    @unique
+  password         String?
+  phone            String?   @unique
+  googleId         String?   @unique
+  profileImage     String?
+  bio              String?   @db.Text
+  cuisineSpecialty String?
+  level            String?
+  isEmailVerified  Boolean   @default(false)
+  isVerified       Boolean   @default(false)
+  isOnline         Boolean   @default(false)
+  lastActiveAt     DateTime?
+
+  recipes          Recipe[]
+  reels            Reel[]
+  recipeComments   RecipeComment[]
+  reelComments     ReelComment[]
+  recipeLikes      RecipeLike[]
+  reelLikes        ReelLike[]
+  ratings          Rating[]
+  collections      Collection[]
+  savedRecipes     SavedRecipe[]
+  savedReels       SavedReel[]
+
+  followers        Follow[]       @relation("UserFollowing")
+  following        Follow[]       @relation("UserFollower")
+
+  friendsInitiated Friendship[]   @relation("FriendUser1")
+  friendsReceived  Friendship[]   @relation("FriendUser2")
+
+  notificationsReceived Notification[] @relation("NotifRecipient")
+  notificationsSent     Notification[] @relation("NotifActor")
+
+  activities       Activity[]
+
+  conversationsAsUser1 Conversation[] @relation("ConvUser1")
+  conversationsAsUser2 Conversation[] @relation("ConvUser2")
+  sentMessages         Message[]      @relation("MessageSender")
+
+  campaigns        Campaign[]
+  payments         Payment[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("users")
+}
+
+
+// ─── Social ───
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+
+  follower    User     @relation("UserFollower",  fields: [followerId],  references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Friendship {
+  id        String           @id @default(uuid())
+  userId1   String
+  userId2   String
+  status    FriendshipStatus @default(PENDING)
+
+  user1     User             @relation("FriendUser1", fields: [userId1], references: [id], onDelete: Cascade)
+  user2     User             @relation("FriendUser2", fields: [userId2], references: [id], onDelete: Cascade)
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId1, userId2])
+  @@index([userId1])
+  @@index([userId2])
+  @@map("friendships")
+}
+
+
+// ─── Categories & Tags ───────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  emoji       String?
+  group       String?
+  sortOrder   Int      @default(0)
+  gradient    String?
+  shadow      String?
+  description String?
+  coverImage  String?
+
+  recipes     RecipeCategory[]
+  reels       ReelCategory[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id      String      @id @default(uuid())
+  name    String      @unique
+  slug    String      @unique
+
+  recipes RecipeTag[]
+  reels   ReelTag[]
+
+  @@map("tags")
+}
+
+
+// ─── Recipe ───────
+
+model Recipe {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?     @db.Text
+  coverImage   String?
+
+  cuisine      String?
+  cookTime     Int?
+  prepTime     Int?
+  servings     Int?
+  calories     Int?
+  difficulty   Difficulty?
+  isVeg        Boolean     @default(false)
+
+  avgRating    Float       @default(0)
+  ratingCount  Int         @default(0)
+  likeCount    Int         @default(0)
+  commentCount Int         @default(0)
+  savedCount   Int         @default(0)
+  viewCount    Int         @default(0)
+
+  isPublished  Boolean     @default(true)
+  isTrending   Boolean     @default(false)
+
+  comments     RecipeComment[]
+  likes        RecipeLike[]
+  ratings      Rating[]
+  savedBy      SavedRecipe[]
+  categories   RecipeCategory[]
+  tags         RecipeTag[]
+  notifications Notification[]
+  activities   Activity[]
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isTrending])
+  @@index([cuisine])
+  @@map("recipes")
+}
+
+
+// ─── Reel ────────
+
+model Reel {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?  @db.Text
+  videoUrl     String
+  thumbnailUrl String?
+  duration     Int?
+
+  gradient     String?
+  emoji        String?
+
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  viewCount    Int      @default(0)
+  savedCount   Int      @default(0)
+
+  isPublished  Boolean  @default(true)
+  isTrending   Boolean  @default(false)
+
+  comments     ReelComment[]
+  likes        ReelLike[]
+  savedBy      SavedReel[]
+  categories   ReelCategory[]
+  tags         ReelTag[]
+  notifications Notification[]
+  activities   Activity[]
+  campaigns    Campaign[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isTrending])
+  @@index([isPublished, createdAt])
+  @@index([likeCount])
+  @@index([viewCount])
+  @@index([isPublished, isTrending, createdAt])
+  @@map("reels")
+}
+
+
+// ─── Junction Tables 
+
+model RecipeCategory {
+  recipeId   String
+  categoryId String
+  recipe     Recipe   @relation(fields: [recipeId],   references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, categoryId])
+  @@map("recipe_categories")
+}
+
+model ReelCategory {
+  reelId     String
+  categoryId String
+  reel       Reel     @relation(fields: [reelId],     references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([reelId, categoryId])
+  @@map("reel_categories")
+}
+
+model RecipeTag {
+  recipeId String
+  tagId    String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId],    references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+  @@map("recipe_tags")
+}
+
+model ReelTag {
+  reelId String
+  tagId  String
+  reel   Reel   @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId],  references: [id], onDelete: Cascade)
+
+  @@id([reelId, tagId])
+  @@map("reel_tags")
+}
+
+
+// ─── Likes ───────────────────────────────────────────────────────────────────
+
+model RecipeLike {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, recipeId])
+  @@index([recipeId])
+  @@map("recipe_likes")
+}
+
+model ReelLike {
+  id        String   @id @default(uuid())
+  userId    String
+  reelId    String
+  user      User     @relation(fields: [userId],  references: [id], onDelete: Cascade)
+  reel      Reel     @relation(fields: [reelId],  references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reelId])
+  @@index([reelId])
+  @@map("reel_likes")
+}
+
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+model RecipeComment {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  parentId  String?
+
+  user      User            @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe          @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  parent    RecipeComment?  @relation("RecipeCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   RecipeComment[] @relation("RecipeCommentReplies")
+
+  content   String   @db.Text
+  likeCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recipeId])
+  @@index([userId])
+  @@map("recipe_comments")
+}
+
+model ReelComment {
+  id        String   @id @default(uuid())
+  userId    String
+  reelId    String
+  parentId  String?
+
+  user      User          @relation(fields: [userId],  references: [id], onDelete: Cascade)
+  reel      Reel          @relation(fields: [reelId],  references: [id], onDelete: Cascade)
+  parent    ReelComment?  @relation("ReelCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   ReelComment[] @relation("ReelCommentReplies")
+
+  content   String   @db.Text
+  likeCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reelId])
+  @@index([userId])
+  @@map("reel_comments")
+}
+
+
+// ─── Ratings ─────────────────────────────────────────────────────────────────
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  value     Int
+  review    String?  @db.Text
+
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, recipeId])
+  @@index([recipeId])
+  @@map("ratings")
+}
+
+
+// ─── Collections & Saved Items ───────────────────────────────────────────────
+
+model Collection {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  coverImage  String?
+  gradient    String?
+  isPublic    Boolean  @default(false)
+
+  savedRecipes SavedRecipe[]
+  savedReels   SavedReel[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("collections")
+}
+
+model SavedRecipe {
+  id           String      @id @default(uuid())
+  userId       String
+  recipeId     String
+  collectionId String?
+
+  user         User        @relation(fields: [userId],       references: [id], onDelete: Cascade)
+  recipe       Recipe      @relation(fields: [recipeId],     references: [id], onDelete: Cascade)
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime    @default(now())
+
+  @@unique([userId, recipeId])
+  @@index([userId])
+  @@map("saved_recipes")
+}
+
+model SavedReel {
+  id           String      @id @default(uuid())
+  userId       String
+  reelId       String
+  collectionId String?
+
+  user         User        @relation(fields: [userId],       references: [id], onDelete: Cascade)
+  reel         Reel        @relation(fields: [reelId],       references: [id], onDelete: Cascade)
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime    @default(now())
+
+  @@unique([userId, reelId])
+  @@index([userId])
+  @@map("saved_reels")
+}
+
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+model Notification {
+  id          String           @id @default(uuid())
+  recipientId String
+  senderId    String
+  type        NotificationType
+
+  recipeId    String?
+  reelId      String?
+  commentId   String?
+  body        String?          @db.VarChar(200)
+  text        String?          @db.Text
+
+  isRead      Boolean          @default(false)
+
+  recipient   User     @relation("NotifRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender      User     @relation("NotifActor",     fields: [senderId],    references: [id], onDelete: Cascade)
+  recipe      Recipe?  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  reel        Reel?    @relation(fields: [reelId],   references: [id], onDelete: Cascade)
+
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt])
+  @@map("notifications")
+}
+
+
+// ─── Activity Feed ───────────────────────────────────────────────────────────
+
+model Activity {
+  id        String       @id @default(uuid())
+  userId    String
+  type      ActivityType
+
+  recipeId  String?
+  reelId    String?
+
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  reel      Reel?    @relation(fields: [reelId],   references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("activities")
+}
+
+
+// ─── Direct Messaging ─────────────────────────────────────────────────────────
+
+model Conversation {
+  id            String    @id @default(uuid())
+  user1Id       String
+  user2Id       String
+
+  user1         User      @relation("ConvUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2         User      @relation("ConvUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  messages      Message[]
+  lastMessageAt DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String        @db.Text
+  imageUrl       String?
+  status         MessageStatus @default(SENT)
+
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+
+// ─── Boost Campaigns ──────────────────────────────────────────────────────────
+
+model Campaign {
+  id           String            @id @default(uuid())
+  userId       String
+  reelId       String?
+
+  name         String
+  objective    CampaignObjective
+  audienceData Json
+  locations    Json
+
+  ageMin       Int?
+  ageMax       Int?
+  gender       String?
+
+  durationDays Int
+  dailyBudget  Decimal           @db.Decimal(10, 2)
+  totalBudget  Decimal           @db.Decimal(10, 2)
+
+  startDate    DateTime?
+  endDate      DateTime?
+
+  status       CampaignStatus    @default(DRAFT)
+  paymentId    String?
+
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reel         Reel?             @relation(fields: [reelId], references: [id], onDelete: SetNull)
+  analytics    CampaignAnalytics?
+  payments     Payment[]
+  leads        CampaignLead[]
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+  @@map("campaigns")
+}
+
+model CampaignAnalytics {
+  id              String   @id @default(uuid())
+  campaignId      String   @unique
+
+  impressions     Int      @default(0)
+  views           Int      @default(0)
+  likes           Int      @default(0)
+  clicks          Int      @default(0)
+  followersGained Int      @default(0)
+  spend           Decimal  @default(0) @db.Decimal(10, 2)
+
+  campaign        Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("campaign_analytics")
+}
+
+model Payment {
+  id                  String        @id @default(uuid())
+  userId              String
+  campaignId          String?
+
+  razorpayOrderId     String?       @unique
+  razorpayPaymentId   String?       @unique
+  razorpaySignature   String?
+
+  amount              Decimal       @db.Decimal(10, 2)
+  currency            String        @default("INR")
+  status              PaymentStatus
+  paymentMethod       String?
+  gatewayResponse     Json?
+
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign            Campaign?     @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([campaignId])
+  @@index([razorpayOrderId])
+  @@map("payments")
+}
+
+model CampaignLead {
+  id          String     @id @default(uuid())
+  campaignId  String
+
+  name        String
+  mobile      String
+  email       String?
+  notes       String?
+
+  status      LeadStatus @default(NEW)
+
+  campaign    Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([campaignId])
+  @@index([campaignId, status])
+  @@map("campaign_leads")
+}

@@ -1,0 +1,530 @@
+// ============================================================
+// CookReels — Full Prisma PostgreSQL Schema
+// ============================================================
+
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  MENTION
+}
+
+enum ActivityType {
+  COOKED
+  SAVED_RECIPE
+  LIKED_RECIPE
+  LIKED_REEL
+  POSTED_RECIPE
+  POSTED_REEL
+  STARTED_FOLLOWING
+}
+
+
+// ─── User ────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(uuid())
+  firstName        String
+  lastName         String
+  username         String    @unique
+  email            String    @unique
+  password         String?
+  phone            String?   @unique
+  googleId         String?   @unique
+  profileImage     String?
+  bio              String?   @db.Text
+  cuisineSpecialty String?             // e.g. "Italian", "Indian" — shown on Friends page
+  level            String?             // e.g. "Home Cook", "Pro Chef"
+  isEmailVerified  Boolean   @default(false)
+  isVerified       Boolean   @default(false)  // creator verified badge (tick icon)
+  isOnline         Boolean   @default(false)
+  lastActiveAt     DateTime?
+
+  recipes          Recipe[]
+  reels            Reel[]
+  recipeComments   RecipeComment[]
+  reelComments     ReelComment[]
+  recipeLikes      RecipeLike[]
+  reelLikes        ReelLike[]
+  ratings          Rating[]
+  collections      Collection[]
+  savedRecipes     SavedRecipe[]
+  savedReels       SavedReel[]
+
+  followers        Follow[]       @relation("UserFollowing")
+  following        Follow[]       @relation("UserFollower")
+
+  friendsInitiated Friendship[]   @relation("FriendUser1")
+  friendsReceived  Friendship[]   @relation("FriendUser2")
+
+  notificationsReceived Notification[] @relation("NotifRecipient")
+  notificationsSent     Notification[] @relation("NotifActor")
+
+  activities       Activity[]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@map("users")
+}
+
+
+// ─── Social ──────────────────────────────────────────────────────────────────
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+
+  follower    User     @relation("UserFollower",  fields: [followerId],  references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
+}
+
+model Friendship {
+  id        String           @id @default(uuid())
+  userId1   String                              // the person who sent the request
+  userId2   String                              // the person who received it
+  status    FriendshipStatus @default(PENDING)
+
+  user1     User             @relation("FriendUser1", fields: [userId1], references: [id], onDelete: Cascade)
+  user2     User             @relation("FriendUser2", fields: [userId2], references: [id], onDelete: Cascade)
+
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([userId1, userId2])
+  @@index([userId1])
+  @@index([userId2])
+  @@map("friendships")
+}
+
+
+// ─── Categories & Tags ───────────────────────────────────────────────────────
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique              // "Italian", "Breakfast", etc.
+  slug        String   @unique              // "italian", "breakfast"
+  emoji       String?                       // "🍕"
+  gradient    String?                       // "from-orange-400 to-red-500"
+  shadow      String?                       // Tailwind shadow class
+  description String?
+  coverImage  String?
+
+  recipes     RecipeCategory[]
+  reels       ReelCategory[]
+
+  @@map("categories")
+}
+
+model Tag {
+  id      String      @id @default(uuid())
+  name    String      @unique              // "#vegan", "#quick", "#spicy"
+  slug    String      @unique
+
+  recipes RecipeTag[]
+  reels   ReelTag[]
+
+  @@map("tags")
+}
+
+
+// ─── Recipe ──────────────────────────────────────────────────────────────────
+
+model Recipe {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String      @db.Text
+  coverImage   String?
+
+  cuisine      String?                     // "Italian", "Indian", etc.
+  cookTime     Int?                        // minutes
+  prepTime     Int?                        // minutes
+  servings     Int?
+  calories     Int?
+  difficulty   Difficulty?
+  isVeg        Boolean     @default(false)
+
+  // Cached aggregates — update in app logic when likes/ratings change
+  avgRating    Float       @default(0)
+  ratingCount  Int         @default(0)
+  likeCount    Int         @default(0)
+  commentCount Int         @default(0)
+  savedCount   Int         @default(0)
+  viewCount    Int         @default(0)
+
+  isPublished  Boolean     @default(true)
+  isTrending   Boolean     @default(false)
+
+  comments     RecipeComment[]
+  likes        RecipeLike[]
+  ratings      Rating[]
+  savedBy      SavedRecipe[]
+  categories   RecipeCategory[]
+  tags         RecipeTag[]
+  notifications Notification[]
+  activities   Activity[]
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isTrending])
+  @@index([cuisine])
+  @@map("recipes")
+}
+
+
+// ─── Reel ────────────────────────────────────────────────────────────────────
+
+model Reel {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title        String
+  description  String?  @db.Text
+  videoUrl     String
+  thumbnailUrl String?
+  duration     Int?                        // seconds
+
+  gradient     String?                     // fallback UI gradient when no thumbnail
+  emoji        String?                     // fallback UI emoji
+
+  // Cached aggregates
+  likeCount    Int      @default(0)
+  commentCount Int      @default(0)
+  viewCount    Int      @default(0)
+  savedCount   Int      @default(0)
+
+  isPublished  Boolean  @default(true)
+  isTrending   Boolean  @default(false)
+
+  comments     ReelComment[]
+  likes        ReelLike[]
+  savedBy      SavedReel[]
+  categories   ReelCategory[]
+  tags         ReelTag[]
+  notifications Notification[]
+  activities   Activity[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([isTrending])
+  @@map("reels")
+}
+
+
+// ─── Junction Tables ─────────────────────────────────────────────────────────
+
+model RecipeCategory {
+  recipeId   String
+  categoryId String
+  recipe     Recipe   @relation(fields: [recipeId],   references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, categoryId])
+  @@map("recipe_categories")
+}
+
+model ReelCategory {
+  reelId     String
+  categoryId String
+  reel       Reel     @relation(fields: [reelId],     references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([reelId, categoryId])
+  @@map("reel_categories")
+}
+
+model RecipeTag {
+  recipeId String
+  tagId    String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId],    references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+  @@map("recipe_tags")
+}
+
+model ReelTag {
+  reelId String
+  tagId  String
+  reel   Reel   @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId],  references: [id], onDelete: Cascade)
+
+  @@id([reelId, tagId])
+  @@map("reel_tags")
+}
+
+
+// ─── Likes ───────────────────────────────────────────────────────────────────
+
+model RecipeLike {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, recipeId])
+  @@index([recipeId])
+  @@map("recipe_likes")
+}
+
+model ReelLike {
+  id        String   @id @default(uuid())
+  userId    String
+  reelId    String
+  user      User     @relation(fields: [userId],  references: [id], onDelete: Cascade)
+  reel      Reel     @relation(fields: [reelId],  references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reelId])
+  @@index([reelId])
+  @@map("reel_likes")
+}
+
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+model RecipeComment {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  parentId  String?                         // for nested replies
+
+  user      User            @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe          @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  parent    RecipeComment?  @relation("RecipeCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   RecipeComment[] @relation("RecipeCommentReplies")
+
+  content   String   @db.Text
+  likeCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recipeId])
+  @@index([userId])
+  @@map("recipe_comments")
+}
+
+model ReelComment {
+  id        String   @id @default(uuid())
+  userId    String
+  reelId    String
+  parentId  String?
+
+  user      User          @relation(fields: [userId],  references: [id], onDelete: Cascade)
+  reel      Reel          @relation(fields: [reelId],  references: [id], onDelete: Cascade)
+  parent    ReelComment?  @relation("ReelCommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies   ReelComment[] @relation("ReelCommentReplies")
+
+  content   String   @db.Text
+  likeCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reelId])
+  @@index([userId])
+  @@map("reel_comments")
+}
+
+
+// ─── Ratings (recipes only — reels use likes) ────────────────────────────────
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  recipeId  String
+  value     Int                             // 1–5 stars
+  review    String?  @db.Text
+
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, recipeId])
+  @@index([recipeId])
+  @@map("ratings")
+}
+
+
+// ─── Collections & Saved Items ───────────────────────────────────────────────
+
+model Collection {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  coverImage  String?
+  gradient    String?                       // UI gradient shown on collection card
+  isPublic    Boolean  @default(false)
+
+  savedRecipes SavedRecipe[]
+  savedReels   SavedReel[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@map("collections")
+}
+
+model SavedRecipe {
+  id           String      @id @default(uuid())
+  userId       String
+  recipeId     String
+  collectionId String?
+
+  user         User        @relation(fields: [userId],       references: [id], onDelete: Cascade)
+  recipe       Recipe      @relation(fields: [recipeId],     references: [id], onDelete: Cascade)
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime    @default(now())
+
+  @@unique([userId, recipeId])
+  @@index([userId])
+  @@map("saved_recipes")
+}
+
+model SavedReel {
+  id           String      @id @default(uuid())
+  userId       String
+  reelId       String
+  collectionId String?
+
+  user         User        @relation(fields: [userId],       references: [id], onDelete: Cascade)
+  reel         Reel        @relation(fields: [reelId],       references: [id], onDelete: Cascade)
+  collection   Collection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime    @default(now())
+
+  @@unique([userId, reelId])
+  @@index([userId])
+  @@map("saved_reels")
+}
+
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String                               // recipient
+  actorId   String                               // who triggered it
+  type      NotificationType
+
+  recipeId  String?
+  reelId    String?
+
+  isRead    Boolean          @default(false)
+
+  recipient User     @relation("NotifRecipient", fields: [userId],   references: [id], onDelete: Cascade)
+  actor     User     @relation("NotifActor",     fields: [actorId],  references: [id], onDelete: Cascade)
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  reel      Reel?    @relation(fields: [reelId],   references: [id], onDelete: Cascade)
+
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+
+// ─── Activity Feed ───────────────────────────────────────────────────────────
+
+model Activity {
+  id        String       @id @default(uuid())
+  userId    String
+  type      ActivityType
+
+  recipeId  String?
+  reelId    String?
+
+  user      User     @relation(fields: [userId],   references: [id], onDelete: Cascade)
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  reel      Reel?    @relation(fields: [reelId],   references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("activities")
+}
+
+
+// ============================================================
+// TABLE SUMMARY
+// ============================================================
+//
+// users              — auth + profile (bio, level, cuisineSpecialty, isVerified, isOnline)
+// follows            — follow/unfollow relationships
+// friendships        — friend requests (PENDING / ACCEPTED / BLOCKED)
+// categories         — 21 food categories (name, slug, emoji, gradient)
+// tags               — hashtags on content (#vegan, #quick)
+// recipes            — recipe content (cuisine, cookTime, calories, difficulty, isVeg, avgRating)
+// reels              — video reels (videoUrl, thumbnailUrl, duration, gradient, emoji)
+// recipe_categories  — Recipe ↔ Category  (M2M)
+// reel_categories    — Reel   ↔ Category  (M2M)
+// recipe_tags        — Recipe ↔ Tag       (M2M)
+// reel_tags          — Reel   ↔ Tag       (M2M)
+// recipe_likes       — likes on recipes   (userId + recipeId unique)
+// reel_likes         — likes on reels     (userId + reelId unique)
+// recipe_comments    — comments + replies on recipes (parentId for nesting)
+// reel_comments      — comments + replies on reels   (parentId for nesting)
+// ratings            — 1–5 star ratings on recipes (value, review)
+// collections        — saved collections (name, gradient, isPublic)
+// saved_recipes      — saves linked to a collection
+// saved_reels        — saves linked to a collection
+// notifications      — bell icon items (type, isRead)
+// activities         — friend activity feed (type, recipeId / reelId)
+//
+// ============================================================
