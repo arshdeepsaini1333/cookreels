@@ -4,12 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, Loader2, ChevronLeft } from 'lucide-react'
+import { Search, X, Loader2, ChevronLeft, Clapperboard } from 'lucide-react'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useTheme } from '@/context/ThemeContext'
-import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
-import { ExploreViewer, type ExploreItem } from '@/components/shared/ExploreViewer'
-import type { ProfileUser } from '@/components/profile/ProfilePage'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,21 +54,6 @@ interface SearchResults {
   reels: SearchReel[]
 }
 
-// Adapts a search-result author into the ProfileUser shape RecipeViewerModal expects.
-function toProfileUser(user: SearchUser): ProfileUser {
-  return {
-    id: user.id,
-    name: `${user.firstName} ${user.lastName}`.trim() || user.username,
-    username: user.username,
-    bio: null,
-    verified: user.isVerified,
-    isOnline: false,
-    topChef: false,
-    level: '',
-    avatar: user.profileImage,
-    cuisineSpecialty: null,
-  }
-}
 
 // ─── Recent searches (cached client-side per browser/user) ────────────────────
 
@@ -185,36 +167,34 @@ function RecipeRow({ recipe, isDark, onSelect }: { recipe: SearchRecipe; isDark:
 function ReelThumb({ url, title, isDark }: { url: string | null; title: string; isDark: boolean }) {
   const [ok, setOk] = useState<boolean | null>(url ? null : false)
 
+  const placeholder = (
+    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
+      <Clapperboard size={18} style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
+    </div>
+  )
+
   if (ok === true) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={url!} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+      <img src={url!} alt={title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
     )
   }
   if (ok === null) {
-    // Loading: render img hidden; on success show it, on error fall back
     return (
       <div className="relative w-9 h-9 flex-shrink-0">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
-          🎬
-        </div>
+        {placeholder}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={url!}
-          alt=""
+          alt={title}
           className="absolute inset-0 w-full h-full rounded-lg object-cover opacity-0"
-          onLoad={e  => { (e.currentTarget as HTMLImageElement).classList.remove('opacity-0'); setOk(true) }}
+          onLoad={e => { (e.currentTarget as HTMLImageElement).classList.remove('opacity-0'); setOk(true) }}
           onError={() => setOk(false)}
         />
       </div>
     )
   }
-  // Failed or no URL
-  return (
-    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
-      🎬
-    </div>
-  )
+  return placeholder
 }
 
 function ReelRow({ reel, isDark, onSelect }: { reel: SearchReel; isDark: boolean; onSelect: () => void }) {
@@ -408,8 +388,6 @@ export function GlobalSearch({
   const [focused, setFocused] = useState(false)
   const [results, setResults] = useState<SearchResults | null>(null)
   const [loading, setLoading] = useState(false)
-  const [viewerRecipe, setViewerRecipe] = useState<SearchRecipe | null>(null)
-  const [viewerReel, setViewerReel] = useState<SearchReel | null>(null)
   const [recentSearches, setRecentSearches] = useState<RecentEntry[]>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -491,14 +469,16 @@ export function GlobalSearch({
   const handleSelectRecipe = useCallback((recipe: SearchRecipe) => {
     addRecentSearch({ type: 'recipe', data: recipe })
     setFocused(false)
-    setViewerRecipe(recipe)
-  }, [addRecentSearch])
+    onClose?.()
+    router.push(`/recipe/${recipe.id}`)
+  }, [addRecentSearch, onClose, router])
 
   const handleSelectReel = useCallback((reel: SearchReel) => {
     addRecentSearch({ type: 'reel', data: reel })
     setFocused(false)
-    setViewerReel(reel)
-  }, [addRecentSearch])
+    onClose?.()
+    router.push(`/reel/${reel.id}`)
+  }, [addRecentSearch, onClose, router])
 
   const handleSelectRecent = useCallback((entry: RecentEntry) => {
     if (entry.type === 'user') handleSelectUser(entry.data)
@@ -633,30 +613,6 @@ export function GlobalSearch({
         document.body
       ) : null}
 
-      {/* Recipe popup */}
-      {viewerRecipe && (
-        <RecipeViewerModal
-          recipes={[viewerRecipe]}
-          initialIndex={0}
-          user={toProfileUser(viewerRecipe.user)}
-          isOpen={!!viewerRecipe}
-          onClose={() => setViewerRecipe(null)}
-          currentUserAvatar={currentUserAvatar}
-          currentUserName={currentUserName}
-          currentUserId={currentUserId}
-        />
-      )}
-
-      {/* Reel popup */}
-      <ExploreViewer
-        items={viewerReel ? [{ type: 'reel', data: viewerReel } as ExploreItem] : []}
-        initialIndex={0}
-        isOpen={!!viewerReel}
-        onClose={() => setViewerReel(null)}
-        currentUserAvatar={currentUserAvatar}
-        currentUserName={currentUserName}
-        currentUserId={currentUserId}
-      />
     </>
   )
 }

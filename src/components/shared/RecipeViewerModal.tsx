@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import type { ProfileRecipe, ProfileUser } from '@/components/profile/ProfilePage'
 import { useRecipeLikes } from '@/hooks/useRecipeLikes'
+import { useRecipeSave } from '@/hooks/useRecipeSave'
 import { useRecipeComments } from '@/hooks/useRecipeComments'
 import { CommentList, CommentInput } from '@/components/shared/CommentSection'
 import { ShareModal } from '@/components/shared/ShareModal'
@@ -33,6 +34,10 @@ export interface RecipeViewerModalProps {
   currentUserAvatar?: string | null
   currentUserName?: string
   currentUserId?: string
+  /** When true the modal never touches window.history — parent owns the URL. */
+  skipUrlManagement?: boolean
+  /** Called with the active recipe id whenever it changes (replaces internal replaceState). */
+  onUrlChange?: (id: string) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,6 +110,7 @@ const slideV = {
 export function RecipeViewerModal({
   recipes, initialIndex, user, users, isOpen, onClose,
   currentUserAvatar, currentUserName, currentUserId,
+  skipUrlManagement, onUrlChange,
 }: RecipeViewerModalProps) {
   const router = useRouter()
 
@@ -121,7 +127,6 @@ export function RecipeViewerModal({
 
   const [index,         setIndex]         = useState(initialIndex)
   const [direction,     setDirection]     = useState(0)
-  const [saved,         setSaved]         = useState(false)
   const [shareOpen,     setShareOpen]     = useState(false)
   const [detail,        setDetail]        = useState<RecipeDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
@@ -132,6 +137,7 @@ export function RecipeViewerModal({
   const mobileCommentRef = useRef<HTMLInputElement>(null)
   const touchX           = useRef<number | null>(null)
   const touchY           = useRef<number | null>(null)
+  const origUrlRef       = useRef('')
 
   const recipe     = recipes[index]
   const activeUser = (users && users[index]) ?? user
@@ -142,6 +148,8 @@ export function RecipeViewerModal({
   const {
     liked, likeCount, hideLikeCount, toggle: handleLike,
   } = useRecipeLikes(recipe?.id ?? '', recipe?.likeCount ?? 0, isOpen)
+
+  const { saved, toggle: handleSave } = useRecipeSave(recipe?.id ?? '', isOpen)
 
   const [blockComments, setBlockComments] = useState(false)
 
@@ -183,6 +191,29 @@ export function RecipeViewerModal({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  // Save the page URL on open so it can be restored when the modal closes.
+  // Skipped when parent owns URL management (intercepting-route / standalone page).
+  useEffect(() => {
+    if (skipUrlManagement) return
+    if (isOpen) {
+      origUrlRef.current = window.location.pathname + window.location.search
+    } else {
+      window.history.replaceState(null, '', origUrlRef.current || window.location.pathname)
+    }
+  }, [isOpen, skipUrlManagement])
+
+  // Keep URL in sync with the active recipe.
+  // When onUrlChange is provided, delegate to parent (intercepting route).
+  // Otherwise fall back to replaceState with the legacy ?recipeId= param.
+  useEffect(() => {
+    if (!isOpen || !recipe) return
+    if (onUrlChange) {
+      onUrlChange(recipe.id)
+    } else if (!skipUrlManagement) {
+      window.history.replaceState(null, '', `${window.location.pathname}?recipeId=${recipe.id}`)
+    }
+  }, [isOpen, index, recipe?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const navigate = useCallback((dir: number) => {
     setDirection(dir)
@@ -456,7 +487,7 @@ export function RecipeViewerModal({
 
                         <motion.button
                           whileTap={{ scale: 0.82 }}
-                          onClick={() => setSaved(s => !s)}
+                          onClick={handleSave}
                           aria-label={saved ? 'Unsave' : 'Save'}
                           className="p-2.5"
                         >
@@ -775,7 +806,7 @@ export function RecipeViewerModal({
                             <div className="flex items-center">
                               <motion.button
                                 whileTap={{ scale: 0.82 }}
-                                onClick={() => setSaved(s => !s)}
+                                onClick={handleSave}
                                 aria-label={saved ? 'Unsave' : 'Save'}
                                 className="w-9 h-9 rounded-full flex items-center justify-center"
                                 style={{ color: saved ? '#F5C518' : 'var(--cr-text-muted)' }}

@@ -14,17 +14,18 @@ const fetchUser = cache(async (username: string) => {
   return prisma.user.findUnique({
     where: { username },
     select: {
-      id:               true,
-      firstName:        true,
-      lastName:         true,
-      username:         true,
-      bio:              true,
-      profileImage:     true,
-      cuisineSpecialty: true,
-      level:            true,
-      isVerified:       true,
-      isOnline:         true,
-      privateAccount:   true,
+      id:                true,
+      firstName:         true,
+      lastName:          true,
+      username:          true,
+      bio:               true,
+      profileImage:      true,
+      backgroundPicture: true,
+      cuisineSpecialty:  true,
+      level:             true,
+      isVerified:        true,
+      isOnline:          true,
+      privateAccount:    true,
       _count: {
         select: {
           recipes:   { where: { isPublished: true } },
@@ -287,16 +288,17 @@ export default async function Page({ params }: Props) {
   return (
     <PublicProfilePage
       user={{
-        id:               user.id,
-        name:             `${user.firstName} ${user.lastName}`,
-        username:         `@${user.username}`,
-        bio:              user.bio,
-        verified:         user.isVerified,
-        isOnline:         user.isOnline,
-        topChef:          user._count.recipes >= 10,
-        level:            user.level ?? 'Home Chef',
-        avatar:           user.profileImage,
-        cuisineSpecialty: user.cuisineSpecialty,
+        id:                user.id,
+        name:              `${user.firstName} ${user.lastName}`,
+        username:          `@${user.username}`,
+        bio:               user.bio,
+        verified:          user.isVerified,
+        isOnline:          user.isOnline,
+        topChef:           user._count.recipes >= 10,
+        level:             user.level ?? 'Home Chef',
+        avatar:            user.profileImage,
+        backgroundPicture: user.backgroundPicture,
+        cuisineSpecialty:  user.cuisineSpecialty,
       }}
       stats={{
         recipes:   user._count.recipes,

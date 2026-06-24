@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
 import { useReelLikes } from '@/hooks/useReelLikes'
+import { useReelSave } from '@/hooks/useReelSave'
 import { useReelComments } from '@/hooks/useReelComments'
 import type { ReelCommentItem } from '@/hooks/useReelComments'
 import type { FeedReel } from '@/lib/reelsFeed'
@@ -506,7 +507,6 @@ const ReelCard = memo(function ReelCard({
   onComment: () => void
   currentUserId?: string
 }) {
-  const [saved, setSaved]             = useState(false)
   const [heartPos, setHeartPos]       = useState({ x: 0, y: 0 })
   const [showHeart, setShowHeart]     = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -519,6 +519,7 @@ const ReelCard = memo(function ReelCard({
   const { liked, likeCount, toggle: toggleLike } = useReelLikes(
     reel.id, reel.likes, isActive, reel.liked,
   )
+  const { saved, toggle: toggleSave } = useReelSave(reel.id, isActive)
 
   // Play / pause based on visibility.
   // Reset to start only on first activation, not on every focus change.
@@ -665,7 +666,7 @@ const ReelCard = memo(function ReelCard({
           <MessageCircle size={20} strokeWidth={1.8} />
         </GlassBtn>
 
-        <GlassBtn label="Save" count={fmt(reel.saves + (saved ? 1 : 0))} active={saved} onClick={() => setSaved(s => !s)}>
+        <GlassBtn label="Save" count={fmt(reel.saves + (saved ? 1 : 0))} active={saved} onClick={toggleSave}>
           <Bookmark
             size={20}
             strokeWidth={saved ? 0 : 1.8}
@@ -881,6 +882,15 @@ export function ReelsPage({
       loadMore()
     }
   }, [activeIdx, reels.length, loadMore])
+
+  // Keep the URL in sync with the active reel so individual reels can be
+  // shared, bookmarked, and deep-linked via /reels?reelId=<id>.
+  // replaceState is intentional — scroll navigation should not pollute history.
+  useEffect(() => {
+    const reel = reels[activeIdx]
+    if (!reel) return
+    window.history.replaceState(null, '', `/reels?reelId=${reel.id}`)
+  }, [activeIdx, reels])
 
   const scrollDesktop = (dir: -1 | 1) =>
     desktopContainerRef.current?.scrollBy({

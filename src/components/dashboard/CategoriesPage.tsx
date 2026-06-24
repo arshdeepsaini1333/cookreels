@@ -11,10 +11,6 @@ import {
 } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
-import {
-  ExploreViewer,
-  type ExploreItem,
-} from '@/components/shared/ExploreViewer'
 
 /* ─── Types ───── */
 
@@ -467,62 +463,6 @@ const FALLBACK_GRADIENTS = [
   'from-cyan-500 to-blue-600',    'from-yellow-500 to-amber-600',
 ]
 
-/* ─── ExploreViewer adapters ─────────────────────────────────── */
-
-function reelToExploreItem(reel: Reel): ExploreItem {
-  const [firstName, ...rest] = reel.creator.split(' ')
-  return {
-    type: 'reel',
-    data: {
-      id: String(reel.id),
-      title: reel.title,
-      description: null,
-      videoUrl: reel.videoUrl,
-      thumbnailUrl: reel.thumbnail,
-      likeCount: reel.likeCount,
-      viewCount: 0,
-      duration: reel.duration,
-      gradient: reel.gradient || null,
-      emoji: reel.emoji || null,
-      createdAt: new Date().toISOString(),
-      user: {
-        id: reel.username,
-        username: reel.username,
-        firstName: firstName || reel.creator,
-        lastName: rest.join(' '),
-        profileImage: null,
-      },
-    },
-  }
-}
-
-function recipeToExploreItem(recipe: Recipe): ExploreItem {
-  const diffMap: Record<string, string> = { Easy: 'EASY', Medium: 'MEDIUM', Hard: 'HARD' }
-  const [firstName, ...rest] = recipe.creator.split(' ')
-  return {
-    type: 'recipe',
-    data: {
-      id: String(recipe.id),
-      title: recipe.title,
-      coverImage: recipe.image,
-      cookTime: null,
-      prepTime: null,
-      likeCount: recipe.ratingCount,
-      difficulty: diffMap[recipe.difficulty] ?? null,
-      description: recipe.description || null,
-      servings: null,
-      createdAt: new Date().toISOString(),
-      user: {
-        id: recipe.username,
-        username: recipe.username,
-        firstName: firstName || recipe.creator,
-        lastName: rest.join(' '),
-        profileImage: null,
-      },
-    },
-  }
-}
-
 /* ─── Recipe Card (explore-style) ───────────────────────────── */
 
 function RecipeCard({ recipe, idx = 0, height = '100%', onClick }: { recipe: Recipe; idx?: number; height?: number | string; onClick?: () => void }) {
@@ -615,11 +555,10 @@ function shuffle<T>(arr: T[]): T[] {
 type GridItem = { type: 'reel'; data: Reel } | { type: 'recipe'; data: Recipe }
 
 function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab: string; contentType: ContentType }) {
+  const router = useRouter()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [reels,   setReels]   = useState<Reel[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewerOpen,  setViewerOpen]  = useState(false)
-  const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
     setLoading(true)
@@ -653,11 +592,6 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
     return result
   }, [reels, recipes])
 
-  const exploreItems = useMemo<ExploreItem[]>(() =>
-    items.map(item => item.type === 'reel' ? reelToExploreItem(item.data) : recipeToExploreItem(item.data)),
-    [items]
-  )
-
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridAutoRows: ROW_HEIGHT }}>
@@ -683,16 +617,10 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridAutoRows: ROW_HEIGHT }}>
         {items.map((item, idx) =>
           item.type === 'reel'
-            ? <ReelCard   key={`reel-${item.data.id}`}   reel={item.data}   idx={idx} height="100%" onClick={() => { setViewerIndex(idx); setViewerOpen(true) }} />
-            : <RecipeCard key={`recipe-${item.data.id}`} recipe={item.data} idx={idx} height="100%" onClick={() => { setViewerIndex(idx); setViewerOpen(true) }} />
+            ? <ReelCard   key={`reel-${item.data.id}`}   reel={item.data}   idx={idx} height="100%" onClick={() => router.push(`/reel/${item.data.id}`)} />
+            : <RecipeCard key={`recipe-${item.data.id}`} recipe={item.data} idx={idx} height="100%" onClick={() => router.push(`/recipe/${item.data.id}`)} />
         )}
       </div>
-      <ExploreViewer
-        items={exploreItems}
-        initialIndex={viewerIndex}
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-      />
     </>
   )
 }
@@ -700,13 +628,12 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
 /* ─── Category Carousel Section (live data) ──────────────────── */
 
 function CategoryCarouselLive({ section }: { section: typeof LIVE_SECTIONS[0] }) {
+  const router = useRouter()
   const scrollRef = useRef<HTMLDivElement>(null)
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewerOpen,  setViewerOpen]  = useState(false)
-  const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
     fetch(`/api/content?type=recipe&category=${section.slug}&limit=30`)
@@ -718,8 +645,6 @@ function CategoryCarouselLive({ section }: { section: typeof LIVE_SECTIONS[0] })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [section.slug])
-
-  const exploreItems = useMemo<ExploreItem[]>(() => recipes.map(recipeToExploreItem), [recipes])
 
   const scroll = (dir: 'left' | 'right') => {
     scrollRef.current?.scrollBy({ left: dir === 'right' ? 260 : -260, behavior: 'smooth' })
@@ -762,18 +687,11 @@ function CategoryCarouselLive({ section }: { section: typeof LIVE_SECTIONS[0] })
             ))
           : recipes.map((recipe, i) => (
               <div key={recipe.id} className="flex-none w-52 sm:w-56" style={{ height: 180 }}>
-                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => { setViewerIndex(i); setViewerOpen(true) }} />
+                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => router.push(`/recipe/${recipe.id}`)} />
               </div>
             ))
         }
       </div>
-
-      <ExploreViewer
-        items={exploreItems}
-        initialIndex={viewerIndex}
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-      />
     </motion.section>
   )
 }
@@ -781,12 +699,11 @@ function CategoryCarouselLive({ section }: { section: typeof LIVE_SECTIONS[0] })
 /* ─── Trending Section (live data) ──────────────────────────── */
 
 function TrendingSection() {
+  const router = useRouter()
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-70px' })
   const [reels,   setReels]   = useState<Reel[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewerOpen,  setViewerOpen]  = useState(false)
-  const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
     fetch('/api/content?type=reel&limit=6&category=all')
@@ -795,8 +712,6 @@ function TrendingSection() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
-
-  const exploreItems = useMemo<ExploreItem[]>(() => reels.map(reelToExploreItem), [reels])
 
   return (
     <section ref={ref} className="space-y-5">
@@ -829,18 +744,11 @@ function TrendingSection() {
             ))
           : reels.map((reel, i) => (
               <motion.div key={reel.id} variants={cardReveal}>
-                <ReelCard reel={reel} onClick={() => { setViewerIndex(i); setViewerOpen(true) }} />
+                <ReelCard reel={reel} onClick={() => router.push(`/reel/${reel.id}`)} />
               </motion.div>
             ))
         }
       </motion.div>
-
-      <ExploreViewer
-        items={exploreItems}
-        initialIndex={viewerIndex}
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-      />
     </section>
   )
 }
@@ -848,12 +756,11 @@ function TrendingSection() {
 /* ─── Trending Recipes Section (live data) ───────────────────── */
 
 function TrendingRecipesSection() {
+  const router = useRouter()
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, margin: '-70px' })
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
-  const [viewerOpen,  setViewerOpen]  = useState(false)
-  const [viewerIndex, setViewerIndex] = useState(0)
 
   useEffect(() => {
     // API already orders by isTrending desc, likeCount desc — no extra params needed
@@ -863,8 +770,6 @@ function TrendingRecipesSection() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
-
-  const exploreItems = useMemo<ExploreItem[]>(() => recipes.map(recipeToExploreItem), [recipes])
 
   return (
     <section ref={ref} className="space-y-5">
@@ -895,18 +800,11 @@ function TrendingRecipesSection() {
             ))
           : recipes.map((recipe, i) => (
               <motion.div key={recipe.id} variants={cardReveal}>
-                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => { setViewerIndex(i); setViewerOpen(true) }} />
+                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => router.push(`/recipe/${recipe.id}`)} />
               </motion.div>
             ))
         }
       </motion.div>
-
-      <ExploreViewer
-        items={exploreItems}
-        initialIndex={viewerIndex}
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-      />
     </section>
   )
 }

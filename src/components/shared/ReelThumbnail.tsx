@@ -10,12 +10,14 @@ interface ReelThumbnailProps {
 
 export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThumbnailProps) {
   const [inView, setInView] = useState(false)
+  const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>(
+    thumbnailUrl ? 'loading' : 'error',
+  )
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -25,7 +27,6 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
       },
       { rootMargin: '150px', threshold: 0 },
     )
-
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
@@ -37,16 +38,33 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
 
   return (
     <div ref={rootRef} className="absolute inset-0">
-      {/* Show thumbnailUrl as immediate fallback while video loads */}
-      {thumbnailUrl && (
+      {/* Shimmer skeleton — visible only while thumbnail is loading */}
+      {imgState === 'loading' && (
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-neutral-800/60" />
+          <div
+            className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite]"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Thumbnail image */}
+      {thumbnailUrl && imgState !== 'error' && (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={thumbnailUrl}
           alt=""
           draggable={false}
-          className={`absolute inset-0 w-full h-full object-cover ${imgClassName ?? ''}`}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${imgState === 'loaded' ? 'opacity-100' : 'opacity-0'} ${imgClassName ?? ''}`}
+          onLoad={() => setImgState('loaded')}
+          onError={() => setImgState('error')}
         />
       )}
 
+      {/* Video (lazy — only after entering viewport) */}
       {inView && (
         <video
           src={videoUrl}

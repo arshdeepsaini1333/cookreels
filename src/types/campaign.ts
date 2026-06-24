@@ -26,6 +26,8 @@ export interface AudienceData {
   timezone?: string
   ctaText?: string
   destinationUrl?: string
+  bannerUrl?: string
+  adVideoUrl?: string
 }
 
 // ─── Request bodies ───────────────────────────────────────────────────────────
@@ -130,7 +132,7 @@ export interface BoostCampaignRow {
   id: string
   name: string
   platform: string
-  status: 'active' | 'pending' | 'draft' | 'completed' | 'rejected'
+  status: 'active' | 'pending' | 'draft' | 'paused' | 'completed' | 'rejected'
   budget: number
   impressions: number
   clicks: number

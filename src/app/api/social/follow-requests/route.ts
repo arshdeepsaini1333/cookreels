@@ -72,6 +72,15 @@ export async function PATCH(req: Request) {
         where: { id: followRecord.id },
         data:  { status: FollowStatus.ACCEPTED },
       })
+      // Convert the FOLLOW_REQUEST notification to FOLLOW so reloads show "started following you"
+      await prisma.notification.updateMany({
+        where: {
+          recipientId: session.userId,
+          senderId:    requesterId,
+          type:        NotificationType.FOLLOW_REQUEST,
+        },
+        data: { type: NotificationType.FOLLOW },
+      })
       await createNotification({
         recipientId:     requesterId,
         senderId:        session.userId,

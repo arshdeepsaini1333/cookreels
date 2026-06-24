@@ -6,16 +6,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, UserPlus, ChefHat, Users, Heart,
   Flame, Check, Sparkles, X, ChevronDown,
-  UserCheck, UserX, Loader2, Eye,
+  UserCheck, UserX, Loader2, Eye, Clapperboard,
 } from 'lucide-react'
 import {
   useSocialCounts, useFriends, useFollowers, useFollowing, useAllUsers,
   useFollow, type SocialListHook,
 } from '@/hooks/useSocial'
 import type { SocialUser } from '@/types/social'
-import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
-import { ReelViewerModal }   from '@/components/shared/ReelViewerModal'
-import type { ProfileRecipe, ProfileReel, ProfileUser } from '@/components/profile/ProfilePage'
 
 /* ─── Types ─────────────────────────────────────────────── */
 
@@ -528,61 +525,59 @@ function LoadMoreBtn({ onClick, fetching }: { onClick: () => void; fetching: boo
   )
 }
 
-/* ─── Modal type mappers ─────────────────────────────────── */
 
-function toProfileUser(u: TrendingRecipeUser): ProfileUser {
-  return {
-    id: u.id,
-    name: `${u.firstName} ${u.lastName}`.trim() || u.username,
-    username: u.username,
-    bio: null,
-    verified: u.isVerified,
-    isOnline: false,
-    topChef: false,
-    level: '',
-    avatar: u.profileImage,
-    cuisineSpecialty: null,
-  }
-}
 
-function toProfileRecipe(r: TrendingRecipe): ProfileRecipe {
-  return {
-    id: r.id,
-    title: r.title,
-    coverImage: r.coverImage,
-    cookTime: r.cookTime ?? null,
-    prepTime: r.prepTime ?? null,
-    likeCount: r.likeCount,
-    difficulty: r.difficulty ?? null,
-    description: r.description ?? null,
-    servings: r.servings ?? null,
-    createdAt: r.createdAt ?? null,
-  }
-}
+/* ─── Trending reel thumbnail ────────────────────────────── */
 
-function toProfileReel(r: TrendingReel): ProfileReel {
-  return {
-    id: r.id,
-    title: r.title,
-    videoUrl: r.videoUrl,
-    thumbnailUrl: r.thumbnailUrl,
-    duration: r.duration,
-    viewCount: r.viewCount,
-    likeCount: r.likeCount,
-  }
+function TrendingReelThumb({ url, gradient, title }: { url: string | null; gradient: string | null; title: string }) {
+  const [state, setState] = useState<'loading' | 'loaded' | 'error'>(url ? 'loading' : 'error')
+  const grad = gradient ?? 'from-violet-500 to-indigo-500'
+
+  return (
+    <>
+      {state === 'loading' && (
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute inset-0 bg-zinc-800/70" />
+          <div
+            className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite]"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)' }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Clapperboard className="w-4 h-4 text-zinc-400" />
+          </div>
+        </div>
+      )}
+
+      {state === 'error' && (
+        <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br ${grad}`}>
+          <Clapperboard className="w-4 h-4 text-white/70" />
+        </div>
+      )}
+
+      {url && state !== 'error' && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={title}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${state === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
+          onLoad={() => setState('loaded')}
+          onError={() => setState('error')}
+        />
+      )}
+    </>
+  )
 }
 
 /* ─── Right sidebar (desktop) ────────────────────────────── */
 
 function RightPanel() {
+  const router = useRouter()
   const [activity,     setActivity]     = useState<ActivityEntry[]>([])
   const [actLoading,   setActLoading]   = useState(true)
   const [recipes,      setRecipes]      = useState<TrendingRecipe[]>([])
   const [recLoading,   setRecLoading]   = useState(true)
   const [reels,        setReels]        = useState<TrendingReel[]>([])
   const [reelLoading,  setReelLoading]  = useState(true)
-  const [openRecipe,   setOpenRecipe]   = useState<TrendingRecipe | null>(null)
-  const [openReel,     setOpenReel]     = useState<TrendingReel | null>(null)
 
   useEffect(() => {
     fetch('/api/social/following/recent-posts')
@@ -699,7 +694,7 @@ function RightPanel() {
             {recipes.map(r => (
               <button
                 key={r.id}
-                onClick={() => setOpenRecipe(r)}
+                onClick={() => router.push(`/recipe/${r.id}`)}
                 className="flex items-center gap-3 cursor-pointer group w-full text-left"
               >
                 <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-base shadow-sm">
@@ -748,16 +743,12 @@ function RightPanel() {
             {reels.map(r => (
               <button
                 key={r.id}
-                onClick={() => setOpenReel(r)}
+                onClick={() => router.push(`/reel/${r.id}`)}
                 className="flex items-center gap-3 cursor-pointer group w-full text-left"
               >
                 {/* Portrait thumbnail */}
                 <div className="w-10 h-14 rounded-xl overflow-hidden shrink-0 shadow-sm relative">
-                  {r.thumbnailUrl
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={r.thumbnailUrl} alt={r.title} className="w-full h-full object-cover" />
-                    : <div className={`w-full h-full flex items-center justify-center text-base bg-gradient-to-br ${r.gradient ?? 'from-violet-500 to-indigo-500'}`}>🎬</div>
-                  }
+                  <TrendingReelThumb url={r.thumbnailUrl} gradient={r.gradient} title={r.title} />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
                       <svg className="w-2.5 h-2.5 text-zinc-900 ml-0.5" viewBox="0 0 8 10" fill="currentColor"><path d="M0 0l8 5-8 5V0z"/></svg>
@@ -779,26 +770,6 @@ function RightPanel() {
       </motion.div>
 
       {/* ── Modals ─────────────────────────────────────────── */}
-      {openRecipe && (
-        <RecipeViewerModal
-          recipes={[toProfileRecipe(openRecipe)]}
-          initialIndex={0}
-          user={toProfileUser(openRecipe.user)}
-          users={[toProfileUser(openRecipe.user)]}
-          isOpen={true}
-          onClose={() => setOpenRecipe(null)}
-        />
-      )}
-      {openReel && (
-        <ReelViewerModal
-          reels={[toProfileReel(openReel)]}
-          initialIndex={0}
-          user={toProfileUser(openReel.user)}
-          isOpen={true}
-          onClose={() => setOpenReel(null)}
-        />
-      )}
-
     </div>
   )
 }

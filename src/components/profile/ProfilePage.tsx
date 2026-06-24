@@ -1,21 +1,20 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
   Settings, Share2, Camera, MessageCircle,
   UserPlus, UserCheck, ChefHat, Flame, Heart, Play,
-  Bookmark, Clock, Film, Eye, BadgeCheck, TrendingUp,
+  Bookmark, Clock, Film, Eye, BadgeCheck,
   Lock, X, Edit3, Plus, ChevronRight,
-  Tag, Key, EyeOff,
+  Key, EyeOff,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
 import { AddContentModal } from '@/components/shared/AddContentModal'
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
-import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
 import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCropModal'
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
@@ -131,16 +130,7 @@ function fmtDuration(seconds: number | null | undefined): string {
 
 // ─── Static UI Data (not in DB) ───────────────────────────────────────────────
 
-const ACHIEVEMENTS = [
-  { icon: '👑', label: 'Top Chef',       desc: 'Top 1% creator',    g: 'from-yellow-400 to-amber-500'  },
-  { icon: '🔥', label: 'On a Streak',    desc: 'Consistent poster', g: 'from-orange-400 to-red-500'    },
-  { icon: '⭐', label: 'Trending Now',   desc: 'Featured creator',  g: 'from-pink-400 to-rose-500'     },
-  { icon: '🏆', label: 'Taste Champion', desc: '10K+ likes',        g: 'from-emerald-400 to-teal-500'  },
-]
-
-const WEEKLY   = [12, 28, 8, 45, 22, 35, 18]
-const WDAYS    = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-const TABS     = ['Recipes', 'Reels', 'Saved', 'Tagged', 'Liked'] as const
+const TABS     = ['Recipes', 'Reels', 'Saved', 'Liked'] as const
 type ProfileTab = (typeof TABS)[number]
 
 // Gradient fallbacks when a recipe/reel has no image
@@ -212,37 +202,6 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
         className="absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm"
       />
     </button>
-  )
-}
-
-// ─── ActivityGraph ─────
-
-function ActivityGraph() {
-  const ref    = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true })
-  const max    = Math.max(...WEEKLY)
-  return (
-    <div ref={ref}>
-      <div className="flex items-end gap-1 sm:gap-1.5 h-12">
-        {WEEKLY.map((val, i) => (
-          <motion.div
-            key={i}
-            className="flex-1 rounded-t-sm"
-            initial={{ height: 0 }}
-            animate={inView ? { height: `${(val / max) * 100}%` } : { height: 0 }}
-            transition={{ delay: i * 0.07, type: 'spring', stiffness: 200, damping: 22 }}
-            style={{ background: val === max ? 'var(--cr-accent)' : `rgba(245,197,24,${0.2 + (val / max) * 0.65})` }}
-          />
-        ))}
-      </div>
-      <div className="flex gap-1 sm:gap-1.5 mt-2">
-        {WDAYS.map((d, i) => (
-          <div key={i} className="flex-1 text-center text-[10px] font-medium" style={{ color: 'var(--cr-text-muted)' }}>
-            {d}
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -611,6 +570,16 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword }: { op
 
 // ─── ProfilePage (main export) ────────────────────────────────────────────────
 
+interface LikedSavedRecipe {
+  id: string; title: string; coverImage: string | null
+  cookTime: number | null; prepTime: number | null
+  likeCount: number; difficulty: string | null
+}
+interface LikedSavedReel {
+  id: string; title: string; thumbnailUrl: string | null
+  videoUrl: string; likeCount: number; duration: number | null; viewCount: number
+}
+
 export function ProfilePage({ user, stats, recipes, reels, collections }: ProfilePageProps) {
   const [activeTab,       setActiveTab]       = useState<ProfileTab>('Recipes')
   const [showSettings,    setShowSettings]    = useState(false)
@@ -620,7 +589,18 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
   const [savedSet,        setSavedSet]        = useState<Set<string>>(new Set())
   const [isFollowing,     setIsFollowing]     = useState(false)
   const [socialModal,     setSocialModal]     = useState<SocialListType | null>(null)
-  const [recipeModal,     setRecipeModal]     = useState<number | null>(null)
+
+  // ── Liked tab data ────────────────────────────────────────────────────────────
+  const [likedRecipes, setLikedRecipes] = useState<LikedSavedRecipe[]>([])
+  const [likedReels,   setLikedReels]   = useState<LikedSavedReel[]>([])
+  const [likedLoaded,  setLikedLoaded]  = useState(false)
+  const [likedLoading, setLikedLoading] = useState(false)
+
+  // ── Saved tab data ────────────────────────────────────────────────────────────
+  const [savedRecipes, setSavedRecipes] = useState<LikedSavedRecipe[]>([])
+  const [savedReels,   setSavedReels]   = useState<LikedSavedReel[]>([])
+  const [savedLoaded,  setSavedLoaded]  = useState(false)
+  const [savedLoading, setSavedLoading] = useState(false)
 
   // ── Editable profile info ────────────────────────────────────────────────────
   const [profileName,     setProfileName]     = useState(user.name)
@@ -656,12 +636,53 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
   const router       = useRouter()
   const isOwnProfile = true
 
+  const handleShare = useCallback(async () => {
+    const username = profileUsername.replace(/^@/, '')
+    const url = `${window.location.origin}/user/${username}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${profileName} on CookReels`, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        showToast('Profile link copied!', true)
+      }
+    } catch {
+      // user cancelled share sheet — do nothing
+    }
+  }, [profileName, profileUsername]) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (sessionStorage.getItem('cr:open-settings') === '1') {
       sessionStorage.removeItem('cr:open-settings')
       setShowSettings(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'Liked' || likedLoaded || likedLoading) return
+    setLikedLoading(true)
+    fetch('/api/profile/liked')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) { setLikedRecipes(d.recipes); setLikedReels(d.reels) }
+        setLikedLoaded(true)
+      })
+      .catch(() => setLikedLoaded(true))
+      .finally(() => setLikedLoading(false))
+  }, [activeTab, likedLoaded, likedLoading])
+
+  useEffect(() => {
+    if (activeTab !== 'Saved' || savedLoaded || savedLoading) return
+    setSavedLoading(true)
+    fetch('/api/profile/saved')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) { setSavedRecipes(d.recipes); setSavedReels(d.reels) }
+        setSavedLoaded(true)
+      })
+      .catch(() => setSavedLoaded(true))
+      .finally(() => setSavedLoading(false))
+  }, [activeTab, savedLoaded, savedLoading])
 
   const toggleSave = (id: string) => {
     setSavedSet(s => {
@@ -768,9 +789,9 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                     className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold border transition-colors"
                     style={{ borderColor: 'var(--cr-accent)', color: 'var(--cr-accent)', background: 'var(--cr-accent-soft)' }}
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Recipe
+                    <Plus className="w-3.5 h-3.5" /> Add Content
                   </motion.button>
-                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors" style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}>
+                  <motion.button onClick={handleShare} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors" style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}>
                     <Share2 className="w-3.5 h-3.5" /> Share
                   </motion.button>
                 </>
@@ -844,9 +865,9 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold border"
                   style={{ borderColor: 'var(--cr-accent)', color: 'var(--cr-accent)', background: 'var(--cr-accent-soft)' }}
                 >
-                  <Plus className="w-4 h-4" /> Add Recipe
+                  <Plus className="w-4 h-4" /> Add Content
                 </motion.button>
-                <motion.button whileTap={{ scale: 0.97 }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-full text-sm font-semibold border" style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}>
+                <motion.button onClick={handleShare} whileTap={{ scale: 0.97 }} className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-full text-sm font-semibold border" style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}>
                   <Share2 className="w-4 h-4" />
                 </motion.button>
               </>
@@ -899,61 +920,6 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
           ))}
         </motion.div>
 
-        {/* ── CUISINE CHIPS + ACHIEVEMENTS + ACTIVITY ──────── */}
-        <motion.div className="px-4 mt-5 space-y-4" {...fadeUp(0.2)}>
-          {/* Cuisine chips */}
-          <div className="flex flex-wrap gap-2">
-            {user.cuisineSpecialty && (
-              <motion.span whileHover={{ scale: 1.06, y: -2 }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer" style={{ background: 'linear-gradient(135deg,rgba(245,197,24,0.15),rgba(255,184,0,0.1))', color: 'var(--cr-accent)', border: '1px solid var(--cr-accent-border)' }}>
-                🍽️ {user.cuisineSpecialty}
-              </motion.span>
-            )}
-            {[
-              { emoji: '🔥', label: 'Grill Expert' },
-              { emoji: '🥗', label: 'Healthy Food' },
-              { emoji: '🍛', label: 'Spice Master' },
-              { emoji: '🎂', label: 'Pastry Arts'  },
-            ].map(c => (
-              <motion.span key={c.label} whileHover={{ scale: 1.06, y: -2 }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold cursor-pointer" style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}>
-                {c.emoji} {c.label}
-              </motion.span>
-            ))}
-          </div>
-
-          {/* Achievement badges */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {ACHIEVEMENTS.map((a, i) => (
-              <motion.div
-                key={a.label}
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.25 + i * 0.07, type: 'spring', stiffness: 280, damping: 24 }}
-                whileHover={{ scale: 1.06, y: -3 }}
-                className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer"
-                style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
-              >
-                <div className={`w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-sm bg-gradient-to-br ${a.g}`}>{a.icon}</div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold leading-tight truncate" style={{ color: 'var(--cr-text-1)' }}>{a.label}</p>
-                  <p className="text-[10px] truncate" style={{ color: 'var(--cr-text-muted)' }}>{a.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* Weekly activity */}
-          <div className="p-4 rounded-2xl" style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--cr-text-1)' }}>Weekly Activity</span>
-              </div>
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--cr-accent-soft)', color: 'var(--cr-accent)' }}>This week</span>
-            </div>
-            <ActivityGraph />
-          </div>
-        </motion.div>
-
         {/* ── STICKY TAB NAVIGATION ────────────────────────── */}
         <div className="sticky top-0 z-20 mt-6 border-b" style={{ background: 'var(--cr-bg-surface)', borderColor: 'var(--cr-border)' }}>
           <div className="flex overflow-x-auto scrollbar-none">
@@ -967,7 +933,6 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 {tab === 'Recipes' && <ChefHat className="w-3.5 h-3.5" />}
                 {tab === 'Reels'   && <Film    className="w-3.5 h-3.5" />}
                 {tab === 'Saved'   && <Bookmark className="w-3.5 h-3.5" />}
-                {tab === 'Tagged'  && <Tag     className="w-3.5 h-3.5" />}
                 {tab === 'Liked'   && <Heart   className="w-3.5 h-3.5" />}
                 {tab}
                 {activeTab === tab && (
@@ -995,7 +960,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 ) : (
                   <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                     {recipes.map((r, i) => (
-                      <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => setRecipeModal(i)} />
+                      <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
                     ))}
                   </motion.div>
                 )}
@@ -1020,29 +985,72 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
             {/* SAVED */}
             {activeTab === 'Saved' && (
               <motion.div key="saved" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.28, ease: EASE }}>
-                {collections.length === 0 ? (
-                  <EmptyState emoji="🔖" title="No collections yet" sub="Save recipes and reels into collections to find them easily" />
+                {savedLoading ? (
+                  <div className="flex justify-center py-20">
+                    <div className="w-6 h-6 rounded-full border-2 border-[#F5C518] border-t-transparent animate-spin" />
+                  </div>
+                ) : savedRecipes.length === 0 && savedReels.length === 0 ? (
+                  <EmptyState emoji="🔖" title="No saved posts yet" sub="Save recipes and reels to find them easily here" />
                 ) : (
-                  <motion.div variants={staggerContainer(0.06)} initial="hidden" animate="visible" className="grid grid-cols-2 gap-3 sm:gap-4">
-                    {collections.map(c => (
-                      <SavedCollectionCard key={c.id} c={c} />
-                    ))}
-                  </motion.div>
+                  <div className="space-y-6">
+                    {savedRecipes.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Recipes</p>
+                        <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                          {savedRecipes.map((r, i) => (
+                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                          ))}
+                        </motion.div>
+                      </div>
+                    )}
+                    {savedReels.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Reels</p>
+                        <motion.div variants={staggerContainer(0.03)} initial="hidden" animate="visible" className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+                          {savedReels.map((r, i) => (
+                            <ReelCard key={r.id} r={{ ...r, description: null }} idx={i} onClick={() => router.push(`/reel/${r.id}`)} />
+                          ))}
+                        </motion.div>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </motion.div>
-            )}
-
-            {/* TAGGED */}
-            {activeTab === 'Tagged' && (
-              <motion.div key="tagged" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.28 }}>
-                <EmptyState emoji="🏷️" title="No tagged posts yet" sub="Posts where you are tagged by others will appear here" />
               </motion.div>
             )}
 
             {/* LIKED */}
             {activeTab === 'Liked' && (
               <motion.div key="liked" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.28 }}>
-                <EmptyState emoji="❤️" title="No liked posts yet" sub="Recipes and reels you like will appear here" />
+                {likedLoading ? (
+                  <div className="flex justify-center py-20">
+                    <div className="w-6 h-6 rounded-full border-2 border-[#F5C518] border-t-transparent animate-spin" />
+                  </div>
+                ) : likedRecipes.length === 0 && likedReels.length === 0 ? (
+                  <EmptyState emoji="❤️" title="No liked posts yet" sub="Recipes and reels you like will appear here" />
+                ) : (
+                  <div className="space-y-6">
+                    {likedRecipes.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Recipes</p>
+                        <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                          {likedRecipes.map((r, i) => (
+                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                          ))}
+                        </motion.div>
+                      </div>
+                    )}
+                    {likedReels.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Reels</p>
+                        <motion.div variants={staggerContainer(0.03)} initial="hidden" animate="visible" className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
+                          {likedReels.map((r, i) => (
+                            <ReelCard key={r.id} r={{ ...r, description: null }} idx={i} onClick={() => router.push(`/reel/${r.id}`)} />
+                          ))}
+                        </motion.div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -1068,15 +1076,27 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
       {/* Edit profile modal */}
       <EditProfileModal
         open={showEditProfile}
+        userId={user.id}
         initialName={profileName}
         initialBio={profileBio}
         initialLevel={profileLevel}
+        initialCoverUrl={coverUrl}
+        initialAvatarUrl={avatarUrl}
         onClose={() => setShowEditProfile(false)}
         onSave={({ name, bio, level }) => {
           setProfileName(name)
           setProfileBio(bio)
           setProfileLevel(level)
           showToast('Profile updated!', true)
+        }}
+        onCoverUpdate={(url) => {
+          setCoverUrl(url)
+          showToast('Banner updated!', true)
+        }}
+        onAvatarUpdate={(url) => {
+          setAvatarUrl(url)
+          showToast('Profile photo updated!', true)
+          window.dispatchEvent(new CustomEvent('cr:avatar-updated', { detail: { url } }))
         }}
       />
 
@@ -1091,18 +1111,6 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         username={profileUsername}
         listType={socialModal ?? 'followers'}
         currentUserId={user.id}
-      />
-
-      {/* Recipe viewer modal */}
-      <RecipeViewerModal
-        key={recipeModal ?? 'closed'}
-        recipes={recipes}
-        initialIndex={recipeModal ?? 0}
-        user={user}
-        isOpen={recipeModal !== null}
-        onClose={() => setRecipeModal(null)}
-        currentUserAvatar={avatarUrl}
-        currentUserName={profileName}
       />
 
       {/* Hidden file inputs */}

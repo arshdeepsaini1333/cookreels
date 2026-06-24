@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { NotificationItem as NotifType } from '@/hooks/useNotifications'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 
@@ -37,12 +38,20 @@ interface Props {
 }
 
 export function NotificationItem({ notification: n, isDark }: Props) {
-  const displayText = n.text ?? fallbackText(n)
-  const thumbnail   = n.reel?.thumbnailUrl ?? n.recipe?.coverImage
+  const router = useRouter()
+  const thumbnail = n.reel?.thumbnailUrl ?? n.recipe?.coverImage
 
   const [reqStatus, setReqStatus] = useState<'idle' | 'pending' | 'accepted' | 'declined'>('idle')
 
-  const handleFollowRequest = async (action: 'accept' | 'decline') => {
+  const isFollowRequest = n.type === 'FOLLOW_REQUEST'
+
+  // After accepting, show the updated text instead of the original request text
+  const displayText = reqStatus === 'accepted'
+    ? `${n.sender.username} started following you.`
+    : (n.text ?? fallbackText(n))
+
+  const handleFollowRequest = async (e: React.MouseEvent, action: 'accept' | 'decline') => {
+    e.stopPropagation()
     if (reqStatus === 'pending') return
     setReqStatus('pending')
     try {
@@ -61,11 +70,14 @@ export function NotificationItem({ notification: n, isDark }: Props) {
     }
   }
 
-  const isFollowRequest = n.type === 'FOLLOW_REQUEST'
+  const goToProfile = () => {
+    router.push(`/user/${n.sender.username}`)
+  }
 
   return (
     <div
-      className="flex items-start gap-3 px-4 py-3 transition-colors duration-150"
+      onClick={goToProfile}
+      className="flex items-start gap-3 px-4 py-3 transition-colors duration-150 cursor-pointer"
       style={{
         background: n.isRead
           ? 'transparent'
@@ -114,7 +126,7 @@ export function NotificationItem({ notification: n, isDark }: Props) {
             {(reqStatus === 'idle' || reqStatus === 'pending') && (
               <>
                 <button
-                  onClick={() => handleFollowRequest('accept')}
+                  onClick={e => handleFollowRequest(e, 'accept')}
                   disabled={reqStatus === 'pending'}
                   className="px-3 py-1 rounded-full text-[12px] font-semibold transition-all disabled:opacity-60"
                   style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
@@ -122,7 +134,7 @@ export function NotificationItem({ notification: n, isDark }: Props) {
                   {reqStatus === 'pending' ? '…' : 'Accept'}
                 </button>
                 <button
-                  onClick={() => handleFollowRequest('decline')}
+                  onClick={e => handleFollowRequest(e, 'decline')}
                   disabled={reqStatus === 'pending'}
                   className="px-3 py-1 rounded-full text-[12px] font-semibold border transition-all disabled:opacity-60"
                   style={{ borderColor: isDark ? '#3F3F46' : '#E5E7EB', color: isDark ? '#D4D4D8' : '#374151', background: 'transparent' }}

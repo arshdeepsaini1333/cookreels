@@ -979,18 +979,65 @@ function SchedulingSection({ state, update, isDark }: {
   update: (k: keyof CampaignState, v: unknown) => void
   isDark: boolean
 }) {
+  const isDaily    = state.budgetType === 'daily'
+  const isLifetime = state.budgetType === 'lifetime'
+  const showImmediateNotice = isLifetime && !state.startDate
+
   return (
     <SectionCard title="Campaign Schedule" icon={Calendar} isDark={isDark}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label isDark={isDark}>Start Date</Label>
-          <Input isDark={isDark} type="date" value={state.startDate} onChange={e => update('startDate', e.target.value)} />
+          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
+            Start Date{(isDaily || isLifetime) && <span style={{ color: '#FF6B6B', marginLeft: 3 }}>*</span>}
+          </label>
+          <Input
+            isDark={isDark}
+            type="date"
+            value={state.startDate}
+            onChange={e => update('startDate', e.target.value)}
+            style={{ borderColor: isDaily && !state.startDate ? 'rgba(255,107,107,0.55)' : undefined }}
+          />
         </div>
         <div>
-          <Label isDark={isDark}>End Date</Label>
-          <Input isDark={isDark} type="date" value={state.endDate} onChange={e => update('endDate', e.target.value)} />
+          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
+            End Date{isDaily && <span style={{ color: '#FF6B6B', marginLeft: 3 }}>*</span>}
+            {isLifetime && <span className="ml-1 normal-case font-normal" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>(optional)</span>}
+          </label>
+          <Input
+            isDark={isDark}
+            type="date"
+            value={state.endDate}
+            onChange={e => update('endDate', e.target.value)}
+            style={{ borderColor: isDaily && !state.endDate ? 'rgba(255,107,107,0.55)' : undefined }}
+          />
         </div>
       </div>
+
+      {/* Lifetime budget: no start date → immediate-launch notice */}
+      {showImmediateNotice && (
+        <div
+          className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-xs"
+          style={{
+            background: isDark ? 'rgba(66,133,244,0.10)' : 'rgba(66,133,244,0.07)',
+            border: '1px solid rgba(66,133,244,0.28)',
+            color: isDark ? '#93C5FD' : '#1D6FCC',
+          }}
+        >
+          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            <span className="font-bold">No start date selected — </span>
+            this campaign will go live immediately after it is approved. Set a start date to schedule it for a specific day.
+          </p>
+        </div>
+      )}
+
+      {/* Daily budget: both dates missing → helper text */}
+      {isDaily && (!state.startDate || !state.endDate) && (
+        <p className="text-xs" style={{ color: '#FF9F1C' }}>
+          Both Start Date and End Date are required for daily budget campaigns.
+        </p>
+      )}
+
       <div>
         <Label isDark={isDark}>Time Zone</Label>
         <Select isDark={isDark} value={state.timezone} onChange={e => update('timezone', e.target.value)}>
@@ -1586,7 +1633,7 @@ function LaunchModal({ state, onConfirm, onClose, isDark, campaignId }: {
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 340, damping: 24 }}
-            className="text-center py-6 space-y-3"
+            className="text-center py-4 space-y-4"
           >
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
@@ -1596,12 +1643,28 @@ function LaunchModal({ state, onConfirm, onClose, isDark, campaignId }: {
             >
               <CheckCircle2 size={32} style={{ color: '#7DBB91' }} />
             </motion.div>
-            <h3 className="text-xl font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A', fontFamily: 'var(--font-poppins), sans-serif' }}>
-              Campaign Launched! 🎉
-            </h3>
-            <p className="text-sm" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
-              Your campaign is now live and will start delivering impressions.
-            </p>
+            <div className="space-y-1">
+              <h3 className="text-xl font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A', fontFamily: 'var(--font-poppins), sans-serif' }}>
+                Campaign Created Successfully!
+              </h3>
+              <p className="text-sm" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
+                Your payment has been received.
+              </p>
+            </div>
+            <div
+              className="rounded-2xl px-4 py-3.5 text-left space-y-2"
+              style={{ background: isDark ? 'rgba(245,197,24,0.08)' : 'rgba(245,197,24,0.07)', border: '1px solid rgba(245,197,24,0.28)' }}
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,197,24,0.20)' }}>
+                  <AlertCircle size={13} style={{ color: '#F5C518' }} />
+                </div>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#F5C518' }}>Under Review</p>
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: isDark ? '#D4D4D8' : '#3F3F46' }}>
+                Your campaign has been submitted for review. It typically takes up to <span className="font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>24 hours</span> to complete the review process and begin delivering results.
+              </p>
+            </div>
           </motion.div>
         )}
       </motion.div>
@@ -1656,6 +1719,11 @@ export function BoostPage({ username }: { username: string }) {
   const handleLaunch = async () => {
     if (!campaign.campaignName.trim()) { setSaveError('Please enter a campaign name'); return }
     if (!campaign.objective) { setSaveError('Please select a campaign objective'); return }
+
+    if (campaign.budgetType === 'daily') {
+      if (!campaign.startDate) { setSaveError('A Start Date is required for Daily Budget campaigns.'); return }
+      if (!campaign.endDate)   { setSaveError('An End Date is required for Daily Budget campaigns.'); return }
+    }
 
     setSavingDraft(true)
     setSaveError('')

@@ -4,6 +4,7 @@ export type S3Folder =
   | "profiles/display_picture"
   | "profiles/background_picture"
   | "messages"
+  | "campaigns"
 
 export const uploadToS3 = async (
   file: File | Blob,

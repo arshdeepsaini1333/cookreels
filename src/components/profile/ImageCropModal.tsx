@@ -203,7 +203,7 @@ export function ImageCropModal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={uploading ? undefined : onClose}
-            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-sm"
+            className="fixed inset-0 z-[150] bg-black/75 backdrop-blur-sm"
           />
 
           {/* Modal shell */}
@@ -213,7 +213,7 @@ export function ImageCropModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 24 }}
             transition={{ type: 'spring', stiffness: 340, damping: 32 }}
-            className="fixed inset-0 z-[101] flex items-center justify-center p-4"
+            className="fixed inset-0 z-[151] flex items-center justify-center p-4"
             style={{ pointerEvents: 'none' }}
           >
             <div

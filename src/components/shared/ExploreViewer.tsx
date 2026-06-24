@@ -483,6 +483,7 @@ export function ExploreViewer({
   const [shareOpen,    setShareOpen]    = useState(false)
   const commentInputRef = useRef<HTMLDivElement>(null)
   const touchStart      = useRef<{ x: number; y: number } | null>(null)
+  const origUrlRef      = useRef('')
 
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
 
@@ -518,6 +519,23 @@ export function ExploreViewer({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  // Save the page URL on open so it can be restored when the modal closes.
+  useEffect(() => {
+    if (isOpen) {
+      origUrlRef.current = window.location.pathname + window.location.search
+    } else {
+      window.history.replaceState(null, '', origUrlRef.current || window.location.pathname)
+    }
+  }, [isOpen])
+
+  // Keep URL in sync with the active item for shareable deep-links.
+  // replaceState is intentional — modal navigation should not pollute history.
+  useEffect(() => {
+    if (!isOpen || !item) return
+    const param = item.type === 'recipe' ? `recipeId=${item.data.id}` : `reelId=${item.data.id}`
+    window.history.replaceState(null, '', `${window.location.pathname}?${param}`)
+  }, [isOpen, index]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Navigation ──────────────────────────────────────────────────────────────
 

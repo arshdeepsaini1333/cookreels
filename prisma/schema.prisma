@@ -58,6 +58,12 @@ enum MessageStatus {
   READ
 }
 
+enum ConvStatus {
+  OPEN
+  PENDING
+  DECLINED
+}
+
 enum CampaignStatus {
   DRAFT
   PENDING_PAYMENT
@@ -584,6 +590,11 @@ model Conversation {
   hiddenForUser2   Boolean   @default(false)
   clearedByUser1At DateTime?
   clearedByUser2At DateTime?
+
+  status        ConvStatus @default(OPEN)
+  requestedById String?
+  acceptedAt    DateTime?
+  declinedAt    DateTime?
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

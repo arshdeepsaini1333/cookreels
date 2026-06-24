@@ -5,14 +5,12 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
-  Play, Heart, Star, Clock, Bookmark, ArrowRight,
+  Play, Heart, Star, Clock, ArrowRight,
   ChefHat, Flame, Quote, Plus, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
 import { AddContentModal } from '@/components/shared/AddContentModal'
-import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
-import type { ProfileRecipe, ProfileUser } from '@/components/profile/ProfilePage'
 
 /* ─── Types ───────────────────────────────────────────────── */
 
@@ -599,7 +597,7 @@ function TrendingReels() {
                 transition={{ type: 'spring', stiffness: 340, damping: 26 }}
                 onClick={() => {
                   if (isReal) {
-                    router.push(`/reels?reelId=${(reel as TrendingReelItem).id}`)
+                    router.push(`/reel/${(reel as TrendingReelItem).id}`)
                   } else {
                     router.push('/reels')
                   }
@@ -722,6 +720,7 @@ function RecommendedSection({
   currentUserAvatar?: string | null
   currentUserId?: string
 }) {
+  const router = useRouter()
   const ref = useRef<HTMLDivElement>(null)
   const inView = useInView(ref, { once: true, margin: '-60px' })
   const { theme } = useTheme()
@@ -729,53 +728,13 @@ function RecommendedSection({
 
   const [recipes, setRecipes] = useState<RecommendedRecipe[]>([])
   const [loading, setLoading] = useState(true)
-  const [saved, setSaved] = useState<Set<string>>(new Set())
-
-  const [modalOpen, setModalOpen] = useState(false)
-  const [modalIndex, setModalIndex] = useState(0)
-  const [allProfileRecipes, setAllProfileRecipes] = useState<ProfileRecipe[]>([])
-  const [allProfileUsers, setAllProfileUsers] = useState<ProfileUser[]>([])
-
-  const toProfileRecipe = (r: RecommendedRecipe): ProfileRecipe => ({
-    id: r.id,
-    title: r.title,
-    coverImage: r.coverImage,
-    cookTime: r.cookTime,
-    prepTime: r.prepTime,
-    likeCount: r.likeCount,
-    difficulty: r.difficulty,
-    description: r.description,
-    servings: r.servings,
-    createdAt: r.createdAt,
-  })
-
-  const toProfileUser = (r: RecommendedRecipe): ProfileUser => ({
-    id: r.user.id,
-    name: `${r.user.firstName} ${r.user.lastName}`.trim(),
-    username: r.user.username,
-    bio: null,
-    verified: r.user.isVerified,
-    isOnline: false,
-    topChef: false,
-    level: 'home',
-    avatar: r.user.profileImage,
-    cuisineSpecialty: null,
-  })
-
-  const openRecipe = (index: number) => {
-    setModalIndex(index)
-    setModalOpen(true)
-  }
 
   useEffect(() => {
     fetch('/api/recipes/recommended')
       .then(r => r.json())
       .then(data => {
         if (Array.isArray(data.recipes)) {
-          const shuffled = shuffleArray(data.recipes) as RecommendedRecipe[]
-          setRecipes(shuffled)
-          setAllProfileRecipes(shuffled.map(toProfileRecipe))
-          setAllProfileUsers(shuffled.map(toProfileUser))
+          setRecipes(shuffleArray(data.recipes) as RecommendedRecipe[])
         }
       })
       .catch(() => {})
@@ -824,7 +783,7 @@ function RecommendedSection({
                 whileHover={{ y: -7 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 26 }}
                 className="group rounded-[24px] overflow-hidden cursor-pointer transition-shadow duration-300"
-                onClick={() => openRecipe(i)}
+                onClick={() => router.push(`/recipe/${recipe.id}`)}
                 style={{
                   background: isDark ? '#2B2B2D' : '#FFFFFF',
                   border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
@@ -866,26 +825,6 @@ function RecommendedSection({
                     </span>
                   </div>
 
-                  {/* Save */}
-                  <motion.button
-                    whileTap={{ scale: 0.86 }}
-                    onClick={e => {
-                      e.stopPropagation()
-                      setSaved(prev => {
-                        const next = new Set(prev)
-                        next.has(recipe.id) ? next.delete(recipe.id) : next.add(recipe.id)
-                        return next
-                      })
-                    }}
-                    className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-md transition-all duration-200"
-                    style={saved.has(recipe.id)
-                      ? { background: '#7DBB91', boxShadow: '0 4px 12px rgba(125,187,145,0.40)' }
-                      : { background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.35)' }
-                    }
-                  >
-                    <Bookmark size={15} className="text-white" fill={saved.has(recipe.id) ? 'currentColor' : 'none'} />
-                  </motion.button>
-
                   {/* Time */}
                   {timeStr !== '—' && (
                     <div className="absolute bottom-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/45 backdrop-blur-sm">
@@ -923,39 +862,16 @@ function RecommendedSection({
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between mt-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-5 h-5 rounded-full flex items-center justify-center"
-                        style={{ background: 'linear-gradient(135deg, #F5C518 0%, #FFB800 100%)' }}
-                      >
-                        <ChefHat size={11} className="text-[#1A1A1A]" />
-                      </div>
-                      <span className="text-xs font-medium" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
-                        {recipe.user.username}
-                      </span>
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={e => { e.stopPropagation(); openRecipe(i) }}
-                      className="text-[10px] font-bold px-3 py-1.5 rounded-xl border transition-all duration-200"
-                      style={{ color: '#F5C518', borderColor: 'rgba(245,197,24,0.28)', background: 'rgba(245,197,24,0.09)' }}
-                      onMouseEnter={e => {
-                        const el = e.currentTarget as HTMLButtonElement
-                        el.style.background = '#F5C518'
-                        el.style.borderColor = '#F5C518'
-                        el.style.color = '#1A1A1A'
-                      }}
-                      onMouseLeave={e => {
-                        const el = e.currentTarget as HTMLButtonElement
-                        el.style.background = 'rgba(245,197,24,0.09)'
-                        el.style.borderColor = 'rgba(245,197,24,0.28)'
-                        el.style.color = '#F5C518'
-                      }}
+                  <div className="flex items-center gap-2 mt-3">
+                    <div
+                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, #F5C518 0%, #FFB800 100%)' }}
                     >
-                      View Recipe
-                    </motion.button>
+                      <ChefHat size={11} className="text-[#1A1A1A]" />
+                    </div>
+                    <span className="text-xs font-medium" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
+                      {recipe.user.username}
+                    </span>
                   </div>
                 </div>
               </motion.article>
@@ -964,19 +880,6 @@ function RecommendedSection({
         </div>
       )}
 
-      {modalOpen && allProfileRecipes.length > 0 && allProfileUsers.length > 0 && (
-        <RecipeViewerModal
-          recipes={allProfileRecipes}
-          initialIndex={modalIndex}
-          user={allProfileUsers[0]}
-          users={allProfileUsers}
-          isOpen={modalOpen}
-          onClose={() => setModalOpen(false)}
-          currentUserAvatar={currentUserAvatar}
-          currentUserName={currentUserName}
-          currentUserId={currentUserId}
-        />
-      )}
     </motion.section>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -8,8 +8,9 @@ import { useTheme } from '@/context/ThemeContext'
 import {
   ArrowLeft, Plus, Megaphone, Search, FileText, CheckCircle2, Clock,
   XCircle, Eye, MousePointer, DollarSign, Zap, Target, MoreHorizontal,
-  PenLine, Copy, Pause, Trash2, Play, Filter, TrendingUp,
+  PenLine, Pause, Trash2, Play, Filter, TrendingUp,
 } from 'lucide-react'
+import CampaignDetailModal from './CampaignDetailModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ interface Campaign {
   id: string
   name: string
   platform: string
-  status: 'active' | 'pending' | 'draft' | 'completed' | 'rejected'
+  status: 'active' | 'pending' | 'draft' | 'paused' | 'completed' | 'rejected'
   budget: number
   impressions: number
   clicks: number
@@ -34,7 +35,7 @@ interface BoostStats {
   campaigns: Campaign[]
 }
 
-type StatusFilter = 'all' | 'active' | 'pending' | 'draft' | 'completed' | 'rejected'
+type StatusFilter = 'all' | 'active' | 'pending' | 'draft' | 'paused' | 'completed' | 'rejected'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,9 +52,10 @@ function formatINR(n: number): string {
 }
 
 const STATUS_CFG: Record<Campaign['status'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  active:    { label: 'Active',         color: '#7DBB91', bg: 'rgba(125,187,145,0.15)', icon: CheckCircle2 },
+  active:    { label: 'Live',           color: '#7DBB91', bg: 'rgba(125,187,145,0.15)', icon: CheckCircle2 },
   pending:   { label: 'Pending Review', color: '#F5C518', bg: 'rgba(245,197,24,0.15)',  icon: Clock },
   draft:     { label: 'Draft',          color: '#A1A1AA', bg: 'rgba(161,161,170,0.15)', icon: FileText },
+  paused:    { label: 'Paused',         color: '#FF9F1C', bg: 'rgba(255,159,28,0.15)',  icon: Pause },
   completed: { label: 'Completed',      color: '#4285F4', bg: 'rgba(66,133,244,0.15)',  icon: CheckCircle2 },
   rejected:  { label: 'Rejected',       color: '#FF6B6B', bg: 'rgba(255,107,107,0.15)', icon: XCircle },
 }
@@ -62,13 +64,18 @@ const PLATFORM_COLORS: Record<string, string> = {
   cookreels: '#F5C518', meta: '#E1306C', google: '#4285F4', geofencing: '#7DBB91',
 }
 
+const PLATFORM_LABELS: Record<string, string> = {
+  cookreels: 'CookReels', meta: 'Meta', google: 'Google', geofencing: 'Geofencing',
+}
+
 const TABS: { id: StatusFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'active', label: 'Active' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'draft', label: 'Draft' },
+  { id: 'all',       label: 'All' },
+  { id: 'active',    label: 'Live' },
+  { id: 'pending',   label: 'Pending' },
+  { id: 'draft',     label: 'Draft' },
+  { id: 'paused',    label: 'Paused' },
   { id: 'completed', label: 'Completed' },
-  { id: 'rejected', label: 'Rejected' },
+  { id: 'rejected',  label: 'Rejected' },
 ]
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
@@ -82,76 +89,178 @@ function Shimmer({ isDark }: { isDark: boolean }) {
   )
 }
 
+// ─── Delete Confirm Inline ────────────────────────────────────────────────────
+
+function DeleteConfirm({ isDark, onConfirm, onCancel }: {
+  isDark: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.92, y: -4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.92, y: -4 }}
+      transition={{ duration: 0.14 }}
+      className="absolute right-0 top-8 z-20 w-52 rounded-xl p-3 shadow-2xl"
+      style={{
+        background: isDark ? '#2B2B2D' : '#fff',
+        border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
+      }}
+    >
+      <p className="text-xs font-semibold mb-2.5" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
+        Delete this campaign?
+      </p>
+      <p className="text-[11px] mb-3" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+        This action cannot be undone.
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+          style={{
+            background: isDark ? 'rgba(52,52,56,0.80)' : '#F5F5F5',
+            color: isDark ? '#A1A1AA' : '#666',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold"
+          style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B' }}
+        >
+          Delete
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 // ─── Campaign Row ─────────────────────────────────────────────────────────────
 
-function CampaignRow({ c, isDark }: { c: Campaign; isDark: boolean }) {
-  const [menuOpen, setMenuOpen] = useState(false)
+function CampaignRow({ c, isDark, onRefresh, onOpen }: {
+  c: Campaign; isDark: boolean; onRefresh: () => void
+  onOpen: (id: string, editMode?: boolean) => void
+}) {
+  const [menuOpen, setMenuOpen]       = useState(false)
+  const [confirming, setConfirming]   = useState(false)
+  const [acting, setActing]           = useState(false)
+
   const cfg = STATUS_CFG[c.status]
   const StatusIcon = cfg.icon
   const pColor = PLATFORM_COLORS[c.platform] ?? '#F5C518'
   const ctr = c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) : '0.00'
 
+  const doStatusAction = async (action: 'pause' | 'resume') => {
+    setMenuOpen(false)
+    setActing(true)
+    await fetch(`/api/campaigns/${c.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    setActing(false)
+    onRefresh()
+  }
+
+  const doDelete = async () => {
+    setConfirming(false)
+    setActing(true)
+    await fetch(`/api/campaigns/${c.id}`, { method: 'DELETE' })
+    setActing(false)
+    onRefresh()
+  }
+
+  const menuItems = [
+    { icon: Eye,    label: 'View', onClick: () => { setMenuOpen(false); onOpen(c.id) } },
+    ...(c.status === 'draft' || c.status === 'paused'
+      ? [{ icon: PenLine, label: 'Edit', onClick: () => { setMenuOpen(false); onOpen(c.id, true) } }]
+      : []),
+    ...(c.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),
+    ...(c.status === 'paused' ? [{ icon: Play,  label: 'Resume', onClick: () => doStatusAction('resume') }] : []),
+    { icon: Trash2, label: 'Delete', onClick: () => { setMenuOpen(false); setConfirming(true) }, danger: true },
+  ]
+
+  const platformLabel = PLATFORM_LABELS[c.platform] ?? c.platform
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative group px-4 py-3.5 rounded-xl transition-colors"
-      style={{ border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
+      className="relative group px-4 py-3 rounded-xl transition-colors"
+      style={{
+        border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}`,
+        opacity: acting ? 0.6 : 1,
+        pointerEvents: acting ? 'none' : 'auto',
+      }}
       onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.35)' : 'rgba(245,197,24,0.03)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      <div className="flex items-center gap-3">
-        {/* Platform dot */}
-        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: pColor }} />
+      <div className="flex items-center">
 
-        {/* Name */}
-        <div className="flex-1 min-w-0">
+        {/* Campaign — flex-1, matches header */}
+        <div className="flex-1 min-w-0 pr-3">
           <p className="text-sm font-semibold truncate" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
             {c.name}
           </p>
-          <p className="text-[11px] capitalize mt-0.5" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-            {c.platform} · {new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          <p className="text-[11px] mt-0.5" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+            {new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
 
-        {/* Status */}
-        <span
-          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold flex-shrink-0"
-          style={{ background: cfg.bg, color: cfg.color }}
-        >
-          <StatusIcon size={10} strokeWidth={2.5} />
-          {cfg.label}
-        </span>
-
-        {/* Stats */}
-        <div className="hidden lg:flex items-center gap-5 text-xs flex-shrink-0">
-          <div className="text-right">
-            <p className="font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatNum(c.impressions)}</p>
-            <p style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>Impr.</p>
-          </div>
-          <div className="text-right">
-            <p className="font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatNum(c.clicks)}</p>
-            <p style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>Clicks</p>
-          </div>
-          <div className="text-right">
-            <p className="font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{ctr}%</p>
-            <p style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>CTR</p>
-          </div>
-          <div className="text-right">
-            <p className="font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatINR(c.budget)}</p>
-            <p style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>Budget</p>
-          </div>
+        {/* Platform — w-28, matches header */}
+        <div className="hidden lg:flex w-28 justify-start flex-shrink-0">
+          <span
+            className="text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+            style={{ background: `${pColor}20`, color: pColor, border: `1px solid ${pColor}35` }}
+          >
+            {platformLabel}
+          </span>
         </div>
 
-        {/* Actions */}
-        <div className="relative flex-shrink-0">
+        {/* Status — w-36, matches header */}
+        <div className="hidden sm:flex w-36 justify-center flex-shrink-0">
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+            style={{ background: cfg.bg, color: cfg.color }}
+          >
+            <StatusIcon size={10} strokeWidth={2.5} />
+            {cfg.label}
+          </span>
+        </div>
+
+        {/* Impr. — w-20, matches header */}
+        <div className="hidden lg:block w-20 text-right flex-shrink-0">
+          <p className="text-sm font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatNum(c.impressions)}</p>
+        </div>
+
+        {/* Clicks — w-20, matches header */}
+        <div className="hidden lg:block w-20 text-right flex-shrink-0">
+          <p className="text-sm font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatNum(c.clicks)}</p>
+        </div>
+
+        {/* CTR — w-16, matches header */}
+        <div className="hidden lg:block w-16 text-right flex-shrink-0">
+          <p className="text-sm font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{ctr}%</p>
+        </div>
+
+        {/* Budget — w-20, matches header */}
+        <div className="hidden lg:block w-20 text-right flex-shrink-0 pr-1">
+          <p className="text-sm font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{formatINR(c.budget)}</p>
+        </div>
+
+        {/* Actions — w-8, matches header spacer */}
+        <div className="relative w-8 flex-shrink-0 flex justify-center">
           <button
-            onClick={() => setMenuOpen(o => !o)}
+            onClick={() => { setMenuOpen(o => !o); setConfirming(false) }}
             className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
             style={{ color: isDark ? '#71717A' : '#9CA3AF' }}
           >
             <MoreHorizontal size={15} />
           </button>
+
           <AnimatePresence>
             {menuOpen && (
               <>
@@ -168,34 +277,32 @@ function CampaignRow({ c, isDark }: { c: Campaign; isDark: boolean }) {
                     boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
                   }}
                 >
-                  {[
-                    { icon: Eye,     label: 'View',      href: `/boost/create?id=${c.id}` },
-                    { icon: PenLine, label: 'Edit',      href: `/boost/create?id=${c.id}&edit=true` },
-                    { icon: Copy,    label: 'Duplicate', onClick: () => setMenuOpen(false) },
-                    { icon: c.status === 'active' ? Pause : Play, label: c.status === 'active' ? 'Pause' : 'Resume', onClick: () => setMenuOpen(false) },
-                    { icon: Trash2,  label: 'Delete',    onClick: () => setMenuOpen(false), danger: true },
-                  ].map(action => (
-                    action.href ? (
-                      <Link key={action.label} href={action.href} onClick={() => setMenuOpen(false)}
-                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors"
-                        style={{ color: isDark ? '#A1A1AA' : '#666' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#F9FAFB')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <action.icon size={13} />{action.label}
-                      </Link>
-                    ) : (
-                      <button key={action.label} onClick={action.onClick}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors"
-                        style={{ color: (action as { danger?: boolean }).danger ? '#FF6B6B' : (isDark ? '#A1A1AA' : '#666') }}
-                        onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#F9FAFB')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <action.icon size={13} />{action.label}
-                      </button>
-                    )
+                  {menuItems.map(action => (
+                    <button key={action.label} onClick={(action as { onClick?: () => void }).onClick}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors"
+                      style={{ color: (action as { danger?: boolean }).danger ? '#FF6B6B' : (isDark ? '#A1A1AA' : '#666') }}
+                      onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#F9FAFB')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <action.icon size={13} />{action.label}
+                    </button>
                   ))}
                 </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {confirming && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setConfirming(false)} />
+                <div className="z-20">
+                  <DeleteConfirm
+                    isDark={isDark}
+                    onConfirm={doDelete}
+                    onCancel={() => setConfirming(false)}
+                  />
+                </div>
               </>
             )}
           </AnimatePresence>
@@ -251,17 +358,30 @@ export default function BoostCampaignsPage() {
   const isDark = theme === 'dark'
   const router = useRouter()
 
-  const [stats, setStats] = useState<BoostStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<StatusFilter>('all')
-  const [search, setSearch] = useState('')
+  const [stats, setStats]       = useState<BoostStats | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [tab, setTab]           = useState<StatusFilter>('all')
+  const [search, setSearch]     = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const [modalId, setModalId]         = useState<string | null>(null)
+  const [modalEditMode, setModalEditMode] = useState(false)
+
+  const openModal = (id: string, editMode = false) => {
+    setModalId(id)
+    setModalEditMode(editMode)
+  }
+  const closeModal = () => setModalId(null)
+
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
   useEffect(() => {
+    setLoading(true)
     fetch('/api/boost/stats')
       .then(r => r.json())
       .then((d: BoostStats) => { setStats(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [refreshKey])
 
   const cardStyle: React.CSSProperties = {
     background: isDark ? 'rgba(43,43,45,0.60)' : 'rgba(255,255,255,0.85)',
@@ -273,18 +393,18 @@ export default function BoostCampaignsPage() {
   }
 
   const allCampaigns = stats?.campaigns ?? []
-  const tabFiltered = tab === 'all' ? allCampaigns : allCampaigns.filter(c => c.status === tab)
-  const filtered = search.trim()
+  const tabFiltered  = tab === 'all' ? allCampaigns : allCampaigns.filter(c => c.status === tab)
+  const filtered     = search.trim()
     ? tabFiltered.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.platform.toLowerCase().includes(search.toLowerCase()))
     : tabFiltered
 
   const statCards = [
-    { label: 'Total Campaigns', value: String(allCampaigns.length), icon: Megaphone, color: '#F5C518' },
-    { label: 'Active', value: String(stats?.activeCampaigns ?? 0), icon: Zap, color: '#7DBB91' },
-    { label: 'Total Impressions', value: formatNum(stats?.totalImpressions ?? 0), icon: Eye, color: '#4285F4' },
-    { label: 'Total Clicks', value: formatNum(stats?.totalClicks ?? 0), icon: MousePointer, color: '#7DBB91' },
-    { label: 'Total Spend', value: formatINR(stats?.totalSpend ?? 0), icon: DollarSign, color: '#FF9F1C' },
-    { label: 'Total Leads', value: formatNum(stats?.totalLeads ?? 0), icon: Target, color: '#E1306C' },
+    { label: 'Total Campaigns',   value: String(allCampaigns.length),              icon: Megaphone,      color: '#F5C518' },
+    { label: 'Live',              value: String(stats?.activeCampaigns ?? 0),       icon: Zap,            color: '#7DBB91' },
+    { label: 'Total Impressions', value: formatNum(stats?.totalImpressions ?? 0),   icon: Eye,            color: '#4285F4' },
+    { label: 'Total Clicks',      value: formatNum(stats?.totalClicks ?? 0),        icon: MousePointer,   color: '#7DBB91' },
+    { label: 'Total Spend',       value: formatINR(stats?.totalSpend ?? 0),         icon: DollarSign,     color: '#FF9F1C' },
+    { label: 'Total Leads',       value: formatNum(stats?.totalLeads ?? 0),         icon: Target,         color: '#E1306C' },
   ]
 
   return (
@@ -360,7 +480,7 @@ export default function BoostCampaignsPage() {
 
       {/* Campaign list card */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.2 }}
-        className="rounded-2xl overflow-hidden" style={cardStyle}
+        className="rounded-2xl" style={cardStyle}
       >
         {/* Top bar: search + filter */}
         <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}>
@@ -421,24 +541,32 @@ export default function BoostCampaignsPage() {
             </div>
           ) : filtered.length > 0 ? (
             <div className="space-y-1.5">
-              {/* Column headers */}
-              <div className="hidden lg:flex items-center px-4 pb-1 text-[10px] font-bold uppercase tracking-wider"
+              {/* Column headers — widths must mirror CampaignRow exactly */}
+              <div className="hidden lg:flex items-center px-4 pb-2 text-[10px] font-bold uppercase tracking-wider"
                 style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>
-                <div className="w-2 mr-3" />
                 <div className="flex-1">Campaign</div>
-                <div className="w-28 text-center mr-5">Status</div>
-                <div className="w-16 text-right mr-5">Impr.</div>
-                <div className="w-16 text-right mr-5">Clicks</div>
-                <div className="w-14 text-right mr-5">CTR</div>
-                <div className="w-16 text-right mr-7">Budget</div>
+                <div className="w-28 flex-shrink-0">Platform</div>
+                <div className="w-36 text-center flex-shrink-0">Status</div>
+                <div className="w-20 text-right flex-shrink-0">Impr.</div>
+                <div className="w-20 text-right flex-shrink-0">Clicks</div>
+                <div className="w-16 text-right flex-shrink-0">CTR</div>
+                <div className="w-20 text-right flex-shrink-0 pr-1">Budget</div>
+                <div className="w-8 flex-shrink-0" />
               </div>
-              {filtered.map(c => <CampaignRow key={c.id} c={c} isDark={isDark} />)}
+              {filtered.map(c => <CampaignRow key={c.id} c={c} isDark={isDark} onRefresh={refresh} onOpen={openModal} />)}
             </div>
           ) : (
             <EmptyState isDark={isDark} filtered={search.trim().length > 0 || tab !== 'all'} />
           )}
         </div>
       </motion.div>
+
+      <CampaignDetailModal
+        campaignId={modalId}
+        startInEditMode={modalEditMode}
+        onClose={closeModal}
+        onRefresh={refresh}
+      />
     </div>
   )
 }

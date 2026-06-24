@@ -75,26 +75,13 @@ export async function POST(req: Request) {
       })
 
       if (payment.campaignId) {
-        const now = new Date()
-
-        // Activate campaign and link payment
-        const campaign = await tx.campaign.update({
-          where: { id: payment.campaignId },
-          data: {
-            status:    'ACTIVE',
-            paymentId: paymentId,
-            startDate: now,
-          },
-          select: { durationDays: true, startDate: true },
-        })
-
-        // Set endDate based on durationDays
-        const endDate = new Date(now)
-        endDate.setDate(endDate.getDate() + campaign.durationDays)
-
+        // Move to pending review — admin/cron approves to go ACTIVE
         await tx.campaign.update({
           where: { id: payment.campaignId },
-          data:  { endDate },
+          data: {
+            status:    'PENDING_PAYMENT',
+            paymentId: paymentId,
+          },
         })
 
         // Seed initial analytics row

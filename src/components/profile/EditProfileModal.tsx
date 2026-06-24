@@ -1,17 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, User, FileText, ChefHat, Loader2, AlertCircle } from 'lucide-react'
+import { X, User, FileText, ChefHat, Loader2, AlertCircle, Camera } from 'lucide-react'
+import { ImageCropModal, validateImageFile } from './ImageCropModal'
 
 interface EditProfileModalProps {
   open: boolean
+  userId: string
   initialName: string
   initialBio: string | null
   initialLevel: string
+  initialCoverUrl?: string | null
+  initialAvatarUrl?: string | null
   onClose: () => void
   onSave: (updated: { name: string; bio: string | null; level: string }) => void
+  onCoverUpdate?: (url: string) => void
+  onAvatarUpdate?: (url: string) => void
 }
 
 const LEVELS = [
@@ -26,11 +32,16 @@ const LEVELS = [
 
 export function EditProfileModal({
   open,
+  userId,
   initialName,
   initialBio,
   initialLevel,
+  initialCoverUrl,
+  initialAvatarUrl,
   onClose,
   onSave,
+  onCoverUpdate,
+  onAvatarUpdate,
 }: EditProfileModalProps) {
   const [mounted, setMounted] = useState(false)
   const [name,    setName]    = useState(initialName)
@@ -39,6 +50,14 @@ export function EditProfileModal({
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState<string | null>(null)
 
+  const [coverUrl,  setCoverUrl]  = useState<string | null>(initialCoverUrl ?? null)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl ?? null)
+  const [cropModal, setCropModal] = useState<{ type: 'avatar' | 'cover'; file: File } | null>(null)
+  const [imgError,  setImgError]  = useState<string | null>(null)
+
+  const coverInputRef  = useRef<HTMLInputElement>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
@@ -46,10 +65,13 @@ export function EditProfileModal({
       setName(initialName)
       setBio(initialBio ?? '')
       setLevel(initialLevel)
+      setCoverUrl(initialCoverUrl ?? null)
+      setAvatarUrl(initialAvatarUrl ?? null)
       setError(null)
+      setImgError(null)
       setSaving(false)
     }
-  }, [open, initialName, initialBio, initialLevel])
+  }, [open, initialName, initialBio, initialLevel, initialCoverUrl, initialAvatarUrl])
 
   const hasChanges =
     name.trim() !== initialName.trim() ||
@@ -57,6 +79,16 @@ export function EditProfileModal({
     level !== initialLevel
 
   const canSave = hasChanges && !saving && name.trim().length > 0
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const err = validateImageFile(file)
+    if (err) { setImgError(err); return }
+    setImgError(null)
+    setCropModal({ type, file })
+  }
 
   const handleSave = async () => {
     if (!canSave) return
@@ -125,7 +157,7 @@ export function EditProfileModal({
               style={{
                 background: 'var(--cr-bg-card)',
                 boxShadow:  '0 24px 80px rgba(0,0,0,0.45)',
-                maxHeight:  'min(92dvh, 640px)',
+                maxHeight:  'min(92dvh, 720px)',
               }}
             >
               {/* Header */}
@@ -149,103 +181,195 @@ export function EditProfileModal({
 
               {/* Scrollable body */}
               <div
-                className="flex-1 overflow-y-auto px-6 py-5 space-y-5 edit-profile-scroll"
+                className="flex-1 overflow-y-auto edit-profile-scroll"
                 style={{ overscrollBehavior: 'contain' }}
               >
-                {/* Error banner */}
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
-                    >
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Name */}
-                <div>
-                  <label
-                    className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2"
-                    style={{ color: 'var(--cr-text-muted)' }}
+                {/* ── BANNER SECTION ─────────────────────────────── */}
+                <div className="relative">
+                  {/* Banner */}
+                  <div
+                    className="w-full h-28 overflow-hidden relative cursor-pointer group"
+                    onClick={() => coverInputRef.current?.click()}
+                    style={!coverUrl ? { background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' } : undefined}
+                    title="Change banner"
                   >
-                    <User className="w-3.5 h-3.5" /> Name
-                  </label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Your full name"
-                    maxLength={60}
-                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all border"
-                    style={{
-                      background:  'var(--cr-bg-surface)',
-                      color:       'var(--cr-text-1)',
-                      borderColor: 'var(--cr-border)',
-                    }}
-                  />
-                </div>
+                    {coverUrl && (
+                      <img
+                        src={coverUrl}
+                        alt="Banner"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
+                    {!coverUrl && (
+                      <div className="absolute inset-0 pointer-events-none select-none" aria-hidden>
+                        <span className="absolute top-2 right-6 text-3xl opacity-25">🍳</span>
+                        <span className="absolute bottom-2 left-8 text-2xl opacity-20">🌶️</span>
+                        <span className="absolute top-3 left-1/3 text-2xl opacity-15">🍜</span>
+                      </div>
+                    )}
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-semibold">
+                        <Camera className="w-3.5 h-3.5" /> Change Banner
+                      </div>
+                    </div>
+                    {/* Always-visible edit hint in corner */}
+                    <div className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                      <Camera className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  </div>
 
-                {/* Bio */}
-                <div>
-                  <label
-                    className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2"
-                    style={{ color: 'var(--cr-text-muted)' }}
-                  >
-                    <FileText className="w-3.5 h-3.5" /> Bio
-                  </label>
-                  <textarea
-                    value={bio}
-                    onChange={e => setBio(e.target.value)}
-                    placeholder="Write something about yourself…"
-                    maxLength={200}
-                    rows={3}
-                    className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all border resize-none"
-                    style={{
-                      background:  'var(--cr-bg-surface)',
-                      color:       'var(--cr-text-1)',
-                      borderColor: 'var(--cr-border)',
-                    }}
-                  />
-                  <p className="mt-1 text-right text-xs" style={{ color: 'var(--cr-text-muted)' }}>
-                    {bio.length}/200
-                  </p>
-                </div>
-
-                {/* Chef Level */}
-                <div>
-                  <label
-                    className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-3"
-                    style={{ color: 'var(--cr-text-muted)' }}
-                  >
-                    <ChefHat className="w-3.5 h-3.5" /> Chef Level
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {LEVELS.map(({ emoji, label }) => {
-                      const selected = level === label
-                      return (
-                        <motion.button
-                          key={label}
-                          type="button"
-                          onClick={() => setLevel(label)}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
-                          style={
-                            selected
-                              ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', borderColor: 'transparent', boxShadow: '0 2px 12px rgba(245,197,24,0.35)' }
-                              : { background: 'var(--cr-bg-surface)', color: 'var(--cr-text-2)', borderColor: 'var(--cr-border)' }
-                          }
+                  {/* Avatar overlapping banner */}
+                  <div className="px-5 -mt-9 mb-2 flex items-end gap-3">
+                    <div className="relative shrink-0">
+                      <div
+                        className="w-16 h-16 rounded-full p-[2.5px] shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #F5C518, #FF9F1C, #F5C518)' }}
+                      >
+                        <div
+                          className="w-full h-full rounded-full overflow-hidden"
+                          style={{ border: '2.5px solid var(--cr-bg-card)' }}
                         >
-                          {emoji} {label}
-                        </motion.button>
-                      )
-                    })}
+                          {avatarUrl ? (
+                            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div
+                              className="w-full h-full flex items-center justify-center text-lg font-bold"
+                              style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                            >
+                              {name.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?'}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => avatarInputRef.current?.click()}
+                        className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full flex items-center justify-center border-2 hover:scale-110 transition-transform shadow"
+                        style={{ background: 'var(--cr-accent)', borderColor: 'var(--cr-bg-card)', color: '#1A1A1A' }}
+                        title="Change profile photo"
+                      >
+                        <Camera className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <p className="text-xs font-medium mb-2" style={{ color: 'var(--cr-text-muted)' }}>
+                      Tap to change photo
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-6 pb-5 space-y-5">
+                  {/* Image error */}
+                  <AnimatePresence>
+                    {imgError && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium"
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                      >
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {imgError}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Error banner */}
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium"
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+                      >
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {error}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Name */}
+                  <div>
+                    <label
+                      className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      <User className="w-3.5 h-3.5" /> Name
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="Your full name"
+                      maxLength={60}
+                      className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all border"
+                      style={{
+                        background:  'var(--cr-bg-surface)',
+                        color:       'var(--cr-text-1)',
+                        borderColor: 'var(--cr-border)',
+                      }}
+                    />
+                  </div>
+
+                  {/* Bio */}
+                  <div>
+                    <label
+                      className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      <FileText className="w-3.5 h-3.5" /> Bio
+                    </label>
+                    <textarea
+                      value={bio}
+                      onChange={e => setBio(e.target.value)}
+                      placeholder="Write something about yourself…"
+                      maxLength={200}
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-xl text-sm font-medium outline-none transition-all border resize-none"
+                      style={{
+                        background:  'var(--cr-bg-surface)',
+                        color:       'var(--cr-text-1)',
+                        borderColor: 'var(--cr-border)',
+                      }}
+                    />
+                    <p className="mt-1 text-right text-xs" style={{ color: 'var(--cr-text-muted)' }}>
+                      {bio.length}/200
+                    </p>
+                  </div>
+
+                  {/* Chef Level */}
+                  <div>
+                    <label
+                      className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-3"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      <ChefHat className="w-3.5 h-3.5" /> Chef Level
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {LEVELS.map(({ emoji, label }) => {
+                        const selected = level === label
+                        return (
+                          <motion.button
+                            key={label}
+                            type="button"
+                            onClick={() => setLevel(label)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
+                            style={
+                              selected
+                                ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', borderColor: 'transparent', boxShadow: '0 2px 12px rgba(245,197,24,0.35)' }
+                                : { background: 'var(--cr-bg-surface)', color: 'var(--cr-text-2)', borderColor: 'var(--cr-border)' }
+                            }
+                          >
+                            {emoji} {label}
+                          </motion.button>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -285,6 +409,41 @@ export function EditProfileModal({
               </div>
             </div>
           </motion.div>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            className="hidden"
+            onChange={e => handleFileSelect(e, 'cover')}
+          />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            className="hidden"
+            onChange={e => handleFileSelect(e, 'avatar')}
+          />
+
+          {/* Crop modal — z-150/151 so it sits above this modal at z-110/120 */}
+          <ImageCropModal
+            open={cropModal !== null}
+            file={cropModal?.file ?? null}
+            type={cropModal?.type ?? 'avatar'}
+            userId={userId}
+            onClose={() => setCropModal(null)}
+            onSuccess={(url) => {
+              if (cropModal?.type === 'avatar') {
+                setAvatarUrl(url)
+                onAvatarUpdate?.(url)
+              } else {
+                setCoverUrl(url)
+                onCoverUpdate?.(url)
+              }
+              setCropModal(null)
+            }}
+          />
         </>
       )}
     </AnimatePresence>,

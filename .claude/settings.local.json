@@ -61,7 +61,15 @@
       "Bash(xargs grep -l \"Conversation\\\\|Messaging\\\\|MessageStatus\")",
       "Bash(xargs grep -l \"Message\\\\|Conversation\")",
       "Bash(xargs grep -l \"socket\\\\|Socket\\\\|realtime\\\\|polling\")",
-      "Bash(node -e \"const pkg = require\\('./package.json'\\); const deps = {...pkg.dependencies, ...pkg.devDependencies}; const emojiKeys = Object.keys\\(deps\\).filter\\(k => k.includes\\('emoji'\\)\\); console.log\\('Emoji packages:', emojiKeys\\); console.log\\('All deps:', Object.keys\\(deps\\).join\\('\\\\n'\\)\\);\")"
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); const deps = {...pkg.dependencies, ...pkg.devDependencies}; const emojiKeys = Object.keys\\(deps\\).filter\\(k => k.includes\\('emoji'\\)\\); console.log\\('Emoji packages:', emojiKeys\\); console.log\\('All deps:', Object.keys\\(deps\\).join\\('\\\\n'\\)\\);\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "PowerShell(cd d:\\\\cookreels-main; npx tsc --noEmit --project tsconfig.json 2>&1 | Where-Object { $_ -match \"EditProfileModal|ImageCropModal|ProfilePage\" })",
+      "PowerShell(cd d:\\\\cookreels-main; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"CampaignDetailModal|uploadTos3|campaign\\\\.ts\" })",
+      "PowerShell(cd d:\\\\cookreels-main; npx tsc --noEmit 2>&1 | Where-Object { $_ -match \"CampaignDetailModal\" } | Select-Object -First 15)",
+      "PowerShell(cd d:\\\\cookreels-main; npx tsc --noEmit --project tsconfig.json 2>&1 | Out-String | Select-String -Pattern \"BoostPage\" -AllMatches | ForEach-Object { $_.Line })",
+      "PowerShell(cd d:\\\\cookreels-main; $result = npx tsc --noEmit --project tsconfig.json 2>&1; $result | Where-Object { $_ -match \"BoostPage\" })",
+      "Bash(xargs grep -l \"recipe\" -i)",
+      "Bash(mkdir -p \"d:/cookreels-main/src/app/api/messages/conversations/[convId]\")"
     ],
     "additionalDirectories": [
       "e:\\Cookreels\\cookreels-main\\src\\app",
@@ -69,7 +77,8 @@
       "e:\\Cookreels\\cookreels-main\\src\\app\\api\\users\\[username]",
       "e:\\Cookreels\\cookreels-main\\src\\app\\api\\recipes",
       "e:\\Cookreels\\cookreels-main\\src\\app\\api\\messages\\[conversationId]",
-      "e:\\Cookreels\\cookreels-main\\src\\app\\reel"
+      "e:\\Cookreels\\cookreels-main\\src\\app\\reel",
+      "d:\\cookreels-main\\src\\app\\api\\messages\\conversations"
     ]
   }
 }

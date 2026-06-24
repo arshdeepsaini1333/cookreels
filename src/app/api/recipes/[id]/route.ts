@@ -12,12 +12,29 @@ export async function GET(_req: Request, { params }: Params) {
     const recipe = await prisma.recipe.findUnique({
       where: { id },
       select: {
+        id:           true,
+        title:        true,
+        coverImage:   true,
+        cookTime:     true,
+        prepTime:     true,
+        difficulty:   true,
         description:  true,
         servings:     true,
         commentCount: true,
         likeCount:    true,
         createdAt:    true,
-        user: { select: { hideLikeCount: true, blockComments: true } },
+        user: {
+          select: {
+            id:           true,
+            username:     true,
+            firstName:    true,
+            lastName:     true,
+            profileImage: true,
+            isVerified:   true,
+            hideLikeCount: true,
+            blockComments: true,
+          },
+        },
         comments: {
           where:   { parentId: null },
           orderBy: { createdAt: 'asc' },
@@ -43,6 +60,12 @@ export async function GET(_req: Request, { params }: Params) {
       : false
 
     return NextResponse.json({
+      id:            recipe.id,
+      title:         recipe.title,
+      coverImage:    recipe.coverImage,
+      cookTime:      recipe.cookTime,
+      prepTime:      recipe.prepTime,
+      difficulty:    recipe.difficulty,
       description:   recipe.description,
       servings:      recipe.servings,
       commentCount:  recipe.commentCount,
@@ -51,6 +74,14 @@ export async function GET(_req: Request, { params }: Params) {
       blockComments: recipe.user.blockComments,
       liked,
       createdAt:     recipe.createdAt.toISOString(),
+      user: {
+        id:           recipe.user.id,
+        username:     recipe.user.username,
+        firstName:    recipe.user.firstName,
+        lastName:     recipe.user.lastName,
+        profileImage: recipe.user.profileImage,
+        isVerified:   recipe.user.isVerified,
+      },
       comments: recipe.comments.map(c => ({
         id:        c.id,
         username:  c.user.username,

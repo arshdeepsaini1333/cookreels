@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Play, Compass } from 'lucide-react'
 import {
-  ExploreViewer,
   type ExploreItem,
   type ExploreRecipe,
   type ExploreReel,
@@ -342,27 +342,21 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
   currentUserAvatar?: string | null
   currentUserId?: string
 }) {
+  const router = useRouter()
   const [tab, setTab] = useState<Tab>('All')
 
-  // Unified viewer state
-  const [viewerOpen,   setViewerOpen]   = useState(false)
-  const [viewerItems,  setViewerItems]  = useState<ExploreItem[]>([])
-  const [viewerIndex,  setViewerIndex]  = useState(0)
-
-  // Kept in ref so FeedTab's loadMore callback can always read the latest items
-  const feedItemsRef = useRef<ExploreItem[]>([])
-
+  // Navigate to the canonical deep-link URL; Next.js intercepting routes
+  // show the content as a modal while keeping this page in the background.
   const openViewer = useCallback((items: ExploreItem[], idx: number) => {
-    feedItemsRef.current = items
-    setViewerItems(items)
-    setViewerIndex(idx)
-    setViewerOpen(true)
-  }, [])
+    const item = items[idx]
+    if (!item) return
+    if (item.type === 'recipe') router.push(`/recipe/${item.data.id}`)
+    else                        router.push(`/reel/${item.data.id}`)
+  }, [router])
 
-  const handleItemsChange = useCallback((items: ExploreItem[]) => {
-    feedItemsRef.current = items
-    setViewerItems(items)
-  }, [])
+  // No-op: items tracking is no longer needed since we use URL-based navigation.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleItemsChange = useCallback((_items: ExploreItem[]) => {}, [])
 
   const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
@@ -416,17 +410,6 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
         tab={tab}
         onOpen={openViewer}
         onItemsChange={handleItemsChange}
-      />
-
-      {/* Unified viewer */}
-      <ExploreViewer
-        items={viewerItems}
-        initialIndex={viewerIndex}
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        currentUserAvatar={currentUserAvatar}
-        currentUserName={username}
-        currentUserId={currentUserId}
       />
     </div>
   )

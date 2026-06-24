@@ -8,10 +8,12 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { useTheme } from '@/context/ThemeContext'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+
+const UNREAD_POLL = 30_000
 
 const navItems = [
   { icon: Home,          label: 'Home',       href: '/',           },
@@ -69,6 +71,21 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
     window.addEventListener('cr:avatar-updated', handler)
     return () => window.removeEventListener('cr:avatar-updated', handler)
   }, [])
+
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  const fetchUnread = useCallback(() => {
+    fetch('/api/messages/unread-count')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setUnreadMessages(d.count ?? 0) })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetchUnread()
+    const id = setInterval(fetchUnread, UNREAD_POLL)
+    return () => clearInterval(id)
+  }, [fetchUnread])
 
   const avatarSrc  = me?.profileImage ?? null
   const avatarName = me ? `${me.firstName} ${me.lastName}` : username
@@ -288,6 +305,15 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
                     </motion.span>
 
                     <span className="relative text-sm font-semibold">{item.label}</span>
+
+                    {item.label === 'Messages' && unreadMessages > 0 && !isActive && (
+                      <span
+                        className="relative ml-auto min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                        style={{ background: '#F5C518', color: '#1A1A1A' }}
+                      >
+                        {unreadMessages > 99 ? '99+' : unreadMessages}
+                      </span>
+                    )}
 
                     {isActive && (
                       <motion.div

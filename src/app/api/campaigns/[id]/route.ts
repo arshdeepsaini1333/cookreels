@@ -223,13 +223,6 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  if (!['DRAFT', 'CANCELLED', 'REJECTED'].includes(campaign.status)) {
-    return NextResponse.json(
-      { error: 'Only DRAFT, CANCELLED, or REJECTED campaigns can be deleted' },
-      { status: 409 },
-    )
-  }
-
   try {
     await prisma.campaign.delete({ where: { id } })
     return NextResponse.json({ message: 'Campaign deleted' })

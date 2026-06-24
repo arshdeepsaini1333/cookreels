@@ -14,7 +14,6 @@ import { useTheme } from '@/context/ThemeContext'
 import type { ProfileRecipe, ProfileReel, ProfileStats, ProfileUser } from './ProfilePage'
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
-import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -379,7 +378,6 @@ export function PublicProfilePage({
   const isFollowing = followStatus === 'accepted'
   const isPending   = followStatus === 'pending'
   const [socialModal,    setSocialModal]    = useState<SocialListType | null>(null)
-  const [recipeModal,    setRecipeModal]    = useState<number | null>(null)
 
   // Tab content state
   const [recipes,          setRecipes]          = useState<ProfileRecipe[]>(initialRecipes)
@@ -494,12 +492,37 @@ export function PublicProfilePage({
 
   // ── Share profile ────────────────────────────────────────────────────────────
 
+  const [shareCopied,    setShareCopied]    = useState(false)
+  const [messagePending, setMessagePending] = useState(false)
+
+  const handleMessage = useCallback(async () => {
+    if (messagePending) return
+    setMessagePending(true)
+    try {
+      const res = await fetch('/api/messages/conversations', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId: user.id }),
+      })
+      if (!res.ok) return
+      const { conversationId } = await res.json()
+      router.push(`/messages?conv=${conversationId}`)
+    } catch { /* ignore */ }
+    finally { setMessagePending(false) }
+  }, [user.id, router, messagePending])
+
   const handleShare = useCallback(async () => {
     const url = window.location.href
-    if (navigator.share) {
-      await navigator.share({ title: `${user.name} on CookReels`, url })
-    } else {
-      await navigator.clipboard.writeText(url)
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `${user.name} on CookReels`, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        setShareCopied(true)
+        setTimeout(() => setShareCopied(false), 2000)
+      }
+    } catch {
+      // user cancelled share sheet — do nothing
     }
   }, [user.name])
 
@@ -518,11 +541,23 @@ export function PublicProfilePage({
             className="relative w-full h-36 sm:h-52 rounded-2xl overflow-hidden"
             style={{ background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' }}
           >
-            <div className="absolute inset-0 pointer-events-none select-none" aria-hidden>
-              <span className="absolute top-4 right-8 text-5xl sm:text-7xl opacity-25">🍳</span>
-              <span className="absolute bottom-3 left-10 text-3xl sm:text-5xl opacity-20">🌶️</span>
-              <span className="absolute top-5 left-1/3 text-4xl sm:text-6xl opacity-15">🍜</span>
-            </div>
+            {user.backgroundPicture && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.backgroundPicture}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            )}
+            {/* Subtle darkening overlay so text/avatar on top remains readable */}
+            <div className="absolute inset-0 bg-black/25 pointer-events-none" />
+            {!user.backgroundPicture && (
+              <div className="absolute inset-0 pointer-events-none select-none" aria-hidden>
+                <span className="absolute top-4 right-8 text-5xl sm:text-7xl opacity-25">🍳</span>
+                <span className="absolute bottom-3 left-10 text-3xl sm:text-5xl opacity-20">🌶️</span>
+                <span className="absolute top-5 left-1/3 text-4xl sm:text-6xl opacity-15">🍜</span>
+              </div>
+            )}
           </div>
 
           {/* Avatar + action buttons */}
@@ -565,21 +600,31 @@ export function PublicProfilePage({
                 {followBtnLabel}
               </motion.button>
               <motion.button
+                onClick={handleMessage}
+                disabled={messagePending}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors disabled:opacity-60"
                 style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
               >
-                <MessageCircle className="w-3.5 h-3.5" /> Message
+                {messagePending
+                  ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                  : <MessageCircle className="w-3.5 h-3.5" />
+                }
+                Message
               </motion.button>
               <motion.button
                 onClick={handleShare}
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
                 className="w-10 h-10 rounded-full flex items-center justify-center border transition-all"
-                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+                style={{ borderColor: shareCopied ? 'var(--cr-accent)' : 'var(--cr-border)', background: shareCopied ? 'var(--cr-accent-soft)' : 'var(--cr-bg-card)' }}
+                title={shareCopied ? 'Link copied!' : 'Share profile'}
               >
-                <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                {shareCopied
+                  ? <span className="text-[10px] font-bold" style={{ color: 'var(--cr-accent)' }}>✓</span>
+                  : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                }
               </motion.button>
             </div>
           </div>
@@ -652,19 +697,29 @@ export function PublicProfilePage({
               {followBtnLabel}
             </motion.button>
             <motion.button
+              onClick={handleMessage}
+              disabled={messagePending}
               whileTap={{ scale: 0.97 }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold border"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold border disabled:opacity-60"
               style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
             >
-              <MessageCircle className="w-4 h-4" /> Message
+              {messagePending
+                ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                : <MessageCircle className="w-4 h-4" />
+              }
+              Message
             </motion.button>
             <motion.button
               onClick={handleShare}
               whileTap={{ scale: 0.97 }}
               className="w-11 h-11 rounded-full flex items-center justify-center border"
-              style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+              style={{ borderColor: shareCopied ? 'var(--cr-accent)' : 'var(--cr-border)', background: shareCopied ? 'var(--cr-accent-soft)' : 'var(--cr-bg-card)' }}
+              title={shareCopied ? 'Link copied!' : 'Share profile'}
             >
-              <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+              {shareCopied
+                ? <span className="text-[10px] font-bold" style={{ color: 'var(--cr-accent)' }}>✓</span>
+                : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+              }
             </motion.button>
           </div>
         </motion.div>
@@ -779,7 +834,7 @@ export function PublicProfilePage({
                       animate="visible"
                       className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
                     >
-                      {recipes.map((r, i) => <RecipeCard key={r.id} r={r} idx={i} onClick={() => setRecipeModal(i)} />)}
+                      {recipes.map((r, i) => <RecipeCard key={r.id} r={r} idx={i} onClick={() => router.push(`/recipe/${r.id}`)} />)}
                     </motion.div>
                     {hasMoreRecipes && (
                       <LoadMoreButton onClick={loadMoreRecipes} loading={recipesLoading} />
@@ -848,16 +903,6 @@ export function PublicProfilePage({
         username={user.username}
         listType={socialModal ?? 'followers'}
         currentUserId={currentUserId}
-      />
-
-      {/* Recipe viewer modal */}
-      <RecipeViewerModal
-        key={recipeModal ?? 'closed'}
-        recipes={recipes}
-        initialIndex={recipeModal ?? 0}
-        user={user}
-        isOpen={recipeModal !== null}
-        onClose={() => setRecipeModal(null)}
       />
 
     </DashboardLayout>

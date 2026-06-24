@@ -9,10 +9,10 @@ function mapStatus(s: CampaignStatus): BoostCampaignRow['status'] {
     case 'ACTIVE':          return 'active'
     case 'PENDING_PAYMENT': return 'pending'
     case 'DRAFT':           return 'draft'
+    case 'PAUSED':          return 'paused'
     case 'COMPLETED':       return 'completed'
-    case 'REJECTED':        return 'rejected'
-    case 'PAUSED':          return 'pending'
     case 'CANCELLED':       return 'completed'
+    case 'REJECTED':        return 'rejected'
     default:                return 'draft'
   }
 }

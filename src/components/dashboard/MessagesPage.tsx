@@ -32,6 +32,8 @@ interface Conversation {
   lastMessage: LastMessage | null
   unreadCount: number
   lastMessageAt: string | null
+  status: 'OPEN' | 'PENDING' | 'DECLINED'
+  requestedById: string | null
 }
 
 interface MsgSender {
@@ -212,12 +214,17 @@ function ConversationItem({
             style={{ color: 'var(--cr-text-muted)', fontWeight: conv.unreadCount > 0 ? 600 : 400 }}>
             {preview}
           </span>
-          {conv.unreadCount > 0 && (
+          {conv.status === 'PENDING' && conv.requestedById === currentUserId ? (
+            <span className="shrink-0 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+              style={{ background: 'rgba(245,197,24,0.15)', color: '#F5C518', border: '1px solid rgba(245,197,24,0.3)' }}>
+              Pending
+            </span>
+          ) : conv.unreadCount > 0 ? (
             <span className="shrink-0 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
               style={{ background: '#F5C518', color: '#1A1A1A' }}>
               {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </motion.button>
@@ -540,9 +547,10 @@ function EmptyChatState() {
 interface Props {
   currentUserId: string
   currentUsername: string
+  openConvId?: string | null
 }
 
-export function MessagesPage({ currentUserId, currentUsername }: Props) {
+export function MessagesPage({ currentUserId, currentUsername, openConvId }: Props) {
   // ── State ──────────────────────────────────────────────────────────────────
   const [conversations,    setConversations]    = useState<Conversation[]>([])
   const [activeConv,       setActiveConv]       = useState<Conversation | null>(null)
@@ -561,11 +569,14 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
   const [deletingMsgId,    setDeletingMsgId]    = useState<string | null>(null)
   const [showHeaderMenu,   setShowHeaderMenu]   = useState(false)
   const [isDeletingChat,   setIsDeletingChat]   = useState(false)
+  const [isAccepting,      setIsAccepting]      = useState(false)
+  const [isDeclining,      setIsDeclining]      = useState(false)
 
-  const endRef      = useRef<HTMLDivElement>(null)
-  const inputRef    = useRef<HTMLTextAreaElement>(null)
-  const pollingRef  = useRef<ReturnType<typeof setInterval> | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const endRef        = useRef<HTMLDivElement>(null)
+  const inputRef      = useRef<HTMLTextAreaElement>(null)
+  const pollingRef    = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const hasAutoOpened = useRef(false)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -682,6 +693,16 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
     setTimeout(() => inputRef.current?.focus(), 100)
   }, [loadMessages])
 
+  // Auto-open conversation from URL param (placed after selectConv declaration)
+  useEffect(() => {
+    if (!openConvId || loadingConvs || hasAutoOpened.current) return
+    const conv = conversations.find(c => c.id === openConvId)
+    if (conv) {
+      hasAutoOpened.current = true
+      selectConv(conv)
+    }
+  }, [openConvId, conversations, loadingConvs, selectConv])
+
   const sendMessage = useCallback(async () => {
     const hasText  = Boolean(inputValue.trim())
     const hasImage = Boolean(imageFile)
@@ -796,7 +817,15 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
     try {
       const res = await fetch(`/api/messages/${activeConv.id}`, { method: 'DELETE' })
       if (res.ok) {
-        setConversations(prev => prev.filter(c => c.id !== activeConv.id))
+        // Keep the user in the sidebar but reset to a "new conversation" state so
+        // they remain clickable without needing a page refresh.
+        setConversations(prev =>
+          prev.map(c =>
+            c.id === activeConv.id
+              ? { ...c, id: null, lastMessage: null, unreadCount: 0, lastMessageAt: null }
+              : c
+          )
+        )
         setActiveConv(null)
         setMessages([])
         setIsMobileChat(false)
@@ -806,12 +835,51 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
     finally { setIsDeletingChat(false) }
   }, [activeConv])
 
+  const acceptRequest = useCallback(async () => {
+    if (!activeConv?.id) return
+    setIsAccepting(true)
+    try {
+      const res = await fetch(`/api/messages/conversations/${activeConv.id}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'accept' }),
+      })
+      if (res.ok) {
+        const updated = { ...activeConv, status: 'OPEN' as const }
+        setActiveConv(updated)
+        setConversations(prev => prev.map(c => c.id === activeConv.id ? updated : c))
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
+    } finally { setIsAccepting(false) }
+  }, [activeConv])
+
+  const declineRequest = useCallback(async () => {
+    if (!activeConv?.id) return
+    setIsDeclining(true)
+    try {
+      const res = await fetch(`/api/messages/conversations/${activeConv.id}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: 'decline' }),
+      })
+      if (res.ok) {
+        setConversations(prev => prev.filter(c => c.id !== activeConv.id))
+        setActiveConv(null)
+        setMessages([])
+        setIsMobileChat(false)
+      }
+    } finally { setIsDeclining(false) }
+  }, [activeConv])
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const filtered = conversations.filter(c =>
     c.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.user.username.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const chatConvs    = filtered.filter(c => c.status === 'OPEN' || c.requestedById === currentUserId)
+  const requestConvs = filtered.filter(c => c.status === 'PENDING' && c.requestedById !== currentUserId)
 
   const groups  = groupByDate(messages)
   const canSend = (Boolean(inputValue.trim()) || Boolean(imageFile)) && !isSending && !isUploadingImage
@@ -885,25 +953,58 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
               </p>
               {!searchQuery && (
                 <p className="text-xs mt-1" style={{ color: 'var(--cr-text-muted)', opacity: 0.7 }}>
-                  Follow other chefs to message them
+                  Start a conversation from any profile
                 </p>
               )}
             </div>
           ) : (
-            <motion.div initial="hidden" animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}>
-              {filtered.map(conv => (
-                <motion.div key={conv.id ?? conv.user.id}
-                  variants={{ hidden: { opacity: 0, x: -12 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE } } }}>
-                  <ConversationItem
-                    conv={conv}
-                    isActive={activeConv?.user.id === conv.user.id}
-                    currentUserId={currentUserId}
-                    onClick={() => selectConv(conv)}
-                  />
+            <>
+              {chatConvs.length > 0 && (
+                <motion.div initial="hidden" animate="visible"
+                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}>
+                  {requestConvs.length > 0 && (
+                    <div className="px-3 pt-2 pb-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--cr-text-muted)' }}>Chats</p>
+                    </div>
+                  )}
+                  {chatConvs.map(conv => (
+                    <motion.div key={conv.id ?? conv.user.id}
+                      variants={{ hidden: { opacity: 0, x: -12 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE } } }}>
+                      <ConversationItem
+                        conv={conv}
+                        isActive={activeConv?.user.id === conv.user.id}
+                        currentUserId={currentUserId}
+                        onClick={() => selectConv(conv)}
+                      />
+                    </motion.div>
+                  ))}
                 </motion.div>
-              ))}
-            </motion.div>
+              )}
+
+              {requestConvs.length > 0 && (
+                <motion.div initial="hidden" animate="visible"
+                  variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}>
+                  <div className="px-3 pt-3 pb-1 flex items-center gap-2">
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--cr-text-muted)' }}>Requests</p>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                      style={{ background: '#F5C518', color: '#1A1A1A' }}>
+                      {requestConvs.length}
+                    </span>
+                  </div>
+                  {requestConvs.map(conv => (
+                    <motion.div key={conv.id ?? conv.user.id}
+                      variants={{ hidden: { opacity: 0, x: -12 }, visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: EASE } } }}>
+                      <ConversationItem
+                        conv={conv}
+                        isActive={activeConv?.user.id === conv.user.id}
+                        currentUserId={currentUserId}
+                        onClick={() => selectConv(conv)}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1004,85 +1105,119 @@ export function MessagesPage({ currentUserId, currentUsername }: Props) {
                 <div ref={endRef} />
               </div>
 
-              {/* ── Composer ─────────────────────────────────────────────── */}
-              <div className="px-3 py-3 border-t shrink-0"
-                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>
-                {/* Image preview */}
-                <AnimatePresence>
-                  {imagePreview && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }} className="mb-2 overflow-hidden">
-                      <div className="relative inline-block">
-                        <img src={imagePreview} alt="preview"
-                          className="h-20 w-auto rounded-xl object-cover border" style={{ borderColor: 'var(--cr-border)' }} />
-                        <button onClick={clearImage}
-                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center shadow"
-                          style={{ background: '#ef4444', color: '#fff' }}>
-                          <X className="w-3 h-3" />
-                        </button>
-                        {isUploadingImage && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-xl"
-                            style={{ background: 'rgba(0,0,0,0.45)' }}>
-                            <Loader2 className="w-5 h-5 animate-spin text-white" />
-                          </div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <div className="relative">
-                  <AnimatePresence>
-                    {showEmoji && (
-                      <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />
-                    )}
-                  </AnimatePresence>
-
-                  <div className="flex items-end gap-2 rounded-2xl px-3 py-2"
-                    style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-                    <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowEmoji(v => !v)}
-                      title="Emoji" className="p-1 shrink-0 mb-0.5 transition-colors"
-                      style={{ color: showEmoji ? '#F5C518' : 'var(--cr-text-muted)' }}>
-                      <Smile className="w-5 h-5" />
-                    </motion.button>
-
-                    <textarea ref={inputRef} value={inputValue}
-                      onChange={e => {
-                        setInputValue(e.target.value)
-                        e.target.style.height = 'auto'
-                        e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`
-                      }}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Type a message…" rows={1}
-                      className="flex-1 bg-transparent text-sm outline-none resize-none leading-relaxed py-0.5"
-                      style={{ color: 'var(--cr-text-1)', minHeight: '22px', maxHeight: '100px' }}
-                    />
-
-                    <motion.button whileTap={{ scale: 0.88 }} onClick={() => fileInputRef.current?.click()}
-                      title="Send image" className="p-1 shrink-0 mb-0.5 transition-colors"
-                      style={{ color: imageFile ? '#F5C518' : 'var(--cr-text-muted)' }}>
-                      <ImageIcon className="w-5 h-5" />
-                    </motion.button>
-
+              {/* ── Composer / Request UI ─────────────────────────────────── */}
+              {activeConv.status === 'PENDING' && activeConv.requestedById !== currentUserId ? (
+                /* Recipient: Accept / Decline */
+                <div className="px-4 py-4 border-t shrink-0 flex flex-col items-center gap-3"
+                  style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>
+                  <p className="text-sm text-center" style={{ color: 'var(--cr-text-muted)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--cr-text-1)' }}>{activeConv.user.name}</span>{' '}
+                    wants to send you a message
+                  </p>
+                  <div className="flex items-center gap-3">
                     <motion.button
-                      whileHover={canSend ? { scale: 1.08 } : {}} whileTap={canSend ? { scale: 0.9 } : {}}
-                      onClick={sendMessage} disabled={!canSend}
-                      className="p-2 rounded-xl shrink-0 transition-all mb-0.5"
-                      style={{
-                        background: canSend ? 'linear-gradient(135deg,#F5C518,#FFB800)' : 'var(--cr-border)',
-                        color:   canSend ? '#1A1A1A' : 'var(--cr-text-muted)',
-                        opacity: isSending ? 0.7 : 1,
-                      }}>
-                      {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+                      onClick={acceptRequest} disabled={isAccepting || isDeclining}
+                      className="px-5 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
+                      style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
+                      {isAccepting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Accept'}
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+                      onClick={declineRequest} disabled={isAccepting || isDeclining}
+                      className="px-5 py-2 rounded-xl text-sm font-semibold disabled:opacity-60"
+                      style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-1)', border: '1px solid var(--cr-border)' }}>
+                      {isDeclining ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Decline'}
                     </motion.button>
                   </div>
                 </div>
+              ) : (
+                /* Sender (PENDING with banner) or OPEN: normal composer */
+                <div className="px-3 py-3 border-t shrink-0"
+                  style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>
+                  {activeConv.status === 'PENDING' && activeConv.requestedById === currentUserId && (
+                    <div className="mb-2 px-3 py-2 rounded-xl text-xs text-center"
+                      style={{ background: 'rgba(245,197,24,0.08)', color: 'var(--cr-text-muted)', border: '1px solid rgba(245,197,24,0.2)' }}>
+                      Message request sent · waiting for {activeConv.user.name.split(' ')[0]} to accept
+                    </div>
+                  )}
+                  {/* Image preview */}
+                  <AnimatePresence>
+                    {imagePreview && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }} className="mb-2 overflow-hidden">
+                        <div className="relative inline-block">
+                          <img src={imagePreview} alt="preview"
+                            className="h-20 w-auto rounded-xl object-cover border" style={{ borderColor: 'var(--cr-border)' }} />
+                          <button onClick={clearImage}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center shadow"
+                            style={{ background: '#ef4444', color: '#fff' }}>
+                            <X className="w-3 h-3" />
+                          </button>
+                          {isUploadingImage && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-xl"
+                              style={{ background: 'rgba(0,0,0,0.45)' }}>
+                              <Loader2 className="w-5 h-5 animate-spin text-white" />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                <p className="text-[10px] text-center mt-1.5 select-none"
-                  style={{ color: 'var(--cr-text-muted)', opacity: 0.6 }}>
-                  Enter to send · Shift+Enter for new line
-                </p>
-              </div>
+                  <div className="relative">
+                    <AnimatePresence>
+                      {showEmoji && (
+                        <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />
+                      )}
+                    </AnimatePresence>
+
+                    <div className="flex items-end gap-2 rounded-2xl px-3 py-2"
+                      style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
+                      <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowEmoji(v => !v)}
+                        title="Emoji" className="p-1 shrink-0 mb-0.5 transition-colors"
+                        style={{ color: showEmoji ? '#F5C518' : 'var(--cr-text-muted)' }}>
+                        <Smile className="w-5 h-5" />
+                      </motion.button>
+
+                      <textarea ref={inputRef} value={inputValue}
+                        onChange={e => {
+                          setInputValue(e.target.value)
+                          e.target.style.height = 'auto'
+                          e.target.style.height = `${Math.min(e.target.scrollHeight, 100)}px`
+                        }}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type a message…" rows={1}
+                        className="flex-1 bg-transparent text-sm outline-none resize-none leading-relaxed py-0.5"
+                        style={{ color: 'var(--cr-text-1)', minHeight: '22px', maxHeight: '100px' }}
+                      />
+
+                      <motion.button whileTap={{ scale: 0.88 }} onClick={() => fileInputRef.current?.click()}
+                        title="Send image" className="p-1 shrink-0 mb-0.5 transition-colors"
+                        style={{ color: imageFile ? '#F5C518' : 'var(--cr-text-muted)' }}>
+                        <ImageIcon className="w-5 h-5" />
+                      </motion.button>
+
+                      <motion.button
+                        whileHover={canSend ? { scale: 1.08 } : {}} whileTap={canSend ? { scale: 0.9 } : {}}
+                        onClick={sendMessage} disabled={!canSend}
+                        className="p-2 rounded-xl shrink-0 transition-all mb-0.5"
+                        style={{
+                          background: canSend ? 'linear-gradient(135deg,#F5C518,#FFB800)' : 'var(--cr-border)',
+                          color:      canSend ? '#1A1A1A' : 'var(--cr-text-muted)',
+                          opacity:    isSending ? 0.7 : 1,
+                        }}>
+                        {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </motion.button>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-center mt-1.5 select-none"
+                    style={{ color: 'var(--cr-text-muted)', opacity: 0.6 }}>
+                    Enter to send · Shift+Enter for new line
+                  </p>
+                </div>
+              )}
             </motion.div>
           ) : (
             <EmptyChatState key="empty" />

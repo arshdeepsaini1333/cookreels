@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,8 +9,8 @@ import { useTheme } from '@/context/ThemeContext'
 import {
   Megaphone, Rocket, BarChart2, Users, MapPin, TrendingUp, Globe,
   Eye, MousePointer, DollarSign, Target, Zap, ChevronRight,
-  Plus, Play, PenLine, Copy, Pause, Trash2, MoreHorizontal,
-  CheckCircle2, Clock, AlertCircle, XCircle, FileText, Film,
+  Plus, Play, PenLine, Pause, Trash2, MoreHorizontal,
+  CheckCircle2, Clock, XCircle, FileText, Film,
   ArrowRight, Sparkles,
 } from 'lucide-react'
 
@@ -30,14 +30,14 @@ interface Campaign {
   id: string
   name: string
   platform: string
-  status: 'active' | 'pending' | 'draft' | 'completed' | 'rejected'
+  status: 'active' | 'pending' | 'draft' | 'paused' | 'completed' | 'rejected'
   budget: number
   impressions: number
   clicks: number
   createdAt: string
 }
 
-type CampaignTab = 'all' | 'active' | 'pending' | 'draft' | 'completed' | 'rejected'
+type CampaignTab = 'all' | 'active' | 'pending' | 'draft' | 'paused' | 'completed' | 'rejected'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -55,9 +55,10 @@ function formatINR(n: number): string {
 }
 
 const STATUS_CONFIG: Record<Campaign['status'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  active:    { label: 'Active',         color: '#7DBB91', bg: 'rgba(125,187,145,0.15)', icon: CheckCircle2 },
+  active:    { label: 'Live',           color: '#7DBB91', bg: 'rgba(125,187,145,0.15)', icon: CheckCircle2 },
   pending:   { label: 'Pending Review', color: '#F5C518', bg: 'rgba(245,197,24,0.15)',  icon: Clock },
   draft:     { label: 'Draft',          color: '#A1A1AA', bg: 'rgba(161,161,170,0.15)', icon: FileText },
+  paused:    { label: 'Paused',         color: '#FF9F1C', bg: 'rgba(255,159,28,0.15)',  icon: Pause },
   completed: { label: 'Completed',      color: '#4285F4', bg: 'rgba(66,133,244,0.15)',  icon: CheckCircle2 },
   rejected:  { label: 'Rejected',       color: '#FF6B6B', bg: 'rgba(255,107,107,0.15)', icon: XCircle },
 }
@@ -186,27 +187,63 @@ const QUICK_ACTIONS = [
 
 const TABS: { id: CampaignTab; label: string }[] = [
   { id: 'all',       label: 'All' },
-  { id: 'active',    label: 'Active' },
-  { id: 'pending',   label: 'Pending Review' },
+  { id: 'active',    label: 'Live' },
+  { id: 'pending',   label: 'Pending' },
   { id: 'draft',     label: 'Draft' },
+  { id: 'paused',    label: 'Paused' },
   { id: 'completed', label: 'Completed' },
   { id: 'rejected',  label: 'Rejected' },
 ]
 
 // ─── Campaign Row ─────────────────────────────────────────────────────────────
 
-function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const status = STATUS_CONFIG[campaign.status]
-  const StatusIcon = status.icon
+function CampaignRow({ campaign, isDark, onRefresh }: { campaign: Campaign; isDark: boolean; onRefresh: () => void }) {
+  const [menuOpen, setMenuOpen]     = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [acting, setActing]         = useState(false)
+
+  const cfg = STATUS_CONFIG[campaign.status]
+  const StatusIcon = cfg.icon
   const platformColor = PLATFORM_COLORS[campaign.platform] ?? '#F5C518'
+
+  const doStatusAction = async (action: 'pause' | 'resume') => {
+    setMenuOpen(false)
+    setActing(true)
+    await fetch(`/api/campaigns/${campaign.id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    setActing(false)
+    onRefresh()
+  }
+
+  const doDelete = async () => {
+    setConfirming(false)
+    setActing(true)
+    await fetch(`/api/campaigns/${campaign.id}`, { method: 'DELETE' })
+    setActing(false)
+    onRefresh()
+  }
+
+  const menuItems = [
+    { icon: Eye,     label: 'View', href: `/boost/create?id=${campaign.id}` },
+    ...(campaign.status === 'draft' ? [{ icon: PenLine, label: 'Edit', href: `/boost/create?id=${campaign.id}&edit=true` }] : []),
+    ...(campaign.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),
+    ...(campaign.status === 'paused' ? [{ icon: Play,  label: 'Resume', onClick: () => doStatusAction('resume') }] : []),
+    { icon: Trash2, label: 'Delete', onClick: () => { setMenuOpen(false); setConfirming(true) }, danger: true },
+  ]
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       className="relative flex items-center gap-3 px-4 py-3 rounded-xl transition-colors group"
-      style={{ border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
+      style={{
+        border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}`,
+        opacity: acting ? 0.6 : 1,
+        pointerEvents: acting ? 'none' : 'auto',
+      }}
       onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.40)' : 'rgba(245,197,24,0.04)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
@@ -226,10 +263,10 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
       {/* Status badge */}
       <span
         className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold flex-shrink-0"
-        style={{ background: status.bg, color: status.color }}
+        style={{ background: cfg.bg, color: cfg.color }}
       >
         <StatusIcon size={10} strokeWidth={2.5} />
-        {status.label}
+        {cfg.label}
       </span>
 
       {/* Stats */}
@@ -251,7 +288,7 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
       {/* Actions menu */}
       <div className="relative flex-shrink-0">
         <button
-          onClick={() => setMenuOpen(o => !o)}
+          onClick={() => { setMenuOpen(o => !o); setConfirming(false) }}
           className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors opacity-0 group-hover:opacity-100"
           style={{ color: isDark ? '#71717A' : '#9CA3AF' }}
           onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.80)' : '#F5F5F5')}
@@ -259,6 +296,7 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
         >
           <MoreHorizontal size={15} />
         </button>
+
         <AnimatePresence>
           {menuOpen && (
             <>
@@ -275,13 +313,7 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
                   boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
                 }}
               >
-                {[
-                  { icon: Eye,     label: 'View',      href: `/boost/create?id=${campaign.id}` },
-                  { icon: PenLine, label: 'Edit',       href: `/boost/create?id=${campaign.id}&edit=true` },
-                  { icon: Copy,    label: 'Duplicate',  onClick: () => setMenuOpen(false) },
-                  { icon: Pause,   label: campaign.status === 'active' ? 'Pause' : 'Resume', onClick: () => setMenuOpen(false) },
-                  { icon: Trash2,  label: 'Delete',     onClick: () => setMenuOpen(false), danger: true },
-                ].map(action => (
+                {menuItems.map(action => (
                   action.href ? (
                     <Link
                       key={action.label}
@@ -298,7 +330,7 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
                   ) : (
                     <button
                       key={action.label}
-                      onClick={action.onClick}
+                      onClick={(action as { onClick?: () => void }).onClick}
                       className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-colors"
                       style={{ color: (action as { danger?: boolean }).danger ? '#FF6B6B' : (isDark ? '#A1A1AA' : '#666') }}
                       onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#F9FAFB')}
@@ -313,6 +345,49 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
             </>
           )}
         </AnimatePresence>
+
+        <AnimatePresence>
+          {confirming && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setConfirming(false)} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 top-8 z-20 w-52 rounded-xl p-3 shadow-2xl"
+                style={{
+                  background: isDark ? '#2B2B2D' : '#fff',
+                  border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
+                }}
+              >
+                <p className="text-xs font-semibold mb-2.5" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
+                  Delete this campaign?
+                </p>
+                <p className="text-[11px] mb-3" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+                  This action cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: isDark ? 'rgba(52,52,56,0.80)' : '#F5F5F5', color: isDark ? '#A1A1AA' : '#666' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={doDelete}
+                    className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B' }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   )
@@ -323,9 +398,10 @@ function CampaignRow({ campaign, isDark }: { campaign: Campaign; isDark: boolean
 function EmptyState({ isDark, tab }: { isDark: boolean; tab: CampaignTab }) {
   const messages: Record<CampaignTab, { title: string; sub: string }> = {
     all:       { title: 'No campaigns yet',          sub: 'Create your first campaign to start reaching your audience.' },
-    active:    { title: 'No active campaigns',       sub: 'Launch a campaign to see it appear here.' },
-    pending:   { title: 'Nothing pending review',    sub: 'Submitted campaigns awaiting approval will show here.' },
-    draft:     { title: 'No drafts saved',           sub: 'Campaigns you save as drafts will appear here.' },
+    active:    { title: 'No live campaigns',         sub: 'Approved campaigns will appear here once they go live.' },
+    pending:   { title: 'Nothing pending review',    sub: 'Paid campaigns awaiting approval or a future start date will show here.' },
+    draft:     { title: 'No drafts saved',           sub: 'Campaigns you haven\'t paid for yet will appear here.' },
+    paused:    { title: 'No paused campaigns',       sub: 'Campaigns you\'ve paused will appear here.' },
     completed: { title: 'No completed campaigns',    sub: 'Finished campaigns and their results will appear here.' },
     rejected:  { title: 'No rejected campaigns',     sub: 'Any campaigns that were rejected will appear here.' },
   }
@@ -394,16 +470,20 @@ export function BoostCenter({ username }: { username: string }) {
   const router = useRouter()
   const featuresRef = useRef<HTMLDivElement>(null)
 
-  const [stats, setStats] = useState<BoostStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<CampaignTab>('all')
+  const [stats, setStats]           = useState<BoostStats | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [activeTab, setActiveTab]   = useState<CampaignTab>('all')
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
   useEffect(() => {
+    setLoading(true)
     fetch('/api/boost/stats')
       .then(r => r.json())
       .then((data: BoostStats) => { setStats(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [refreshKey])
 
   const filteredCampaigns = (stats?.campaigns ?? []).filter(
     c => activeTab === 'all' || c.status === activeTab
@@ -674,7 +754,7 @@ export function BoostCenter({ username }: { username: string }) {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl"
         style={cardStyle}
       >
         {/* Header */}
@@ -745,7 +825,7 @@ export function BoostCenter({ username }: { username: string }) {
           ) : filteredCampaigns.length > 0 ? (
             <div className="space-y-1.5">
               {filteredCampaigns.map(c => (
-                <CampaignRow key={c.id} campaign={c} isDark={isDark} />
+                <CampaignRow key={c.id} campaign={c} isDark={isDark} onRefresh={refresh} />
               ))}
             </div>
           ) : (

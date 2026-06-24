@@ -24,9 +24,16 @@ export async function POST(req: NextRequest) {
       id: conversationId,
       OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
     },
-    select: { id: true, user1Id: true },
+    select: { id: true, user1Id: true, status: true, requestedById: true },
   })
   if (!conv) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (conv.status === 'DECLINED') {
+    return NextResponse.json({ error: 'Conversation was declined' }, { status: 403 })
+  }
+  if (conv.status === 'PENDING' && conv.requestedById !== session.userId) {
+    return NextResponse.json({ error: 'Accept the message request first' }, { status: 403 })
+  }
 
   const isUser1 = conv.user1Id === session.userId
 

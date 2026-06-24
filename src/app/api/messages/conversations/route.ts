@@ -16,20 +16,19 @@ export async function GET() {
       prisma.user.findMany({
         where: {
           id:        { not: userId },
-          // they follow me
           followers: { some: { followerId: userId } },
-          // I follow them
           following: { some: { followingId: userId } },
         },
         select: { id: true, firstName: true, lastName: true, username: true, profileImage: true, isOnline: true },
       }),
-      // Existing DM threads — exclude ones this user has hidden
+      // Existing DM threads — exclude hidden and declined
       prisma.conversation.findMany({
         where: {
           OR: [
             { user1Id: userId, hiddenForUser1: false },
             { user2Id: userId, hiddenForUser2: false },
           ],
+          status: { not: 'DECLINED' },
         },
         orderBy: { lastMessageAt: 'desc' },
         include: {
@@ -56,12 +55,14 @@ export async function GET() {
       }),
     ])
 
-    // Shape conversation data
+    // Shape conversation data — include status and requestedById
     const convData = conversations.map(conv => {
       const other = conv.user1Id === userId ? conv.user2 : conv.user1
       const last  = conv.messages[0] ?? null
       return {
         id:   conv.id,
+        status:        conv.status,
+        requestedById: conv.requestedById,
         user: {
           id:       other.id,
           name:     `${other.firstName} ${other.lastName}`,
@@ -82,12 +83,14 @@ export async function GET() {
       }
     })
 
-    // Friends who don't have a visible conversation yet — show at the bottom
+    // Friends who don't have any conversation yet — show at the bottom
     const convFriendIds = new Set(convData.map(c => c.user.id))
     const freshFriends  = friends
       .filter(f => !convFriendIds.has(f.id))
       .map(f => ({
         id:            null as string | null,
+        status:        'OPEN' as const,
+        requestedById: null as string | null,
         user: {
           id:       f.id,
           name:     `${f.firstName} ${f.lastName}`,
@@ -107,7 +110,7 @@ export async function GET() {
   }
 }
 
-// POST /api/messages/conversations — open/create a conversation with a friend
+// POST /api/messages/conversations — open/create a conversation with any user
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -119,10 +122,43 @@ export async function POST(req: NextRequest) {
 
   const [user1Id, user2Id] = [session.userId, targetUserId].sort()
 
-  const conversation = await prisma.conversation.upsert({
-    where:  { user1Id_user2Id: { user1Id, user2Id } },
-    create: { user1Id, user2Id },
-    update: {},
+  // Check mutual follow
+  const [iFollow, theyFollow] = await Promise.all([
+    prisma.follow.findFirst({
+      where: { followerId: session.userId, followingId: targetUserId, status: 'ACCEPTED' },
+      select: { id: true },
+    }),
+    prisma.follow.findFirst({
+      where: { followerId: targetUserId, followingId: session.userId, status: 'ACCEPTED' },
+      select: { id: true },
+    }),
+  ])
+  const isMutual = !!(iFollow && theyFollow)
+
+  // Check for existing conversation
+  const existing = await prisma.conversation.findFirst({
+    where: { user1Id, user2Id },
+    select: { id: true, status: true, requestedById: true },
+  })
+
+  if (existing) {
+    // Allow re-requesting after a decline if current user was original requester
+    if (existing.status === 'DECLINED' && existing.requestedById === session.userId) {
+      await prisma.conversation.update({
+        where: { id: existing.id },
+        data: { status: 'PENDING', declinedAt: null },
+      })
+    }
+    return NextResponse.json({ conversationId: existing.id })
+  }
+
+  const conversation = await prisma.conversation.create({
+    data: {
+      user1Id,
+      user2Id,
+      status:        isMutual ? 'OPEN'    : 'PENDING',
+      requestedById: isMutual ? null      : session.userId,
+    },
     select: { id: true },
   })
 

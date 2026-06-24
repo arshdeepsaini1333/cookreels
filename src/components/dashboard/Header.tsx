@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Settings, LogOut, UserCircle, MessageCircle, Users } from 'lucide-react'
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -81,13 +81,18 @@ export function Header({
     router.push('/auth/login')
   }
 
-  // Fetch unread messages count once on mount
-  useEffect(() => {
+  const fetchUnreadMessages = useCallback(() => {
     fetch('/api/messages/unread-count')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data) setUnreadMessages(data.count ?? 0) })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetchUnreadMessages()
+    const id = setInterval(fetchUnreadMessages, 30_000)
+    return () => clearInterval(id)
+  }, [fetchUnreadMessages])
 
   // Close dropdowns on outside click
   useEffect(() => {

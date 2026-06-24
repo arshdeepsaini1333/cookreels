@@ -7,13 +7,13 @@ import type { CampaignStatus } from '@/generated/prisma'
 type Params = { params: Promise<{ id: string }> }
 
 const StatusSchema = z.object({
-  action: z.enum(['pause', 'resume', 'cancel', 'complete']),
+  action: z.enum(['pause', 'resume', 'cancel', 'complete', 'approve']),
 })
 
 // Allowed transitions: [currentStatus] -> allowedActions
 const TRANSITIONS: Record<CampaignStatus, string[]> = {
   DRAFT:           ['cancel'],
-  PENDING_PAYMENT: ['cancel'],
+  PENDING_PAYMENT: ['approve', 'cancel'],
   ACTIVE:          ['pause', 'cancel', 'complete'],
   PAUSED:          ['resume', 'cancel'],
   COMPLETED:       [],
@@ -26,6 +26,7 @@ const ACTION_TO_STATUS: Record<string, CampaignStatus> = {
   resume:   'ACTIVE',
   cancel:   'CANCELLED',
   complete: 'COMPLETED',
+  approve:  'ACTIVE',
 }
 
 // ─── PATCH /api/campaigns/[id]/status ────────────────────────────────────────
@@ -65,9 +66,23 @@ export async function PATCH(req: Request, { params }: Params) {
 
   try {
     const newStatus = ACTION_TO_STATUS[action]
+
+    // When approving, set startDate (if unset) and endDate
+    let extraData: { startDate?: Date; endDate?: Date } = {}
+    if (action === 'approve') {
+      const full = await prisma.campaign.findUnique({
+        where:  { id },
+        select: { startDate: true, durationDays: true },
+      })
+      const startDate = full?.startDate ?? new Date()
+      const endDate   = new Date(startDate)
+      endDate.setDate(endDate.getDate() + (full?.durationDays ?? 30))
+      extraData = { startDate, endDate }
+    }
+
     const updated = await prisma.campaign.update({
       where: { id },
-      data: { status: newStatus },
+      data:  { status: newStatus, ...extraData },
       select: { id: true, status: true, updatedAt: true },
     })
 

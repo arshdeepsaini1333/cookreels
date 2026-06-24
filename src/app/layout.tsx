@@ -38,8 +38,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
+  modal,
 }: Readonly<{
   children: React.ReactNode;
+  modal?: React.ReactNode;
 }>) {
   return (
     <html
@@ -47,7 +49,10 @@ export default function RootLayout({
       className={`${playfairDisplay.variable} ${manrope.variable} ${poppins.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="font-body min-h-full flex flex-col dark:bg-[#1E1E1F] text-[#1A1A1A] dark:text-[#F5F5F5]" style={{ background: 'var(--cr-bg-main)' }}>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          {modal}
+        </ThemeProvider>
       </body>
     </html>
   );
