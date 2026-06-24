@@ -358,7 +358,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                       </span>
                     )}
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: `${pColor}18`, color: pColor, border: `1px solid ${pColor}30` }}>{pLabel}</span>
-                    {ad.adFormat && (
+                    {(ad.adFormat as string | undefined) && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: ad.adFormat === 'banner' ? 'rgba(66,133,244,0.12)' : 'rgba(245,197,24,0.12)', color: ad.adFormat === 'banner' ? '#4285F4' : '#F5C518' }}>
                         {ad.adFormat === 'banner' ? <ImageIcon size={9} /> : <Video size={9} />}
                         {ad.adFormat === 'banner' ? 'Banner' : 'Reel'}
