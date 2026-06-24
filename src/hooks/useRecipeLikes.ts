@@ -10,9 +10,10 @@ export function useRecipeLikes(
   initialLikeCount = 0,
   isActive = true,
 ) {
-  const [likeCount, setLikeCount] = useState(initialLikeCount)
-  const [liked, setLiked] = useState<boolean | null>(null)
-  const [pending, setPending] = useState(false)
+  const [likeCount,     setLikeCount]     = useState(initialLikeCount)
+  const [liked,         setLiked]         = useState<boolean | null>(null)
+  const [pending,       setPending]       = useState(false)
+  const [hideLikeCount, setHideLikeCount] = useState(false)
 
   // Fetch current like status from API
   useEffect(() => {
@@ -23,6 +24,7 @@ export function useRecipeLikes(
         if (!d) return
         setLikeCount(d.likeCount)
         setLiked(d.liked)
+        if (typeof d.hideLikeCount === 'boolean') setHideLikeCount(d.hideLikeCount)
       })
       .catch(() => {})
   }, [recipeId])
@@ -58,5 +60,5 @@ export function useRecipeLikes(
     }
   }, [recipeId, liked, pending])
 
-  return { likeCount, liked: liked ?? false, likeLoaded: liked !== null, toggle, pending }
+  return { likeCount, hideLikeCount, liked: liked ?? false, likeLoaded: liked !== null, toggle, pending }
 }

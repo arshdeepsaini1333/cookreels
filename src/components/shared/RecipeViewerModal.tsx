@@ -140,8 +140,10 @@ export function RecipeViewerModal({
 
   // ── Real like/comment state via hooks ──────────────────────────────────────
   const {
-    liked, likeCount, toggle: handleLike,
+    liked, likeCount, hideLikeCount, toggle: handleLike,
   } = useRecipeLikes(recipe?.id ?? '', recipe?.likeCount ?? 0, isOpen)
+
+  const [blockComments, setBlockComments] = useState(false)
 
   const {
     comments, commentCount, loading: commentsLoading,
@@ -167,7 +169,10 @@ export function RecipeViewerModal({
     fetch(`/api/recipes/${recipe.id}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (!dead && d) setDetail({ description: d.description, servings: d.servings, createdAt: d.createdAt })
+        if (!dead && d) {
+          setDetail({ description: d.description, servings: d.servings, createdAt: d.createdAt })
+          if (typeof d.blockComments === 'boolean') setBlockComments(d.blockComments)
+        }
       })
       .catch(() => {})
       .finally(() => { if (!dead) setLoadingDetail(false) })
@@ -463,11 +468,13 @@ export function RecipeViewerModal({
                       </div>
 
                       {/* Like count */}
-                      <div className="px-4 pb-1">
-                        <span className="text-sm font-bold" style={{ color: 'var(--cr-text-1)' }}>
-                          {fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}
-                        </span>
-                      </div>
+                      {!hideLikeCount && (
+                        <div className="px-4 pb-1">
+                          <span className="text-sm font-bold" style={{ color: 'var(--cr-text-1)' }}>
+                            {fmt(likeCount)} {likeCount === 1 ? 'like' : 'likes'}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Caption */}
                       <div className="px-4 pb-2">
@@ -556,12 +563,18 @@ export function RecipeViewerModal({
                   className="flex-shrink-0 border-t px-4 py-3"
                   style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
                 >
-                  <CommentInput
-                    currentUserAvatar={resolvedAvatar}
-                    currentUserName={commenter}
-                    onSubmit={handleAddComment}
-                    submitting={submitting}
-                  />
+                  {blockComments ? (
+                    <p className="text-xs text-center py-1" style={{ color: 'var(--cr-text-muted)' }}>
+                      Comments are disabled on this post.
+                    </p>
+                  ) : (
+                    <CommentInput
+                      currentUserAvatar={resolvedAvatar}
+                      currentUserName={commenter}
+                      onSubmit={handleAddComment}
+                      submitting={submitting}
+                    />
+                  )}
                 </div>
               </div>
               {/* end mobile layout */}
@@ -741,7 +754,9 @@ export function RecipeViewerModal({
                                     style={{ fill: liked ? '#F5C518' : 'transparent', color: liked ? '#F5C518' : 'var(--cr-text-muted)' }}
                                   />
                                 </motion.span>
-                                <span className="text-xs font-semibold tabular-nums">{fmt(likeCount)}</span>
+                                {!hideLikeCount && (
+                                  <span className="text-xs font-semibold tabular-nums">{fmt(likeCount)}</span>
+                                )}
                               </motion.button>
 
                               <button
@@ -782,12 +797,18 @@ export function RecipeViewerModal({
                           </div>
 
                           <div className="px-4 pb-4">
-                            <CommentInput
-                              currentUserAvatar={resolvedAvatar}
-                              currentUserName={commenter}
-                              onSubmit={handleAddComment}
-                              submitting={submitting}
-                            />
+                            {blockComments ? (
+                              <p className="text-xs text-center py-1" style={{ color: 'var(--cr-text-muted)' }}>
+                                Comments are disabled on this post.
+                              </p>
+                            ) : (
+                              <CommentInput
+                                currentUserAvatar={resolvedAvatar}
+                                currentUserName={commenter}
+                                onSubmit={handleAddComment}
+                                submitting={submitting}
+                              />
+                            )}
                           </div>
                         </div>
 

@@ -20,6 +20,6 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json(user, {
-    headers: { 'Cache-Control': 'private, max-age=60' },
+    headers: { 'Cache-Control': 'no-store' },
   })
 }

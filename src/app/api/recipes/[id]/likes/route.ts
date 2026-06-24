@@ -9,8 +9,8 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params
 
   const recipe = await prisma.recipe.findUnique({
-    where: { id },
-    select: { likeCount: true },
+    where:  { id },
+    select: { likeCount: true, user: { select: { hideLikeCount: true } } },
   })
 
   if (!recipe) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -19,5 +19,9 @@ export async function GET(_req: Request, { params }: Params) {
     ? (await prisma.recipeLike.count({ where: { userId: session.userId, recipeId: id } })) > 0
     : false
 
-  return NextResponse.json({ likeCount: recipe.likeCount, liked })
+  return NextResponse.json({
+    likeCount:     recipe.likeCount,
+    hideLikeCount: recipe.user.hideLikeCount,
+    liked,
+  })
 }

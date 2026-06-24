@@ -26,6 +26,8 @@ enum NotificationType {
   LIKE
   COMMENT
   FOLLOW
+  FOLLOW_REQUEST
+  FOLLOW_ACCEPTED
   FRIEND_REQUEST
   FRIEND_ACCEPTED
   MENTION
@@ -33,6 +35,11 @@ enum NotificationType {
   REEL_COMMENT
   RECIPE_LIKE
   RECIPE_COMMENT
+}
+
+enum FollowStatus {
+  PENDING
+  ACCEPTED
 }
 
 enum ActivityType {
@@ -95,14 +102,18 @@ model User {
   password         String?
   phone            String?   @unique
   googleId         String?   @unique
-  profileImage     String?
-  bio              String?   @db.Text
+  profileImage      String?
+  backgroundPicture String?
+  bio               String?   @db.Text
   cuisineSpecialty String?
   level            String?
   isEmailVerified  Boolean   @default(false)
   isVerified       Boolean   @default(false)
   isOnline         Boolean   @default(false)
   lastActiveAt     DateTime?
+  hideLikeCount    Boolean   @default(false)
+  blockComments    Boolean   @default(false)
+  privateAccount   Boolean   @default(false)
 
   recipes          Recipe[]
   reels            Reel[]
@@ -143,18 +154,20 @@ model User {
 // ─── Social ───
 
 model Follow {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   followerId  String
   followingId String
+  status      FollowStatus @default(ACCEPTED)
 
-  follower    User     @relation("UserFollower",  fields: [followerId],  references: [id], onDelete: Cascade)
-  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+  follower    User         @relation("UserFollower",  fields: [followerId],  references: [id], onDelete: Cascade)
+  following   User         @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt   DateTime     @default(now())
 
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+  @@index([followingId, status])
   @@map("follows")
 }
 
@@ -567,6 +580,11 @@ model Conversation {
   messages      Message[]
   lastMessageAt DateTime?
 
+  hiddenForUser1   Boolean   @default(false)
+  hiddenForUser2   Boolean   @default(false)
+  clearedByUser1At DateTime?
+  clearedByUser2At DateTime?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -578,12 +596,14 @@ model Conversation {
 }
 
 model Message {
-  id             String        @id @default(uuid())
-  conversationId String
-  senderId       String
-  content        String        @db.Text
-  imageUrl       String?
-  status         MessageStatus @default(SENT)
+  id                  String        @id @default(uuid())
+  conversationId      String
+  senderId            String
+  content             String        @db.Text
+  imageUrl            String?
+  status              MessageStatus @default(SENT)
+  deletedForEveryone  Boolean       @default(false)
+  deletedForUserIds   String[]      @default([])
 
   conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)

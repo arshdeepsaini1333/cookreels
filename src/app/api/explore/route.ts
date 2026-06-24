@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true, username: true, firstName: true,
               lastName: true, profileImage: true, isVerified: true,
+              hideLikeCount: true,
             },
           },
         },
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest) {
           user: {
             select: {
               id: true, username: true, firstName: true,
-              lastName: true, profileImage: true,
+              lastName: true, profileImage: true, hideLikeCount: true,
             },
           },
         },
@@ -74,8 +75,8 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json({
-      recipes: shuffle(recipes).map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
-      reels:   shuffle(reels).map((r: any)   => ({ ...r, createdAt: r.createdAt.toISOString() })),
+      recipes: shuffle(recipes).map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      reels:   shuffle(reels).map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
       hasMore: false,
       page: 0,
     }, CACHE)
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
           user: {
             select: {
               id: true, username: true, firstName: true,
-              lastName: true, profileImage: true, isVerified: true,
+              lastName: true, profileImage: true, isVerified: true, hideLikeCount: true,
             },
           },
         },
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest) {
           user: {
             select: {
               id: true, username: true, firstName: true,
-              lastName: true, profileImage: true,
+              lastName: true, profileImage: true, hideLikeCount: true,
             },
           },
         },
@@ -123,8 +124,8 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json({
-      recipes: shuffle(recipes).map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
-      reels:   shuffle(reels).map((r: any)   => ({ ...r, createdAt: r.createdAt.toISOString() })),
+      recipes: shuffle(recipes).map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      reels:   shuffle(reels).map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
       hasMore: false,
       page: 0,
     }, CACHE)
@@ -152,7 +153,7 @@ export async function GET(req: NextRequest) {
               user: {
                 select: {
                   id: true, username: true, firstName: true,
-                  lastName: true, profileImage: true, isVerified: true,
+                  lastName: true, profileImage: true, isVerified: true, hideLikeCount: true,
                 },
               },
             },
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
               user: {
                 select: {
                   id: true, username: true, firstName: true,
-                  lastName: true, profileImage: true,
+                  lastName: true, profileImage: true, hideLikeCount: true,
                 },
               },
             },
@@ -190,8 +191,8 @@ export async function GET(req: NextRequest) {
     const outReels   = shuffle(reels)
 
     return NextResponse.json({
-      recipes: outRecipes.map((r: any) => ({ ...r, createdAt: r.createdAt.toISOString() })),
-      reels:   outReels.map((r: any)   => ({ ...r, createdAt: r.createdAt.toISOString() })),
+      recipes: outRecipes.map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      reels:   outReels.map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
       hasMore,
       page,
     }, CACHE)
@@ -214,7 +215,7 @@ export async function GET(req: NextRequest) {
         id: true, title: true, coverImage: true,
         cookTime: true, prepTime: true, likeCount: true,
         difficulty: true, description: true, servings: true, createdAt: true,
-        user: { select: { id: true, username: true, firstName: true, lastName: true, profileImage: true, isVerified: true } },
+        user: { select: { id: true, username: true, firstName: true, lastName: true, profileImage: true, isVerified: true, hideLikeCount: true } },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -224,7 +225,7 @@ export async function GET(req: NextRequest) {
         id: true, title: true, description: true, videoUrl: true, thumbnailUrl: true,
         likeCount: true, viewCount: true, duration: true,
         gradient: true, emoji: true, createdAt: true,
-        user: { select: { id: true, username: true, firstName: true, lastName: true, profileImage: true } },
+        user: { select: { id: true, username: true, firstName: true, lastName: true, profileImage: true, hideLikeCount: true } },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -233,8 +234,8 @@ export async function GET(req: NextRequest) {
   ])
 
   return NextResponse.json({
-    recipes: shuffle(recipes).map(r => ({ ...r, createdAt: r.createdAt.toISOString() })),
-    reels:   shuffle(reels).map(r   => ({ ...r, createdAt: r.createdAt.toISOString() })),
+    recipes: shuffle(recipes).map(r => ({ ...r, likeCount: (r as any).user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+    reels:   shuffle(reels).map(r   => ({ ...r, likeCount: (r as any).user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
     week, startDate: start.toISOString(), endDate: end.toISOString(),
     hasOlder: olderRecipesCount + olderReelsCount > 0,
   }, CACHE)

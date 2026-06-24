@@ -1,11 +1,20 @@
+export type S3Folder =
+  | "recipes"
+  | "reels"
+  | "profiles/display_picture"
+  | "profiles/background_picture"
+  | "messages"
+
 export const uploadToS3 = async (
-  file: File,
-  folder: "recipes" | "reels"
+  file: File | Blob,
+  folder: S3Folder,
+  fileName?: string,
 ) => {
+  const name = fileName ?? (file instanceof File ? file.name : `upload_${Date.now()}`);
   const response = await fetch("/api/upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fileType: file.type, fileName: file.name, folder }),
+    body: JSON.stringify({ fileType: file.type, fileName: name, folder }),
   });
 
   if (!response.ok) {

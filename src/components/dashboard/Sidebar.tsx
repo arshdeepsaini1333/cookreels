@@ -36,11 +36,38 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
   const isDark = theme === 'dark'
 
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
+
   useEffect(() => {
+    // Populate from cache first so avatar appears immediately after hydration
+    try {
+      const cached = JSON.parse(localStorage.getItem('cr:me') ?? 'null')
+      if (cached?.firstName) setMe(cached)
+    } catch {}
+
+    // Then fetch fresh data from server
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.firstName) setMe(d) })
+      .then(d => {
+        if (d?.firstName) {
+          setMe(d)
+          localStorage.setItem('cr:me', JSON.stringify(d))
+        }
+      })
       .catch(() => {})
+  }, [])
+
+  // Keep avatar in sync when user uploads a new profile photo
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const url = (e as CustomEvent<{ url: string }>).detail.url
+      setMe(prev => {
+        const next = prev ? { ...prev, profileImage: url } : prev
+        if (next) localStorage.setItem('cr:me', JSON.stringify(next))
+        return next
+      })
+    }
+    window.addEventListener('cr:avatar-updated', handler)
+    return () => window.removeEventListener('cr:avatar-updated', handler)
   }, [])
 
   const avatarSrc  = me?.profileImage ?? null

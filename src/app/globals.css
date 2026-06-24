@@ -616,3 +616,23 @@ button, a { cursor: pointer; }
   background: #F3F4F6;
   color: #666666;
 }
+
+/* ── Edit Profile Modal scrollbar ─────────────────────────── */
+
+.edit-profile-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.edit-profile-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.edit-profile-scroll::-webkit-scrollbar-thumb {
+  background: rgba(245, 197, 24, 0.45);
+  border-radius: 99px;
+}
+.edit-profile-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 197, 24, 0.75);
+}
+.edit-profile-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(245, 197, 24, 0.45) transparent;
+}

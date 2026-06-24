@@ -38,10 +38,36 @@ export function Header({
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
 
   useEffect(() => {
+    // Populate from cache first so avatar appears immediately after hydration
+    try {
+      const cached = JSON.parse(localStorage.getItem('cr:me') ?? 'null')
+      if (cached?.firstName) setMe(cached)
+    } catch {}
+
+    // Then fetch fresh data from server
     fetch('/api/auth/me')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.firstName) setMe(d) })
+      .then(d => {
+        if (d?.firstName) {
+          setMe(d)
+          localStorage.setItem('cr:me', JSON.stringify(d))
+        }
+      })
       .catch(() => {})
+  }, [])
+
+  // Keep avatar in sync when user uploads a new profile photo
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const url = (e as CustomEvent<{ url: string }>).detail.url
+      setMe(prev => {
+        const next = prev ? { ...prev, profileImage: url } : prev
+        if (next) localStorage.setItem('cr:me', JSON.stringify(next))
+        return next
+      })
+    }
+    window.addEventListener('cr:avatar-updated', handler)
+    return () => window.removeEventListener('cr:avatar-updated', handler)
   }, [])
 
   const avatarSrc  = me?.profileImage ?? avatarUrl ?? null
@@ -50,6 +76,7 @@ export function Header({
   async function handleLogout() {
     setProfileOpen(false)
     setMobileProfileOpen(false)
+    localStorage.removeItem('cr:me')
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/auth/login')
   }
@@ -266,12 +293,19 @@ export function Header({
                     <div className="p-1.5">
                       {[
                         { icon: UserCircle, label: 'View Profile', href: '/profile' },
-                        { icon: Settings,   label: 'Settings',     href: '/settings' },
+                        { icon: Settings,   label: 'Settings',     href: '/profile' },
                       ].map(({ icon: Icon, label, href }) => (
                         <a
                           key={label}
                           href={href}
-                          onClick={() => setProfileOpen(false)}
+                          onClick={(e) => {
+                            setProfileOpen(false)
+                            if (label === 'Settings') {
+                              e.preventDefault()
+                              sessionStorage.setItem('cr:open-settings', '1')
+                              router.push('/profile')
+                            }
+                          }}
                           className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150"
                           style={{ color: isDark ? '#A1A1AA' : '#666666' }}
                           onMouseEnter={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#FFF3BF'; el.style.color = '#F5C518' }}
@@ -338,12 +372,19 @@ export function Header({
                   <div className="p-1.5">
                     {[
                       { icon: UserCircle, label: 'View Profile', href: '/profile' },
-                      { icon: Settings,   label: 'Settings',     href: '/settings' },
+                      { icon: Settings,   label: 'Settings',     href: '/profile' },
                     ].map(({ icon: Icon, label, href }) => (
                       <a
                         key={label}
                         href={href}
-                        onClick={() => setMobileProfileOpen(false)}
+                        onClick={(e) => {
+                          setMobileProfileOpen(false)
+                          if (label === 'Settings') {
+                            e.preventDefault()
+                            sessionStorage.setItem('cr:open-settings', '1')
+                            router.push('/profile')
+                          }
+                        }}
                         className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors duration-150"
                         style={{ color: isDark ? '#A1A1AA' : '#666666' }}
                         onMouseEnter={e => { const el = e.currentTarget as HTMLAnchorElement; el.style.background = isDark ? 'rgba(52,52,56,0.60)' : '#FFF3BF'; el.style.color = '#F5C518' }}

@@ -36,8 +36,7 @@ export function UserAvatar({
 }: UserAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false)
   const dim = SIZE_MAP[size]
-  const isGooglePhoto = src ? /googleusercontent\.com/i.test(src) : false
-  const showImage = src && !imgFailed && !isGooglePhoto
+  const showImage = src && !imgFailed
 
   return (
     <div className={`${dim} rounded-full overflow-hidden flex-shrink-0 ${className}`}>

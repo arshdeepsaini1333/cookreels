@@ -10,22 +10,37 @@ export async function GET(req: NextRequest, { params }: Context) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { conversationId } = await params
-  // Verify participant
+
+  // Verify participant and get cleared-at timestamps
   const conv = await prisma.conversation.findFirst({
     where: {
       id: conversationId,
       OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
     },
-    select: { id: true },
+    select: {
+      id: true,
+      user1Id: true,
+      clearedByUser1At: true,
+      clearedByUser2At: true,
+    },
   })
   if (!conv) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const isUser1   = conv.user1Id === session.userId
+  const clearedAt = isUser1 ? conv.clearedByUser1At : conv.clearedByUser2At
 
   const { searchParams } = new URL(req.url)
   const cursor = searchParams.get('cursor')
   const LIMIT  = 40
 
   const messages = await prisma.message.findMany({
-    where:   { conversationId },
+    where: {
+      conversationId,
+      // Hide messages deleted for current user
+      NOT: { deletedForUserIds: { has: session.userId } },
+      // Hide messages before the user's clear timestamp
+      ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
+    },
     orderBy: { createdAt: 'desc' },
     take:    LIMIT + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -34,11 +49,40 @@ export async function GET(req: NextRequest, { params }: Context) {
     },
   })
 
-  const hasMore  = messages.length > LIMIT
+  const hasMore = messages.length > LIMIT
   if (hasMore) messages.pop()
   messages.reverse() // chronological order
 
   const nextCursor = hasMore ? messages[0]?.id ?? null : null
 
   return NextResponse.json({ messages, nextCursor })
-} 
+}
+
+// DELETE /api/messages/[conversationId] — clear chat for current user
+export async function DELETE(_req: NextRequest, { params }: Context) {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { conversationId } = await params
+
+  const conv = await prisma.conversation.findFirst({
+    where: {
+      id: conversationId,
+      OR: [{ user1Id: session.userId }, { user2Id: session.userId }],
+    },
+    select: { id: true, user1Id: true },
+  })
+  if (!conv) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const isUser1 = conv.user1Id === session.userId
+  const now     = new Date()
+
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data:  isUser1
+      ? { hiddenForUser1: true, clearedByUser1At: now }
+      : { hiddenForUser2: true, clearedByUser2At: now },
+  })
+
+  return NextResponse.json({ ok: true })
+}

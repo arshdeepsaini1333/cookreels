@@ -52,8 +52,14 @@ export async function POST(req: Request, { params }: Params) {
   if (!content) return NextResponse.json({ error: 'Comment cannot be empty' }, { status: 400 })
   if (content.length > 1000) return NextResponse.json({ error: 'Comment too long' }, { status: 400 })
 
-  const reel = await prisma.reel.findUnique({ where: { id }, select: { id: true, userId: true, title: true } })
+  const reel = await prisma.reel.findUnique({
+    where:  { id },
+    select: { id: true, userId: true, title: true, user: { select: { blockComments: true } } },
+  })
   if (!reel) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (reel.user.blockComments) {
+    return NextResponse.json({ error: 'Comments are disabled on this reel' }, { status: 403 })
+  }
 
   const [comment, updated] = await prisma.$transaction([
     prisma.reelComment.create({

@@ -24,12 +24,13 @@ const fetchUser = cache(async (username: string) => {
       level:            true,
       isVerified:       true,
       isOnline:         true,
+      privateAccount:   true,
       _count: {
         select: {
           recipes:   { where: { isPublished: true } },
           reels:     { where: { isPublished: true } },
-          followers: true,
-          following: true,
+          followers: { where: { status: 'ACCEPTED' } },
+          following: { where: { status: 'ACCEPTED' } },
         },
       },
       recipes: {
@@ -117,8 +118,9 @@ export default async function Page({ params }: Props) {
           lastName:  true,
           username:  true,
           bio:       true,
-          profileImage:     true,
-          cuisineSpecialty: true,
+          profileImage:      true,
+          backgroundPicture: true,
+          cuisineSpecialty:  true,
           level:     true,
           isVerified: true,
           isOnline:  true,
@@ -194,16 +196,17 @@ export default async function Page({ params }: Props) {
     return (
       <ProfilePage
         user={{
-          id:               user.id,
-          name:             `${fullUser.firstName} ${fullUser.lastName}`,
-          username:         `@${fullUser.username}`,
-          bio:              fullUser.bio,
-          verified:         fullUser.isVerified,
-          isOnline:         fullUser.isOnline,
-          topChef:          fullUser._count.recipes >= 10,
-          level:            fullUser.level ?? 'Home Chef',
-          avatar:           fullUser.profileImage,
-          cuisineSpecialty: fullUser.cuisineSpecialty,
+          id:                user.id,
+          name:              `${fullUser.firstName} ${fullUser.lastName}`,
+          username:          `@${fullUser.username}`,
+          bio:               fullUser.bio,
+          verified:          fullUser.isVerified,
+          isOnline:          fullUser.isOnline,
+          topChef:           fullUser._count.recipes >= 10,
+          level:             fullUser.level ?? 'Home Chef',
+          avatar:            fullUser.profileImage,
+          backgroundPicture: fullUser.backgroundPicture,
+          cuisineSpecialty:  fullUser.cuisineSpecialty,
         }}
         stats={{
           recipes:   fullUser._count.recipes,
@@ -256,10 +259,10 @@ export default async function Page({ params }: Props) {
       ? Promise.all([
           prisma.follow.findFirst({
             where: { followerId: session.userId, followingId: user.id },
-            select: { id: true },
+            select: { id: true, status: true },
           }),
           prisma.follow.findFirst({
-            where: { followerId: user.id, followingId: session.userId },
+            where: { followerId: user.id, followingId: session.userId, status: 'ACCEPTED' },
             select: { id: true },
           }),
         ])
@@ -273,8 +276,13 @@ export default async function Page({ params }: Props) {
   ])
 
   const [fwdRecord, revRecord] = followRelation
-  const isFollowing  = !!fwdRecord
+  const followStatus: 'none' | 'pending' | 'accepted' = !fwdRecord
+    ? 'none'
+    : fwdRecord.status === 'PENDING' ? 'pending' : 'accepted'
   const isFollowedBy = !!revRecord
+
+  // Hide content from private accounts unless viewer is an accepted follower or the owner
+  const canSeeContent = !user.privateAccount || followStatus === 'accepted'
 
   return (
     <PublicProfilePage
@@ -297,7 +305,7 @@ export default async function Page({ params }: Props) {
         following: user._count.following,
         friends:   friendsCount,
       }}
-      initialRecipes={user.recipes.map(r => ({
+      initialRecipes={canSeeContent ? user.recipes.map(r => ({
         id:         r.id,
         title:      r.title,
         coverImage: r.coverImage,
@@ -305,8 +313,8 @@ export default async function Page({ params }: Props) {
         prepTime:   r.prepTime,
         likeCount:  r.likeCount,
         difficulty: r.difficulty as string | null,
-      }))}
-      initialReels={user.reels.map(r => ({
+      })) : []}
+      initialReels={canSeeContent ? user.reels.map(r => ({
         id:           r.id,
         title:        r.title,
         videoUrl:     r.videoUrl,
@@ -314,13 +322,14 @@ export default async function Page({ params }: Props) {
         duration:     r.duration,
         viewCount:    r.viewCount,
         likeCount:    r.likeCount,
-      }))}
+      })) : []}
       totalRecipes={user._count.recipes}
       totalReels={user._count.reels}
       currentUserId={session?.userId ?? null}
       currentUserName={currentViewer?.firstName ?? 'Chef'}
-      initialIsFollowing={isFollowing}
+      initialFollowStatus={followStatus}
       initialIsFollowedBy={isFollowedBy}
+      isPrivate={user.privateAccount}
     />
   )
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { FollowStatus } from '@/generated/prisma'
 
 export async function GET() {
   try {
@@ -10,14 +11,14 @@ export async function GET() {
     const userId = session.userId
 
     const [followersCount, followingCount, friendsCount] = await Promise.all([
-      prisma.follow.count({ where: { followingId: userId } }),
-      prisma.follow.count({ where: { followerId: userId } }),
-      // Friends = mutual follows
+      prisma.follow.count({ where: { followingId: userId, status: FollowStatus.ACCEPTED } }),
+      prisma.follow.count({ where: { followerId:  userId, status: FollowStatus.ACCEPTED } }),
+      // Friends = mutual accepted follows
       prisma.user.count({
         where: {
           AND: [
-            { followers: { some: { followerId:  userId } } },
-            { following: { some: { followingId: userId } } },
+            { followers: { some: { followerId:  userId, status: FollowStatus.ACCEPTED } } },
+            { following: { some: { followingId: userId, status: FollowStatus.ACCEPTED } } },
           ],
         },
       }),

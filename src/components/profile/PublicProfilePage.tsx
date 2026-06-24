@@ -7,7 +7,7 @@ import {
   Share2, MessageCircle,
   UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play,
   Clock, Film, Eye, BadgeCheck,
-  Tag, ChevronRight,
+  Tag, ChevronRight, Lock,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
@@ -19,16 +19,17 @@ import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
 // ─── Public profile prop types ────────────────────────────────────────────────
 
 export interface PublicProfilePageProps {
-  user:                ProfileUser
-  stats:               ProfileStats
-  initialRecipes:      ProfileRecipe[]
-  initialReels:        ProfileReel[]
-  totalRecipes:        number
-  totalReels:          number
-  currentUserId:       string | null
-  currentUserName:     string        // logged-in user's name for the sidebar/navbar
-  initialIsFollowing:  boolean
-  initialIsFollowedBy: boolean
+  user:                 ProfileUser
+  stats:                ProfileStats
+  initialRecipes:       ProfileRecipe[]
+  initialReels:         ProfileReel[]
+  totalRecipes:         number
+  totalReels:           number
+  currentUserId:        string | null
+  currentUserName:      string
+  initialFollowStatus:  'none' | 'pending' | 'accepted'
+  initialIsFollowedBy:  boolean
+  isPrivate:            boolean
 }
 
 // ─── Animation presets 
@@ -362,17 +363,21 @@ export function PublicProfilePage({
   totalReels,
   currentUserId,
   currentUserName,
-  initialIsFollowing,
+  initialFollowStatus,
   initialIsFollowedBy,
+  isPrivate,
 }: PublicProfilePageProps) {
   const router = useRouter()
   const { theme } = useTheme()
 
   const [activeTab,    setActiveTab]    = useState<PublicTab>('Recipes')
-  const [isFollowing,  setIsFollowing]  = useState(initialIsFollowing)
+  const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted'>(initialFollowStatus)
   const [isFollowedBy] = useState(initialIsFollowedBy)
   const [followersCount, setFollowersCount] = useState(stats.followers)
   const [followPending,  setFollowPending]  = useState(false)
+
+  const isFollowing = followStatus === 'accepted'
+  const isPending   = followStatus === 'pending'
   const [socialModal,    setSocialModal]    = useState<SocialListType | null>(null)
   const [recipeModal,    setRecipeModal]    = useState<number | null>(null)
 
@@ -391,7 +396,7 @@ export function PublicProfilePage({
 
   const isFriend = isFollowing && isFollowedBy
 
-  // ── Follow / Unfollow 
+  // ── Follow / Unfollow / Request / Withdraw
 
   const handleFollow = useCallback(async () => {
     if (!currentUserId) {
@@ -399,27 +404,44 @@ export function PublicProfilePage({
       return
     }
     if (followPending) return
-
-    const wasFollowing = isFollowing
-    setIsFollowing(!wasFollowing)
-    setFollowersCount(c => wasFollowing ? c - 1 : c + 1)
     setFollowPending(true)
 
-    try {
-      const res = await fetch('/api/social/follow', {
-        method: wasFollowing ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId: user.id }),
-      })
-      if (!res.ok) throw new Error('Failed')
-    } catch {
-      // Revert on failure
-      setIsFollowing(wasFollowing)
-      setFollowersCount(c => wasFollowing ? c + 1 : c - 1)
-    } finally {
-      setFollowPending(false)
+    if (followStatus === 'none') {
+      try {
+        const res = await fetch('/api/social/follow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: user.id }),
+        })
+        if (!res.ok) throw new Error('Failed')
+        const data = await res.json()
+        const next: 'pending' | 'accepted' = data.status === 'pending' ? 'pending' : 'accepted'
+        setFollowStatus(next)
+        if (next === 'accepted') setFollowersCount(c => c + 1)
+      } catch { /* no-op */ }
+    } else {
+      // Unfollow or withdraw request
+      const prev = followStatus
+      setFollowStatus('none')
+      if (prev === 'accepted') setFollowersCount(c => c - 1)
+      try {
+        const res = await fetch('/api/social/follow', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUserId: user.id }),
+        })
+        if (!res.ok) {
+          setFollowStatus(prev)
+          if (prev === 'accepted') setFollowersCount(c => c + 1)
+        }
+      } catch {
+        setFollowStatus(prev)
+        if (prev === 'accepted') setFollowersCount(c => c + 1)
+      }
     }
-  }, [currentUserId, followPending, isFollowing, router, user.id])
+
+    setFollowPending(false)
+  }, [currentUserId, followPending, followStatus, router, user.id])
 
   // ── Load more recipes ────────────────────────────────────────────────────────
 
@@ -459,14 +481,16 @@ export function PublicProfilePage({
 
   // ── Follow button styles ─────────────────────────────────────────────────────
 
-  const followBtnStyle = isFriend
-    ? { background: 'rgba(16,185,129,0.12)', border: '1px solid #10b981', color: '#10b981' }
-    : isFollowing
-      ? { borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)' }
-      : { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }
+  const followBtnStyle = isPending
+    ? { border: '1px solid var(--cr-border)', color: 'var(--cr-text-muted)', background: 'var(--cr-bg-card)' }
+    : isFriend
+      ? { background: 'rgba(16,185,129,0.12)', border: '1px solid #10b981', color: '#10b981' }
+      : isFollowing
+        ? { border: '1px solid var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }
+        : { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }
 
-  const followBtnLabel = isFriend ? 'Friends' : isFollowing ? 'Following' : 'Follow'
-  const FollowIcon = isFriend ? Users : isFollowing ? UserCheck : UserPlus
+  const followBtnLabel = isPending ? 'Requested' : isFriend ? 'Friends' : isFollowing ? 'Following' : 'Follow'
+  const FollowIcon = isPending ? Clock : isFriend ? Users : isFollowing ? UserCheck : UserPlus
 
   // ── Share profile ────────────────────────────────────────────────────────────
 
@@ -677,8 +701,33 @@ export function PublicProfilePage({
           ))}
         </motion.div>
 
+        {/* ── PRIVATE ACCOUNT GATE ────────────────────────── */}
+        {isPrivate && followStatus !== 'accepted' && (
+          <motion.div
+            className="flex flex-col items-center py-16 px-4 mt-6"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.2 }}
+          >
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
+              style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
+            >
+              <Lock className="w-9 h-9" style={{ color: 'var(--cr-text-muted)' }} />
+            </div>
+            <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--cr-text-1)', fontFamily: 'var(--font-heading)' }}>
+              This account is private
+            </h2>
+            <p className="text-sm text-center max-w-xs leading-relaxed" style={{ color: 'var(--cr-text-muted)' }}>
+              {followStatus === 'pending'
+                ? "Your follow request is pending. Once approved, you'll be able to see their recipes and reels."
+                : 'Follow this account to see their recipes and reels.'}
+            </p>
+          </motion.div>
+        )}
+
         {/* ── STICKY TAB NAVIGATION ────────────────────────── */}
-        <div
+        {(!isPrivate || followStatus === 'accepted') && <div
           className="sticky top-0 z-20 mt-6 border-b"
           style={{ background: 'var(--cr-bg-surface)', borderColor: 'var(--cr-border)' }}
         >
@@ -705,10 +754,10 @@ export function PublicProfilePage({
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* ── TAB CONTENT ──────────────────────────────────── */}
-        <div className="mt-5 px-4 pb-8">
+        {(!isPrivate || followStatus === 'accepted') && <div className="mt-5 px-4 pb-8">
           <AnimatePresence mode="wait">
 
             {/* RECIPES */}
@@ -787,7 +836,7 @@ export function PublicProfilePage({
             )}
 
           </AnimatePresence>
-        </div>
+        </div>}
 
       </div>
 

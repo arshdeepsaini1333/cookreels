@@ -139,7 +139,7 @@ const ReelCard = memo(function ReelCard({ reel, idx, onOpen }: ReelCardProps) {
         <p className="text-white text-xs font-bold truncate drop-shadow-md leading-tight">{reel.title}</p>
         <div className="flex items-center justify-between mt-0.5">
           <span className="text-white/60 text-[10px] truncate">@{reel.user.username}</span>
-          {reel.likeCount > 0 && (
+          {reel.likeCount != null && reel.likeCount > 0 && (
             <span className="text-white/60 text-[10px] shrink-0 ml-2">♥ {fmtNum(reel.likeCount)}</span>
           )}
         </div>

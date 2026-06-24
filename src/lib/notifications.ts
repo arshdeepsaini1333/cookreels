@@ -34,6 +34,12 @@ function buildText(input: CreateInput): string {
     case NotificationType.FOLLOW:
       return `${name} started following you.`
 
+    case NotificationType.FOLLOW_REQUEST:
+      return `${name} requested to follow you.`
+
+    case NotificationType.FOLLOW_ACCEPTED:
+      return `${name} accepted your follow request.`
+
     case NotificationType.RECIPE_LIKE:
       return input.recipeTitle
         ? `${name} liked your recipe "${input.recipeTitle}".`

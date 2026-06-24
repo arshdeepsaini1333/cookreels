@@ -7,8 +7,8 @@ import {
   Settings, Share2, Camera, MessageCircle,
   UserPlus, UserCheck, ChefHat, Flame, Heart, Play,
   Bookmark, Clock, Film, Eye, BadgeCheck, TrendingUp,
-  Zap, Bell, Lock, LogOut, X, Edit3, Plus, Users, ChevronRight,
-  Tag,
+  Lock, X, Edit3, Plus, ChevronRight,
+  Tag, Key, EyeOff,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
@@ -16,6 +16,9 @@ import { AddContentModal } from '@/components/shared/AddContentModal'
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
 import { RecipeViewerModal } from '@/components/shared/RecipeViewerModal'
+import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCropModal'
+import { EditProfileModal } from '@/components/profile/EditProfileModal'
+import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
 // ─── Prop Types (data from server / DB) 
 
 export interface ProfileUser {
@@ -28,6 +31,7 @@ export interface ProfileUser {
   topChef: boolean
   level: string
   avatar: string | null
+  backgroundPicture?: string | null
   cuisineSpecialty: string | null
 }
 
@@ -483,10 +487,30 @@ function AvatarFallback({ name }: { name: string }) {
 
 // ─── SettingsDrawer ───────────────────────────────────────────────────────────
 
-function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword }: { open: boolean; onClose: () => void; onEditProfile: () => void; onChangePassword: () => void }) {
   const { theme, toggleTheme } = useTheme()
-  const [privacy, setPrivacy] = useState({ privateAccount: false, activityStatus: true })
-  const [notifs,  setNotifs]  = useState({ likes: true, comments: true, follows: true, messages: false })
+  const [privacy, setPrivacy] = useState({ hideLikeCount: false, blockComments: false, privateAccount: false })
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!open || loaded) return
+    fetch('/api/profile/settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d) setPrivacy(p => ({ ...p, hideLikeCount: d.hideLikeCount, blockComments: d.blockComments, privateAccount: d.privateAccount ?? false }))
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [open, loaded])
+
+  const savePrivacy = (key: 'hideLikeCount' | 'blockComments' | 'privateAccount', value: boolean) => {
+    setPrivacy(p => ({ ...p, [key]: value }))
+    fetch('/api/profile/settings', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ [key]: value }),
+    }).catch(() => {})
+  }
 
   return (
     <AnimatePresence>
@@ -520,13 +544,12 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                 <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Account</p>
                 <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
                   {[
-                    { icon: <Edit3 className="w-4 h-4" />, label: 'Edit Profile' },
-                    { icon: <Camera className="w-4 h-4" />, label: 'Change Photo' },
-                    { icon: <Bookmark className="w-4 h-4" />, label: 'Saved Collections' },
-                    { icon: <Users className="w-4 h-4" />, label: 'Manage Friends' },
+                    { icon: <Edit3 className="w-4 h-4" />, label: 'Edit Profile',    onClick: onEditProfile    },
+                    { icon: <Key   className="w-4 h-4" />, label: 'Change Password', onClick: onChangePassword },
                   ].map((item, i, arr) => (
                     <button
                       key={item.label}
+                      onClick={item.onClick}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left ${i < arr.length - 1 ? 'border-b' : ''}`}
                       style={{ borderColor: 'var(--cr-border)' }}
                     >
@@ -534,6 +557,32 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                       <span className="text-sm font-medium flex-1" style={{ color: 'var(--cr-text-1)' }}>{item.label}</span>
                       <ChevronRight className="w-4 h-4" style={{ color: 'var(--cr-text-muted)' }} />
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Privacy */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Privacy</p>
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
+                  {([
+                    { key: 'hideLikeCount'  as const, label: 'Hide Like Count',  sub: "Others won't see like counts on your posts", icon: <EyeOff        className="w-4 h-4" /> },
+                    { key: 'blockComments'  as const, label: 'Block Comments',   sub: 'Disable comments on your posts',             icon: <MessageCircle className="w-4 h-4" /> },
+                    { key: 'privateAccount' as const, label: 'Private Account',  sub: 'Only approved followers can see your posts', icon: <Lock          className="w-4 h-4" /> },
+                  ] as const).map((item, i, arr) => (
+                    <div key={item.key} className={`flex items-center justify-between px-4 py-3.5 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{ borderColor: 'var(--cr-border)' }}>
+                      <div className="flex items-center gap-3">
+                        <span style={{ color: 'var(--cr-text-2)' }}>{item.icon}</span>
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: 'var(--cr-text-1)' }}>{item.label}</p>
+                          <p className="text-xs" style={{ color: 'var(--cr-text-muted)' }}>{item.sub}</p>
+                        </div>
+                      </div>
+                      <Toggle
+                        on={privacy[item.key]}
+                        onToggle={() => savePrivacy(item.key, !privacy[item.key])}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -552,55 +601,6 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
                   <Toggle on={theme === 'dark'} onToggle={toggleTheme} />
                 </div>
               </div>
-
-              {/* Privacy */}
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Privacy</p>
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
-                  {([
-                    { key: 'privateAccount' as const, label: 'Private Account',   sub: 'Only approved followers', icon: <Lock className="w-4 h-4" /> },
-                    { key: 'activityStatus' as const, label: 'Activity Status',   sub: 'Show when online',        icon: <Zap  className="w-4 h-4" /> },
-                  ] as const).map((item, i) => (
-                    <div key={item.key} className={`flex items-center justify-between px-4 py-3.5 ${i === 0 ? 'border-b' : ''}`} style={{ borderColor: 'var(--cr-border)' }}>
-                      <div className="flex items-center gap-3">
-                        <span style={{ color: 'var(--cr-text-2)' }}>{item.icon}</span>
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: 'var(--cr-text-1)' }}>{item.label}</p>
-                          <p className="text-xs" style={{ color: 'var(--cr-text-muted)' }}>{item.sub}</p>
-                        </div>
-                      </div>
-                      <Toggle on={privacy[item.key]} onToggle={() => setPrivacy(p => ({ ...p, [item.key]: !p[item.key] }))} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Notifications */}
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Notifications</p>
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
-                  {([
-                    { key: 'likes'    as const, label: 'Likes'          },
-                    { key: 'comments' as const, label: 'Comments'       },
-                    { key: 'follows'  as const, label: 'New Followers'  },
-                    { key: 'messages' as const, label: 'Messages'       },
-                  ] as const).map((item, i, arr) => (
-                    <div key={item.key} className={`flex items-center justify-between px-4 py-3.5 ${i < arr.length - 1 ? 'border-b' : ''}`} style={{ borderColor: 'var(--cr-border)' }}>
-                      <div className="flex items-center gap-3">
-                        <Bell className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
-                        <span className="text-sm font-medium" style={{ color: 'var(--cr-text-1)' }}>{item.label}</span>
-                      </div>
-                      <Toggle on={notifs[item.key]} onToggle={() => setNotifs(n => ({ ...n, [item.key]: !n[item.key] }))} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Logout */}
-              <button className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl transition-colors hover:bg-red-500/20 bg-red-500/10">
-                <LogOut className="w-4 h-4 text-red-500" />
-                <span className="text-sm font-semibold text-red-500">Log Out</span>
-              </button>
             </div>
           </motion.div>
         </>
@@ -612,15 +612,56 @@ function SettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void 
 // ─── ProfilePage (main export) ────────────────────────────────────────────────
 
 export function ProfilePage({ user, stats, recipes, reels, collections }: ProfilePageProps) {
-  const [activeTab,    setActiveTab]    = useState<ProfileTab>('Recipes')
-  const [showSettings, setShowSettings] = useState(false)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [savedSet,     setSavedSet]     = useState<Set<string>>(new Set())
-  const [isFollowing,  setIsFollowing]  = useState(false)
-  const [socialModal,  setSocialModal]  = useState<SocialListType | null>(null)
-  const [recipeModal,  setRecipeModal]  = useState<number | null>(null)
+  const [activeTab,       setActiveTab]       = useState<ProfileTab>('Recipes')
+  const [showSettings,    setShowSettings]    = useState(false)
+  const [showEditProfile,     setShowEditProfile]     = useState(false)
+  const [showChangePassword,  setShowChangePassword]  = useState(false)
+  const [showAddModal,    setShowAddModal]    = useState(false)
+  const [savedSet,        setSavedSet]        = useState<Set<string>>(new Set())
+  const [isFollowing,     setIsFollowing]     = useState(false)
+  const [socialModal,     setSocialModal]     = useState<SocialListType | null>(null)
+  const [recipeModal,     setRecipeModal]     = useState<number | null>(null)
+
+  // ── Editable profile info ────────────────────────────────────────────────────
+  const [profileName,     setProfileName]     = useState(user.name)
+  const [profileUsername, setProfileUsername] = useState(user.username)
+  const [profileBio,      setProfileBio]      = useState(user.bio)
+  const [profileLevel,    setProfileLevel]    = useState(user.level)
+
+  // ── Image upload state ───────────────────────────────────────────────────────
+  const [avatarUrl,       setAvatarUrl]       = useState<string | null>(user.avatar)
+  const [coverUrl,        setCoverUrl]        = useState<string | null>(user.backgroundPicture ?? null)
+  const [cropModal,       setCropModal]       = useState<{ type: 'avatar' | 'cover'; file: File } | null>(null)
+  const [toast,           setToast]           = useState<{ msg: string; ok: boolean } | null>(null)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef  = useRef<HTMLInputElement>(null)
+
+  const showToast = (msg: string, ok: boolean) => {
+    setToast({ msg, ok })
+    setTimeout(() => setToast(null), 3000)
+  }
+
+  const handleFileSelect = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'avatar' | 'cover',
+  ) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const err = validateImageFile(file)
+    if (err) { showToast(err, false); return }
+    setCropModal({ type, file })
+  }
+
   const router       = useRouter()
   const isOwnProfile = true
+
+  useEffect(() => {
+    if (sessionStorage.getItem('cr:open-settings') === '1') {
+      sessionStorage.removeItem('cr:open-settings')
+      setShowSettings(true)
+    }
+  }, [])
 
   const toggleSave = (id: string) => {
     setSavedSet(s => {
@@ -630,7 +671,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
     })
   }
 
-  const firstName = user.name.split(' ')[0]
+  const firstName = profileName.split(' ')[0]
 
   return (
     <DashboardLayout username={firstName}>
@@ -642,20 +683,51 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE }}
         >
-          {/* Cover banner */}
-          <div
-            className="relative w-full h-36 sm:h-52 rounded-2xl overflow-hidden"
-            style={{ background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' }}
-          >
-            <div className="absolute inset-0 pointer-events-none select-none" aria-hidden>
-              <span className="absolute top-4 right-8 text-5xl sm:text-7xl opacity-25">🍳</span>
-              <span className="absolute bottom-3 left-10 text-3xl sm:text-5xl opacity-20">🌶️</span>
-              <span className="absolute top-5 left-1/3 text-4xl sm:text-6xl opacity-15">🍜</span>
+          {/* Cover banner — wrapped in a relative container so the edit button
+               sits OUTSIDE overflow-hidden and never gets clipped or flickers */}
+          <div className="relative z-10">
+            <div
+              className="w-full h-36 sm:h-52 rounded-2xl overflow-hidden"
+              style={!coverUrl ? { background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' } : undefined}
+            >
+              {coverUrl ? (
+                <img
+                  src={coverUrl}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="absolute inset-0 pointer-events-none select-none" aria-hidden>
+                  <span className="absolute top-4 right-8 text-5xl sm:text-7xl opacity-25">🍳</span>
+                  <span className="absolute bottom-3 left-10 text-3xl sm:text-5xl opacity-20">🌶️</span>
+                  <span className="absolute top-5 left-1/3 text-4xl sm:text-6xl opacity-15">🍜</span>
+                </div>
+              )}
             </div>
+
+            {/* Cover edit button — always visible, outside overflow-hidden */}
+            {isOwnProfile && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => coverInputRef.current?.click()}
+                className="absolute top-3 right-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg border"
+                style={{
+                  background: 'rgba(0,0,0,0.55)',
+                  backdropFilter: 'blur(8px)',
+                  borderColor: 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                }}
+                title="Change cover photo"
+              >
+                <Camera className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Edit Cover</span>
+              </motion.button>
+            )}
           </div>
 
           {/* Avatar + action buttons */}
-          <div className="relative flex items-end justify-between px-4 -mt-10 sm:-mt-14">
+          <div className="relative z-20 flex items-end justify-between px-4 -mt-10 sm:-mt-14">
             <div className="relative shrink-0">
               {/* Glowing ring */}
               <div
@@ -663,8 +735,8 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 style={{ background: 'linear-gradient(135deg, #F5C518, #FF9F1C, #F5C518)' }}
               >
                 <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid var(--cr-bg-card)' }}>
-                  {user.avatar
-                    ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                     : <AvatarFallback name={user.name} />
                   }
                 </div>
@@ -675,7 +747,12 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
               )}
               {/* Camera button — own profile */}
               {isOwnProfile && (
-                <button className="absolute -bottom-0.5 -left-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 hover:scale-110 transition-transform shadow-lg" style={{ background: 'var(--cr-accent)', borderColor: 'var(--cr-bg-card)', color: '#1A1A1A' }}>
+                <button
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="absolute -bottom-0.5 -left-0.5 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 hover:scale-110 transition-transform shadow-lg"
+                  style={{ background: 'var(--cr-accent)', borderColor: 'var(--cr-bg-card)', color: '#1A1A1A' }}
+                  title="Change profile photo"
+                >
                   <Camera className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                 </button>
               )}
@@ -685,9 +762,6 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
             <div className="hidden sm:flex items-center gap-2 pb-3">
               {isOwnProfile ? (
                 <>
-                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow-md" style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-                    <Edit3 className="w-3.5 h-3.5" /> Edit Profile
-                  </motion.button>
                   <motion.button
                     onClick={() => setShowAddModal(true)}
                     whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
@@ -723,7 +797,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
           {/* Name + badges */}
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold" style={{ fontFamily: 'var(--font-heading)', color: 'var(--cr-text-1)' }}>
-              {user.name}
+              {profileName}
             </h1>
             {user.verified && (
               <BadgeCheck className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" style={{ color: 'var(--cr-accent)' }} />
@@ -737,13 +811,13 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
 
           {/* Username */}
           <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--cr-text-muted)' }}>
-            {user.username}
+            @{profileUsername}
           </p>
 
           {/* Bio */}
-          {user.bio && (
+          {profileBio && (
             <p className="text-sm mt-2 leading-relaxed max-w-lg" style={{ color: 'var(--cr-text-2)' }}>
-              {user.bio}
+              {profileBio}
             </p>
           )}
 
@@ -756,7 +830,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
               </span>
             )}
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ background: 'var(--cr-accent-soft)', color: 'var(--cr-accent)' }}>
-              {user.level}
+              {profileLevel}
             </span>
           </div>
 
@@ -764,9 +838,6 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
           <div className="flex sm:hidden gap-2 mt-4">
             {isOwnProfile ? (
               <>
-                <motion.button whileTap={{ scale: 0.97 }} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold shadow" style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-                  <Edit3 className="w-4 h-4" /> Edit Profile
-                </motion.button>
                 <motion.button
                   onClick={() => setShowAddModal(true)}
                   whileTap={{ scale: 0.97 }}
@@ -980,7 +1051,34 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
       </div>
 
       {/* Settings drawer */}
-      <SettingsDrawer open={showSettings} onClose={() => setShowSettings(false)} />
+      <SettingsDrawer
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        onEditProfile={() => { setShowSettings(false); setShowEditProfile(true) }}
+        onChangePassword={() => { setShowSettings(false); setShowChangePassword(true) }}
+      />
+
+      {/* Change password modal */}
+      <ChangePasswordModal
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+        onSuccess={() => showToast('Password updated!', true)}
+      />
+
+      {/* Edit profile modal */}
+      <EditProfileModal
+        open={showEditProfile}
+        initialName={profileName}
+        initialBio={profileBio}
+        initialLevel={profileLevel}
+        onClose={() => setShowEditProfile(false)}
+        onSave={({ name, bio, level }) => {
+          setProfileName(name)
+          setProfileBio(bio)
+          setProfileLevel(level)
+          showToast('Profile updated!', true)
+        }}
+      />
 
       {/* Add content modal */}
       <AddContentModal open={showAddModal} onClose={() => setShowAddModal(false)} userId={user.id} />
@@ -990,7 +1088,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         isOpen={socialModal !== null}
         onClose={() => setSocialModal(null)}
         title={socialModal === 'followers' ? 'Followers' : socialModal === 'following' ? 'Following' : 'Friends'}
-        username={user.username}
+        username={profileUsername}
         listType={socialModal ?? 'followers'}
         currentUserId={user.id}
       />
@@ -1003,9 +1101,65 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         user={user}
         isOpen={recipeModal !== null}
         onClose={() => setRecipeModal(null)}
-        currentUserAvatar={user.avatar}
-        currentUserName={user.name}
+        currentUserAvatar={avatarUrl}
+        currentUserName={profileName}
       />
+
+      {/* Hidden file inputs */}
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => handleFileSelect(e, 'avatar')}
+      />
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => handleFileSelect(e, 'cover')}
+      />
+
+      {/* Image crop modal */}
+      <ImageCropModal
+        open={cropModal !== null}
+        file={cropModal?.file ?? null}
+        type={cropModal?.type ?? 'avatar'}
+        userId={user.id}
+        onClose={() => setCropModal(null)}
+        onSuccess={(url) => {
+          if (cropModal?.type === 'avatar') {
+            setAvatarUrl(url)
+            showToast('Profile photo updated!', true)
+          } else {
+            setCoverUrl(url)
+            showToast('Cover photo updated!', true)
+          }
+          setCropModal(null)
+        }}
+      />
+
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="profile-toast"
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] px-5 py-3 rounded-2xl text-sm font-semibold shadow-2xl flex items-center gap-2"
+            style={{
+              background: toast.ok ? 'linear-gradient(135deg,#22c55e,#16a34a)' : '#ef4444',
+              color: '#fff',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+            }}
+          >
+            {toast.ok ? '✓' : '✕'} {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </DashboardLayout>
   )

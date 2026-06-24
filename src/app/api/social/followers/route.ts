@@ -14,9 +14,9 @@ export async function GET(req: Request) {
 
     const userId = session.userId
 
-    // Get all follower IDs first (users who follow me)
+    // Get all accepted follower IDs (users who follow me)
     const followerRecords = await prisma.follow.findMany({
-      where: { followingId: userId },
+      where: { followingId: userId, status: 'ACCEPTED' },
       select: { followerId: true },
     })
     const followerIds = followerRecords.map(r => r.followerId)

@@ -182,6 +182,41 @@ function RecipeRow({ recipe, isDark, onSelect }: { recipe: SearchRecipe; isDark:
   )
 }
 
+function ReelThumb({ url, title, isDark }: { url: string | null; title: string; isDark: boolean }) {
+  const [ok, setOk] = useState<boolean | null>(url ? null : false)
+
+  if (ok === true) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={url!} alt="" className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+    )
+  }
+  if (ok === null) {
+    // Loading: render img hidden; on success show it, on error fall back
+    return (
+      <div className="relative w-9 h-9 flex-shrink-0">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
+          🎬
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url!}
+          alt=""
+          className="absolute inset-0 w-full h-full rounded-lg object-cover opacity-0"
+          onLoad={e  => { (e.currentTarget as HTMLImageElement).classList.remove('opacity-0'); setOk(true) }}
+          onError={() => setOk(false)}
+        />
+      </div>
+    )
+  }
+  // Failed or no URL
+  return (
+    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
+      🎬
+    </div>
+  )
+}
+
 function ReelRow({ reel, isDark, onSelect }: { reel: SearchReel; isDark: boolean; onSelect: () => void }) {
   return (
     <button
@@ -190,14 +225,7 @@ function ReelRow({ reel, isDark, onSelect }: { reel: SearchReel; isDark: boolean
       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = isDark ? 'rgba(52,52,56,0.60)' : '#FFF3BF' }}
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
     >
-      {reel.thumbnailUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={reel.thumbnailUrl} alt={reel.title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
-      ) : (
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
-          🎬
-        </div>
-      )}
+      <ReelThumb url={reel.thumbnailUrl} title={reel.title} isDark={isDark} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
           {reel.title}

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import type { NotificationItem as NotifType } from '@/hooks/useNotifications'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 
@@ -16,16 +17,17 @@ function timeAgo(iso: string): string {
   return `${Math.floor(d / 7)}w`
 }
 
-// Fallback text if the stored text field is null (old notifications)
 function fallbackText(n: NotifType): string {
   const name = n.sender.username
   switch (n.type) {
-    case 'FOLLOW': return `${name} started following you.`
-    case 'RECIPE_LIKE': return n.recipe ? `${name} liked your recipe "${n.recipe.title}".` : `${name} liked your recipe.`
-    case 'RECIPE_COMMENT': return n.recipe ? `${name} commented on your recipe "${n.recipe.title}".` : `${name} commented on your recipe.`
-    case 'REEL_LIKE': return n.reel ? `${name} liked your reel "${n.reel.title}".` : `${name} liked your reel.`
-    case 'REEL_COMMENT': return n.reel ? `${name} commented on your reel "${n.reel.title}".` : `${name} commented on your reel.`
-    default: return `${name} interacted with your content.`
+    case 'FOLLOW':          return `${name} started following you.`
+    case 'FOLLOW_REQUEST':  return `${name} requested to follow you.`
+    case 'FOLLOW_ACCEPTED': return `${name} accepted your follow request.`
+    case 'RECIPE_LIKE':     return n.recipe ? `${name} liked your recipe "${n.recipe.title}".` : `${name} liked your recipe.`
+    case 'RECIPE_COMMENT':  return n.recipe ? `${name} commented on your recipe "${n.recipe.title}".` : `${name} commented on your recipe.`
+    case 'REEL_LIKE':       return n.reel ? `${name} liked your reel "${n.reel.title}".` : `${name} liked your reel.`
+    case 'REEL_COMMENT':    return n.reel ? `${name} commented on your reel "${n.reel.title}".` : `${name} commented on your reel.`
+    default:                return `${name} interacted with your content.`
   }
 }
 
@@ -36,7 +38,30 @@ interface Props {
 
 export function NotificationItem({ notification: n, isDark }: Props) {
   const displayText = n.text ?? fallbackText(n)
-  const thumbnail = n.reel?.thumbnailUrl ?? n.recipe?.coverImage
+  const thumbnail   = n.reel?.thumbnailUrl ?? n.recipe?.coverImage
+
+  const [reqStatus, setReqStatus] = useState<'idle' | 'pending' | 'accepted' | 'declined'>('idle')
+
+  const handleFollowRequest = async (action: 'accept' | 'decline') => {
+    if (reqStatus === 'pending') return
+    setReqStatus('pending')
+    try {
+      const res = await fetch('/api/social/follow-requests', {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action, requesterId: n.sender.id }),
+      })
+      if (res.ok) {
+        setReqStatus(action === 'accept' ? 'accepted' : 'declined')
+      } else {
+        setReqStatus('idle')
+      }
+    } catch {
+      setReqStatus('idle')
+    }
+  }
+
+  const isFollowRequest = n.type === 'FOLLOW_REQUEST'
 
   return (
     <div
@@ -66,27 +91,52 @@ export function NotificationItem({ notification: n, isDark }: Props) {
       </div>
 
       {/* Sender avatar */}
-      <UserAvatar
-        src={n.sender.profileImage}
-        name={n.sender.username}
-        size="md"
-      />
+      <UserAvatar src={n.sender.profileImage} name={n.sender.username} size="md" />
 
-      {/* Text */}
+      {/* Text + actions */}
       <div className="flex-1 min-w-0">
-        <p
-          className="text-[13px] leading-snug break-words"
-          style={{ color: isDark ? '#D4D4D8' : '#374151' }}
-        >
+        <p className="text-[13px] leading-snug break-words" style={{ color: isDark ? '#D4D4D8' : '#374151' }}>
           {displayText}
         </p>
         <p className="text-[11px] mt-1" style={{ color: isDark ? '#52525B' : '#9CA3AF' }}>
           {timeAgo(n.createdAt)}
         </p>
+
+        {/* Accept / Decline buttons for follow requests */}
+        {isFollowRequest && (
+          <div className="flex gap-2 mt-2">
+            {reqStatus === 'accepted' && (
+              <span className="text-[12px] font-semibold text-emerald-500">Accepted</span>
+            )}
+            {reqStatus === 'declined' && (
+              <span className="text-[12px] font-semibold" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>Declined</span>
+            )}
+            {(reqStatus === 'idle' || reqStatus === 'pending') && (
+              <>
+                <button
+                  onClick={() => handleFollowRequest('accept')}
+                  disabled={reqStatus === 'pending'}
+                  className="px-3 py-1 rounded-full text-[12px] font-semibold transition-all disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                >
+                  {reqStatus === 'pending' ? '…' : 'Accept'}
+                </button>
+                <button
+                  onClick={() => handleFollowRequest('decline')}
+                  disabled={reqStatus === 'pending'}
+                  className="px-3 py-1 rounded-full text-[12px] font-semibold border transition-all disabled:opacity-60"
+                  style={{ borderColor: isDark ? '#3F3F46' : '#E5E7EB', color: isDark ? '#D4D4D8' : '#374151', background: 'transparent' }}
+                >
+                  Decline
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Content thumbnail */}
-      {thumbnail && (
+      {/* Content thumbnail (not shown for follow requests) */}
+      {thumbnail && !isFollowRequest && (
         <div className="flex-shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

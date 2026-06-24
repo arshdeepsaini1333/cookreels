@@ -39,6 +39,8 @@ export interface InstagramReelViewerProps {
   currentUserId: string | null
   initialIsFollowing: boolean
   isOwnReel: boolean
+  hideLikeCount?: boolean
+  blockComments?: boolean
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ const GRADIENTS = [
 
 // ─── CommentSheet ─────────────────────────────────────────────────────────────
 
-function CommentSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+function CommentSheet({ open, onClose, blockComments }: { open: boolean; onClose: () => void; blockComments?: boolean }) {
   const [comment, setComment] = useState('')
 
   return (
@@ -97,43 +99,45 @@ function CommentSheet({ open, onClose }: { open: boolean; onClose: () => void })
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-none px-5 py-4">
               <p className="text-center text-sm py-12" style={{ color: 'var(--cr-text-muted)' }}>
-                No comments yet. Be the first!
+                {blockComments ? 'Comments are disabled on this reel.' : 'No comments yet. Be the first!'}
               </p>
             </div>
-            <div
-              className="flex-shrink-0 px-4 py-3 border-t"
-              style={{
-                borderColor: 'var(--cr-border)',
-                paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
-              }}
-            >
+            {!blockComments && (
               <div
-                className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
-                style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+                className="flex-shrink-0 px-4 py-3 border-t"
+                style={{
+                  borderColor: 'var(--cr-border)',
+                  paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+                }}
               >
-                <input
-                  type="text"
-                  value={comment}
-                  onChange={e => setComment(e.target.value)}
-                  placeholder="Add a comment…"
-                  className="flex-1 bg-transparent text-sm outline-none"
-                  style={{ color: 'var(--cr-text-1)' }}
-                />
-                <AnimatePresence>
-                  {comment.trim() && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{ duration: 0.14 }}
-                      onClick={() => setComment('')}
-                    >
-                      <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
+                <div
+                  className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
+                  style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+                >
+                  <input
+                    type="text"
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    placeholder="Add a comment…"
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: 'var(--cr-text-1)' }}
+                  />
+                  <AnimatePresence>
+                    {comment.trim() && (
+                      <motion.button
+                        initial={{ opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.6 }}
+                        transition={{ duration: 0.14 }}
+                        onClick={() => setComment('')}
+                      >
+                        <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         </>
       )}
@@ -153,11 +157,12 @@ interface SlotProps {
   globalMuted: boolean
   onMuteToggle: () => void
   onCommentOpen: () => void
+  hideLikeCount?: boolean
 }
 
 function MobileReelSlot({
   reel, index, isActive, creator, initialIsFollowing, isOwnReel,
-  globalMuted, onMuteToggle, onCommentOpen,
+  globalMuted, onMuteToggle, onCommentOpen, hideLikeCount,
 }: SlotProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const [paused,    setPaused]    = useState(false)
@@ -279,9 +284,11 @@ function MobileReelSlot({
               }}
             />
           </motion.button>
-          <span className="text-white text-xs font-bold" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
-            {fmt(likeCount)}
-          </span>
+          {!hideLikeCount && (
+            <span className="text-white text-xs font-bold" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}>
+              {fmt(likeCount)}
+            </span>
+          )}
         </div>
 
         {/* Comment */}
@@ -426,11 +433,13 @@ interface DesktopProps {
   onPrev: () => void
   onNext: () => void
   onBack: () => void
+  hideLikeCount?: boolean
+  blockComments?: boolean
 }
 
 function DesktopReelViewer({
   reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
-  hasPrev, hasNext, onPrev, onNext, onBack,
+  hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments,
 }: DesktopProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const [muted,     setMuted]     = useState(true)
@@ -668,12 +677,14 @@ function DesktopReelViewer({
               )}
 
               <div className="flex flex-wrap gap-2">
-                <span
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"
-                  style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-muted)' }}
-                >
-                  <Heart className="w-3 h-3" /> {fmt(reel.likeCount)} likes
-                </span>
+                {!hideLikeCount && (
+                  <span
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"
+                    style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-muted)' }}
+                  >
+                    <Heart className="w-3 h-3" /> {fmt(reel.likeCount)} likes
+                  </span>
+                )}
                 <span
                   className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"
                   style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-muted)' }}
@@ -684,9 +695,15 @@ function DesktopReelViewer({
 
               <div className="border-t pt-3" style={{ borderColor: 'var(--cr-border)' }}>
                 <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--cr-text-1)' }}>Comments</h3>
-                <p className="text-xs text-center py-6" style={{ color: 'var(--cr-text-muted)' }}>
-                  No comments yet. Be the first!
-                </p>
+                {blockComments ? (
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--cr-text-muted)' }}>
+                    Comments are disabled on this reel.
+                  </p>
+                ) : (
+                  <p className="text-xs text-center py-6" style={{ color: 'var(--cr-text-muted)' }}>
+                    No comments yet. Be the first!
+                  </p>
+                )}
               </div>
             </div>
 
@@ -704,7 +721,9 @@ function DesktopReelViewer({
                       className="w-5 h-5"
                       style={{ fill: liked ? '#F5C518' : 'transparent', color: liked ? '#F5C518' : 'var(--cr-text-muted)' }}
                     />
-                    <span className="text-xs font-semibold tabular-nums">{fmt(likeCount)}</span>
+                    {!hideLikeCount && (
+                      <span className="text-xs font-semibold tabular-nums">{fmt(likeCount)}</span>
+                    )}
                   </motion.button>
                   <button
                     className="flex items-center gap-1.5 px-3 py-2 rounded-full"
@@ -736,44 +755,50 @@ function DesktopReelViewer({
               </div>
 
               {/* Comment input */}
-              <div className="flex items-center gap-2.5 px-4 pb-4">
-                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                  {creator.avatar
-                    ? <img src={creator.avatar} alt="" className="w-full h-full object-cover" />
-                    : <div
-                        className="w-full h-full"
-                        style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)' }}
-                      />
-                  }
+              {blockComments ? (
+                <p className="text-xs text-center px-4 pb-4" style={{ color: 'var(--cr-text-muted)' }}>
+                  Comments are disabled on this reel.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2.5 px-4 pb-4">
+                  <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                    {creator.avatar
+                      ? <img src={creator.avatar} alt="" className="w-full h-full object-cover" />
+                      : <div
+                          className="w-full h-full"
+                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)' }}
+                        />
+                    }
+                  </div>
+                  <div
+                    className="flex-1 flex items-center gap-2 rounded-full px-3.5 py-2"
+                    style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+                  >
+                    <input
+                      type="text"
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && comment.trim()) setComment('') }}
+                      placeholder="Add a comment…"
+                      className="flex-1 bg-transparent text-sm outline-none min-w-0"
+                      style={{ color: 'var(--cr-text-1)' }}
+                    />
+                    <AnimatePresence>
+                      {comment.trim() && (
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.6 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.6 }}
+                          transition={{ duration: 0.14 }}
+                          onClick={() => setComment('')}
+                        >
+                          <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-                <div
-                  className="flex-1 flex items-center gap-2 rounded-full px-3.5 py-2"
-                  style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
-                >
-                  <input
-                    type="text"
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && comment.trim()) setComment('') }}
-                    placeholder="Add a comment…"
-                    className="flex-1 bg-transparent text-sm outline-none min-w-0"
-                    style={{ color: 'var(--cr-text-1)' }}
-                  />
-                  <AnimatePresence>
-                    {comment.trim() && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.6 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.6 }}
-                        transition={{ duration: 0.14 }}
-                        onClick={() => setComment('')}
-                      >
-                        <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -786,7 +811,7 @@ function DesktopReelViewer({
 
 export function InstagramReelViewer({
   initialReelId, allReels, creator, currentUserId: _currentUserId,
-  initialIsFollowing, isOwnReel,
+  initialIsFollowing, isOwnReel, hideLikeCount = false, blockComments = false,
 }: InstagramReelViewerProps) {
   const router = useRouter()
   const initialIndex = Math.max(0, allReels.findIndex(r => r.id === initialReelId))
@@ -902,6 +927,7 @@ export function InstagramReelViewer({
               globalMuted={globalMuted}
               onMuteToggle={() => setGlobalMuted(m => !m)}
               onCommentOpen={() => setCommentSheetOpen(true)}
+              hideLikeCount={hideLikeCount}
             />
           ))}
         </div>
@@ -910,6 +936,7 @@ export function InstagramReelViewer({
         <CommentSheet
           open={commentSheetOpen}
           onClose={() => setCommentSheetOpen(false)}
+          blockComments={blockComments}
         />
       </div>
 
@@ -935,6 +962,8 @@ export function InstagramReelViewer({
               onPrev={() => navigateTo(activeIndex - 1)}
               onNext={() => navigateTo(activeIndex + 1)}
               onBack={() => router.back()}
+              hideLikeCount={hideLikeCount}
+              blockComments={blockComments}
             />
           </motion.div>
         </AnimatePresence>

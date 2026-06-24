@@ -51,12 +51,14 @@ export default async function ReelPage({ params }: Props) {
       userId: true,
       user: {
         select: {
-          id:           true,
-          firstName:    true,
-          lastName:     true,
-          username:     true,
-          profileImage: true,
-          isVerified:   true,
+          id:            true,
+          firstName:     true,
+          lastName:      true,
+          username:      true,
+          profileImage:  true,
+          isVerified:    true,
+          hideLikeCount: true,
+          blockComments: true,
           _count: { select: { recipes: { where: { isPublished: true } } } },
         },
       },
@@ -104,6 +106,8 @@ export default async function ReelPage({ params }: Props) {
         verified: reel.user.isVerified,
         topChef:  reel.user._count.recipes >= 10,
       }}
+      hideLikeCount={reel.user.hideLikeCount}
+      blockComments={reel.user.blockComments}
       currentUserId={session?.userId ?? null}
       initialIsFollowing={isFollowing}
       isOwnReel={session?.userId === reel.userId}

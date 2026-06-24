@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { createNotification } from '@/lib/notifications'
-import { NotificationType } from '@/generated/prisma'
+import { FollowStatus, NotificationType } from '@/generated/prisma'
 
 export async function POST(req: Request) {
   try {
@@ -13,21 +13,35 @@ export async function POST(req: Request) {
     if (!targetUserId) return NextResponse.json({ message: 'Missing targetUserId' }, { status: 400 })
     if (targetUserId === session.userId) return NextResponse.json({ message: 'Cannot follow yourself' }, { status: 400 })
 
-    const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true } })
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, privateAccount: true },
+    })
     if (!target) return NextResponse.json({ message: 'User not found' }, { status: 404 })
 
-    await prisma.follow.create({
-      data: { followerId: session.userId, followingId: targetUserId },
-    })
-
-    await createNotification({
-      recipientId: targetUserId,
-      senderId: session.userId,
-      senderUsername: session.username,
-      type: NotificationType.FOLLOW,
-    })
-
-    return NextResponse.json({ success: true })
+    if (target.privateAccount) {
+      await prisma.follow.create({
+        data: { followerId: session.userId, followingId: targetUserId, status: FollowStatus.PENDING },
+      })
+      await createNotification({
+        recipientId: targetUserId,
+        senderId: session.userId,
+        senderUsername: session.username,
+        type: NotificationType.FOLLOW_REQUEST,
+      })
+      return NextResponse.json({ success: true, status: 'pending' })
+    } else {
+      await prisma.follow.create({
+        data: { followerId: session.userId, followingId: targetUserId },
+      })
+      await createNotification({
+        recipientId: targetUserId,
+        senderId: session.userId,
+        senderUsername: session.username,
+        type: NotificationType.FOLLOW,
+      })
+      return NextResponse.json({ success: true, status: 'accepted' })
+    }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2002') {
       return NextResponse.json({ message: 'Already following' }, { status: 409 })

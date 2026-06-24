@@ -17,6 +17,7 @@ export async function GET(_req: Request, { params }: Params) {
         commentCount: true,
         likeCount:    true,
         createdAt:    true,
+        user: { select: { hideLikeCount: true, blockComments: true } },
         comments: {
           where:   { parentId: null },
           orderBy: { createdAt: 'asc' },
@@ -42,12 +43,14 @@ export async function GET(_req: Request, { params }: Params) {
       : false
 
     return NextResponse.json({
-      description:  recipe.description,
-      servings:     recipe.servings,
-      commentCount: recipe.commentCount,
-      likeCount:    recipe.likeCount,
+      description:   recipe.description,
+      servings:      recipe.servings,
+      commentCount:  recipe.commentCount,
+      likeCount:     recipe.likeCount,
+      hideLikeCount: recipe.user.hideLikeCount,
+      blockComments: recipe.user.blockComments,
       liked,
-      createdAt:    recipe.createdAt.toISOString(),
+      createdAt:     recipe.createdAt.toISOString(),
       comments: recipe.comments.map(c => ({
         id:        c.id,
         username:  c.user.username,
