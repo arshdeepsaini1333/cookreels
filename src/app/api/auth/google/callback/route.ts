@@ -60,7 +60,7 @@ export async function GET(req: Request) {
           email: googleUser.email,
           googleId: googleUser.id,
           isEmailVerified: true,
-          // password intentionally omitted — null by default
+          isActive: true, // email pre-verified by Google
         },
       })
     }

@@ -108,6 +108,20 @@ model User {
   password         String?
   phone            String?   @unique
   googleId         String?   @unique
+  facebookId       String?   @unique
+
+  isActive             Boolean   @default(false)
+  emailVerificationOTP String?
+  otpExpiresAt         DateTime?
+  otpCreatedAt         DateTime?
+  otpAttempts          Int       @default(0)
+
+  passwordResetOTP          String?
+  passwordResetOTPExpiresAt DateTime?
+  passwordResetOTPCreatedAt DateTime?
+  passwordResetOTPAttempts  Int       @default(0)
+  passwordResetVerified     Boolean   @default(false)
+
   profileImage      String?
   backgroundPicture String?
   bio               String?   @db.Text

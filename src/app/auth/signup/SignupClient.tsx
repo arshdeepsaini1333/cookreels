@@ -1,10 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import SignupPage from '@/components/auth/SignupPage'
+import OtpModal from '@/components/auth/OtpModal'
+
+type OtpState = { show: true; email: string; message: string } | { show: false }
 
 export default function SignupClient() {
   const router = useRouter()
+  const [otpState, setOtpState] = useState<OtpState>({ show: false })
 
   const handleSignup = async (data: {
     firstName: string
@@ -20,14 +25,35 @@ export default function SignupClient() {
       body: JSON.stringify(data),
     })
 
-    if (res.ok) {
-      router.push('/')
+    const body = await res.json().catch(() => ({})) as {
+      requiresVerification?: boolean
+      email?: string
+      message?: string
+    }
+
+    if (!res.ok) {
+      throw new Error(body.message ?? 'Signup failed. Please try again.')
+    }
+
+    if (body.requiresVerification && body.email) {
+      setOtpState({ show: true, email: body.email, message: body.message ?? '' })
       return
     }
 
-    const body = await res.json().catch(() => ({}))
-    throw new Error((body as { message?: string }).message ?? 'Signup failed. Please try again.')
+    router.push('/')
   }
 
-  return <SignupPage onSubmit={handleSignup} />
+  return (
+    <>
+      <SignupPage onSubmit={handleSignup} />
+      {otpState.show && (
+        <OtpModal
+          email={otpState.email}
+          message={otpState.message}
+          onSuccess={() => router.push('/')}
+          onClose={() => setOtpState({ show: false })}
+        />
+      )}
+    </>
+  )
 }

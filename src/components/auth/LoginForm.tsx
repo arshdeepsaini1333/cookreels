@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import OtpModal from '@/components/auth/OtpModal'
+import ForgotPasswordModal from '@/components/auth/ForgotPasswordModal'
 
 type FormData = {
   identifier: string
@@ -58,6 +60,14 @@ function GoogleIcon() {
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+    </svg>
+  )
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="#1877F2">
+      <path d="M24 12.073C24 5.405 18.627 0 12 0S0 5.405 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.312 0 2.686.236 2.686.236v2.97h-1.513c-1.491 0-1.956.93-1.956 1.887v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z" />
     </svg>
   )
 }
@@ -153,14 +163,25 @@ export default function LoginForm() {
   const [touched, setTouched] = useState<TouchedFields>({})
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const [isFacebookLoading, setIsFacebookLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [otpState, setOtpState] = useState<{ show: true; email: string; message: string } | { show: false }>({ show: false })
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const err = params.get('error')
     if (err === 'oauth_cancelled') setServerError('Google sign-in was cancelled.')
     else if (err === 'oauth_failed') setServerError('Google sign-in failed. Please try again.')
+    else if (err === 'fb_cancelled') setServerError('Facebook sign-in was cancelled.')
+    else if (err === 'fb_failed') setServerError('Facebook sign-in failed. Please try again.')
+    else if (err === 'fb_no_email') setServerError('Your Facebook account has no verified email. Please use another sign-in method.')
+
+    const prefillEmail = params.get('email')
+    if (prefillEmail) {
+      setFormData(prev => ({ ...prev, identifier: prefillEmail }))
+    }
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,12 +229,22 @@ export default function LoginForm() {
 
       if (res.ok) {
         router.push('/')
-      } else {
-        const body = await res.json().catch(() => ({}))
-        setServerError(
-          (body as { message?: string }).message ?? 'Invalid credentials. Please try again.',
-        )
+        return
       }
+
+      const body = await res.json().catch(() => ({})) as {
+        requiresVerification?: boolean
+        email?: string
+        message?: string
+      }
+
+      // Account exists but email not yet verified — show OTP modal
+      if (res.status === 403 && body.requiresVerification && body.email) {
+        setOtpState({ show: true, email: body.email, message: body.message ?? '' })
+        return
+      }
+
+      setServerError(body.message ?? 'Invalid credentials. Please try again.')
     } catch {
       setServerError('Network error. Please check your connection.')
     } finally {
@@ -222,6 +253,24 @@ export default function LoginForm() {
   }
 
   return (
+    <>
+    {otpState.show && (
+      <OtpModal
+        email={otpState.email}
+        message={otpState.message}
+        onSuccess={() => router.push('/')}
+        onClose={() => setOtpState({ show: false })}
+      />
+    )}
+    {showForgotPassword && (
+      <ForgotPasswordModal
+        onClose={() => setShowForgotPassword(false)}
+        onSuccess={(email) => {
+          setShowForgotPassword(false)
+          setFormData(prev => ({ ...prev, identifier: email }))
+        }}
+      />
+    )}
     <div className="w-full max-w-md animate-card-in">
       {/* Mobile-only compact branding */}
       <div className="lg:hidden text-center mb-5 animate-fade-in">
@@ -303,15 +352,16 @@ export default function LoginForm() {
               >
                 Password
               </label>
-              <Link
-                href="/auth/forgot-password"
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
                 className="text-xs font-medium transition-colors"
                 style={{ color: 'rgba(245,197,24,0.70)' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#F5C518' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = 'rgba(245,197,24,0.70)' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#F5C518' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(245,197,24,0.70)' }}
               >
                 Forgot password?
-              </Link>
+              </button>
             </div>
             <div className="relative">
               <input
@@ -404,7 +454,7 @@ export default function LoginForm() {
           {/* Google button */}
           <button
             type="button"
-            disabled={isGoogleLoading || isLoading}
+            disabled={isGoogleLoading || isFacebookLoading || isLoading}
             onClick={() => {
               setIsGoogleLoading(true)
               window.location.href = '/api/auth/google'
@@ -435,6 +485,40 @@ export default function LoginForm() {
               </>
             )}
           </button>
+
+          {/* Facebook button */}
+          <button
+            type="button"
+            disabled={isFacebookLoading || isGoogleLoading || isLoading}
+            onClick={() => {
+              setIsFacebookLoading(true)
+              window.location.href = '/api/auth/facebook'
+            }}
+            className={[
+              'w-full py-2.5 rounded-xl',
+              'text-white font-medium text-sm',
+              'flex items-center justify-center gap-3',
+              'transition-all duration-150',
+              'active:scale-[0.98]',
+              isFacebookLoading ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:brightness-110',
+            ].join(' ')}
+            style={{ background: '#1877F2', boxShadow: '0 1px 4px rgba(24,119,242,0.30)' }}
+          >
+            {isFacebookLoading ? (
+              <>
+                <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Redirecting…
+              </>
+            ) : (
+              <>
+                <FacebookIcon />
+                Continue with Facebook
+              </>
+            )}
+          </button>
         </form>
 
         {/* Footer */}
@@ -452,5 +536,6 @@ export default function LoginForm() {
         </p>
       </div>
     </div>
+    </>
   )
 }
