@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bell, Settings, LogOut, UserCircle, MessageCircle, Users } from 'lucide-react'
+import { Bell, Settings, LogOut, UserCircle, MessageCircle, Users, Search } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { UserAvatar } from '@/components/shared/UserAvatar'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,7 @@ export function Header({
   const [profileOpen, setProfileOpen] = useState(false)
   const [mobileProfileOpen, setMobileProfileOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [unreadMessages, setUnreadMessages] = useState(0)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -141,6 +142,20 @@ export function Header({
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+
+          {/* Mobile: Search button */}
+          <button
+            aria-label="Search"
+            onClick={() => setMobileSearchOpen(true)}
+            className="sm:hidden relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200"
+            style={{
+              background: isDark ? 'rgba(43,43,45,0.90)' : 'rgba(255,255,255,0.90)',
+              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+              color: isDark ? '#A1A1AA' : '#666666',
+            }}
+          >
+            <Search size={16} strokeWidth={1.9} />
+          </button>
 
           {/* Mobile: Friends link */}
           <Link
@@ -420,6 +435,16 @@ export function Header({
         </div>
       </div>
 
+      <AnimatePresence>
+        {mobileSearchOpen && (
+          <GlobalSearch
+            variant="mobile"
+            onClose={() => setMobileSearchOpen(false)}
+            currentUserAvatar={avatarUrl}
+            currentUserName={username}
+          />
+        )}
+      </AnimatePresence>
     </motion.header>
   )
 }
