@@ -57,7 +57,7 @@ function Avatar({ src, name, size = 'md' }: { src?: string | null; name: string;
 
 function VideoPlayer({ reel }: { reel: ProfileReel }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [muted,  setMuted]  = useState(true)
+  const [muted,  setMuted]  = useState(false)
   const [paused, setPaused] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -65,12 +65,16 @@ function VideoPlayer({ reel }: { reel: ProfileReel }) {
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    v.muted = true
-    setMuted(true)
     setPaused(false)
     setFailed(false)
-    v.play().catch(() => setPaused(true))
-  }, [reel.id])
+    // Always start muted so autoplay is never blocked.
+    // After play() resolves, apply the user's mute preference —
+    // setting muted=false on an already-playing video does NOT require a user gesture.
+    v.muted = true
+    v.play()
+      .then(() => { v.muted = muted })
+      .catch(() => setPaused(true))
+  }, [reel.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePlay = () => {
     const v = videoRef.current
@@ -98,7 +102,6 @@ function VideoPlayer({ reel }: { reel: ProfileReel }) {
           ref={videoRef}
           src={reel.videoUrl}
           poster={reel.thumbnailUrl ?? undefined}
-          muted
           loop
           playsInline
           className="absolute inset-0 w-full h-full object-contain"

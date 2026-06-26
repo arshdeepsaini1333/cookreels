@@ -10,6 +10,7 @@ import {
   Check, Sparkles, Flame,
   Home, Compass, Film, LayoutGrid, User,
   Users, UserCheck, UserPlus,
+  Volume2, VolumeX, Play,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -499,19 +500,22 @@ function CommentDrawer({
 //     isActive change, to avoid stuttering during rapid scrolls.
 
 const ReelCard = memo(function ReelCard({
-  reel, isActive, isNext = false, onComment, currentUserId,
+  reel, isActive, isNext = false, onComment, currentUserId, isMuted, onMuteToggle,
 }: {
   reel: FeedReel
   isActive: boolean
   isNext?: boolean
   onComment: () => void
   currentUserId?: string
+  isMuted: boolean
+  onMuteToggle: () => void
 }) {
   const [heartPos, setHeartPos]       = useState({ x: 0, y: 0 })
   const [showHeart, setShowHeart]     = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [videoFailed, setVideoFailed] = useState(false)
   const [shareOpen, setShareOpen]     = useState(false)
+  const [paused, setPaused]           = useState(false)
   const videoRef      = useRef<HTMLVideoElement>(null)
   const wasActiveRef  = useRef(false)
   const tapRef        = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null })
@@ -531,12 +535,25 @@ const ReelCard = memo(function ReelCard({
         v.currentTime = 0
         wasActiveRef.current = true
       }
-      v.play().catch(() => setVideoFailed(true))
+      setPaused(false)
+      // Always start muted so autoplay is never blocked by browser policy.
+      // After play() resolves, apply the user's mute preference —
+      // setting muted=false on an already-playing video does NOT require a
+      // user gesture, so audio unlocks immediately.
+      v.muted = true
+      v.play()
+        .then(() => { v.muted = isMuted })
+        .catch(() => setVideoFailed(true))
     } else {
       wasActiveRef.current = false
       v.pause()
     }
-  }, [isActive])
+  }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync global mute state to the video element whenever it changes
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = isMuted
+  }, [isMuted])
 
   // Release browser resources when the card is removed from the DOM.
   useEffect(() => {
@@ -556,15 +573,23 @@ const ReelCard = memo(function ReelCard({
     if (t.count >= 2) {
       if (t.timer) clearTimeout(t.timer)
       t.count = 0
+      // Double tap → like
       const rect = e.currentTarget.getBoundingClientRect()
       setHeartPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
       setShowHeart(true)
       if (!liked) toggleLike()
       setTimeout(() => setShowHeart(false), 900)
     } else {
-      t.timer = setTimeout(() => { t.count = 0 }, 280)
+      t.timer = setTimeout(() => {
+        t.count = 0
+        // Single tap → toggle play/pause
+        const v = videoRef.current
+        if (!v || videoFailed) return
+        if (v.paused) { v.play().catch(() => {}); setPaused(false) }
+        else          { v.pause(); setPaused(true) }
+      }, 280)
     }
-  }, [liked, toggleLike])
+  }, [liked, toggleLike, videoFailed])
 
   const initial = reel.creator.username[0]?.toUpperCase() ?? '?'
 
@@ -594,12 +619,12 @@ const ReelCard = memo(function ReelCard({
         <video
           ref={videoRef}
           src={reel.videoUrl}
-          muted
           loop
           playsInline
-          autoPlay={isActive}
           preload={videoPreload}
           className="absolute inset-0 w-full h-full object-cover"
+          onPlay={() => setPaused(false)}
+          onPause={() => setPaused(true)}
           onError={() => setVideoFailed(true)}
         />
       )}
@@ -615,6 +640,23 @@ const ReelCard = memo(function ReelCard({
       <div className="absolute inset-0 bg-gradient-to-t from-black/96 via-black/8 to-black/32 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/22 via-transparent to-transparent pointer-events-none" />
       <div className="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-[#F5C518]/25 to-transparent pointer-events-none" />
+
+      {/* Paused indicator */}
+      <AnimatePresence>
+        {paused && !videoFailed && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+          >
+            <div className="w-16 h-16 rounded-full bg-black/55 backdrop-blur-md flex items-center justify-center">
+              <Play className="w-7 h-7 text-white fill-white ml-1" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Double-tap heart */}
       <AnimatePresence>
@@ -677,6 +719,29 @@ const ReelCard = memo(function ReelCard({
 
         <GlassBtn label="Share" count="Share" onClick={() => setShareOpen(true)}>
           <Share2 size={18} strokeWidth={1.8} />
+        </GlassBtn>
+
+        <GlassBtn
+          label={isMuted ? 'Unmute' : 'Mute'}
+          onClick={(e) => {
+            e?.stopPropagation()
+            const v = videoRef.current
+            if (v) {
+              const unmuting = isMuted  // true → we're switching to unmuted
+              v.muted = !isMuted
+              if (unmuting && !v.paused) {
+                // Unmuting a playing video — call play() in this user-gesture
+                // context so the browser unlocks the audio track immediately.
+                v.play().catch(() => { v.muted = true })
+              }
+            }
+            onMuteToggle()
+          }}
+        >
+          {isMuted
+            ? <VolumeX size={18} strokeWidth={1.8} />
+            : <Volume2 size={18} strokeWidth={1.8} />
+          }
         </GlassBtn>
       </div>
 
@@ -774,8 +839,19 @@ export function ReelsPage({
 }) {
   const [activeIdx, setActiveIdx]     = useState(0)
   const [commentOpen, setCommentOpen] = useState(false)
+  const [globalMuted, setGlobalMuted] = useState(false)
+  const [isMobile, setIsMobile]       = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : true,
+  )
+  const toggleMute = useCallback(() => setGlobalMuted(m => !m), [])
   const mobileContainerRef  = useRef<HTMLDivElement>(null)
   const desktopContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // IntersectionObserver instances — created once, never recreated.
   const mobileIoRef   = useRef<IntersectionObserver | null>(null)
@@ -922,10 +998,12 @@ export function ReelsPage({
         {inWindow && (
           <ReelCard
             reel={reel}
-            isActive={i === activeIdx}
+            isActive={i === activeIdx && isMobile}
             isNext={i === activeIdx + 1}
             onComment={openComments}
             currentUserId={currentUserId}
+            isMuted={globalMuted}
+            onMuteToggle={toggleMute}
           />
         )}
       </div>
@@ -943,10 +1021,12 @@ export function ReelsPage({
         {inWindow && (
           <ReelCard
             reel={reel}
-            isActive={i === activeIdx}
+            isActive={i === activeIdx && !isMobile}
             isNext={i === activeIdx + 1}
             onComment={openComments}
             currentUserId={currentUserId}
+            isMuted={globalMuted}
+            onMuteToggle={toggleMute}
           />
         )}
       </div>

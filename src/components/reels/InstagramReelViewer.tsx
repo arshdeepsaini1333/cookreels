@@ -184,8 +184,10 @@ function MobileReelSlot({
     const v = videoRef.current
     if (!v) return
     if (isActive) {
-      v.muted = globalMuted
-      v.play().catch(() => setPaused(true))
+      v.muted = true // start muted so autoplay is never blocked
+      v.play()
+        .then(() => { v.muted = globalMuted })
+        .catch(() => setPaused(true))
     } else {
       v.pause()
     }
@@ -227,10 +229,8 @@ function MobileReelSlot({
         <video
           ref={videoRef}
           src={reel.videoUrl}
-          muted
           loop
           playsInline
-          autoPlay={isActive}
           poster={reel.thumbnailUrl ?? undefined}
           preload={isActive ? 'auto' : 'metadata'}
           className="absolute inset-0 w-full h-full object-cover"
@@ -442,7 +442,7 @@ function DesktopReelViewer({
   hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments,
 }: DesktopProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
-  const [muted,     setMuted]     = useState(true)
+  const [muted,     setMuted]     = useState(false)
   const [paused,    setPaused]    = useState(false)
   const [liked,     setLiked]     = useState(false)
   const [likeCount, setLikeCount] = useState(reel.likeCount)
@@ -455,14 +455,20 @@ function DesktopReelViewer({
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    v.muted = true
-    setMuted(true)
+    // Sync muted to the newly created video element (key={reel.id} remounts it)
+    // but preserve the user's current mute preference (don't force muted=true)
+    v.muted = muted
     setPaused(false)
     setFailed(false)
     setLikeCount(reel.likeCount)
     setLiked(false)
     setSaved(false)
-    v.play().catch(() => setPaused(true))
+    v.play().catch(() => {
+      // Browser blocked unmuted autoplay — retry muted
+      v.muted = true
+      setMuted(true)
+      v.play().catch(() => setPaused(true))
+    })
   }, [reel.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const togglePlay = () => {
@@ -553,10 +559,8 @@ function DesktopReelViewer({
                 ref={videoRef}
                 key={reel.id}
                 src={reel.videoUrl}
-                muted
                 loop
                 playsInline
-                autoPlay
                 poster={reel.thumbnailUrl ?? undefined}
                 className="absolute inset-0 w-full h-full object-cover"
                 onPlay={() => setPaused(false)}
@@ -817,7 +821,7 @@ export function InstagramReelViewer({
   const initialIndex = Math.max(0, allReels.findIndex(r => r.id === initialReelId))
 
   const [activeIndex,       setActiveIndex]       = useState(initialIndex)
-  const [globalMuted,       setGlobalMuted]       = useState(true)
+  const [globalMuted,       setGlobalMuted]       = useState(false)
   const [commentSheetOpen,  setCommentSheetOpen]  = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 

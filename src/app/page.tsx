@@ -11,20 +11,25 @@ export default async function HomePage() {
     redirect('/auth/login')
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: {
-      profileImage: true,
-      _count: {
-        select: {
-          recipes: { where: { isPublished: true } },
-          reels:   { where: { isPublished: true } },
-          followers: true,
-          following: true,
+  let user = null
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: {
+        profileImage: true,
+        _count: {
+          select: {
+            recipes: { where: { isPublished: true } },
+            reels:   { where: { isPublished: true } },
+            followers: true,
+            following: true,
+          },
         },
       },
-    },
-  })
+    })
+  } catch {
+    // DB temporarily unreachable — render page without stats
+  }
 
   const profileStats = user
     ? {

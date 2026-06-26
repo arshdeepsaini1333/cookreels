@@ -481,13 +481,23 @@ export function ExploreViewer({
   const [following,    setFollowing]    = useState<Record<string, boolean>>({})
   const [saved,        setSaved]        = useState<Record<string, boolean>>({})
   const [shareOpen,    setShareOpen]    = useState(false)
+  const [isMobile,     setIsMobile]     = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 768 : true,
+  )
   const commentInputRef = useRef<HTMLDivElement>(null)
   const touchStart      = useRef<{ x: number; y: number } | null>(null)
   const origUrlRef      = useRef('')
+  const modalRef        = useRef<HTMLDivElement>(null)
 
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
 
   useEffect(() => setMounted(true), [])
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Fetch current user once so comment input shows the commenter's avatar/initials
   useEffect(() => {
@@ -541,6 +551,8 @@ export function ExploreViewer({
 
   const goTo = useCallback((next: number) => {
     if (next < 0 || next >= items.length) return
+    // Pause any playing videos immediately before the exit animation starts
+    modalRef.current?.querySelectorAll('video').forEach(v => v.pause())
     setDirection(next > index ? 1 : -1)
     setIndex(next)
   }, [index, items.length])
@@ -698,6 +710,7 @@ export function ExploreViewer({
             onTouchEnd={onTouchEnd}
           >
             <div
+              ref={modalRef}
               onClick={e => e.stopPropagation()}
               className="
                 pointer-events-auto relative w-full overflow-hidden
@@ -728,7 +741,7 @@ export function ExploreViewer({
                     {isReel && reel ? (
                       /* ─ Mobile Reel: full-screen TikTok style ─ */
                       <div className="relative w-full h-full bg-black">
-                        <VideoPanel reel={reel} onDoubleTap={handleDoubleTapLike} />
+                        {isMobile && <VideoPanel reel={reel} onDoubleTap={handleDoubleTapLike} />}
 
                         {/* Bottom gradient */}
                         <div className="absolute bottom-0 inset-x-0 h-64 bg-gradient-to-t from-black/90 to-transparent pointer-events-none" />
@@ -937,7 +950,7 @@ export function ExploreViewer({
                       <>
                         {/* Left: 9:16 video panel */}
                         <div className="flex-shrink-0 h-full overflow-hidden overflow-hidden" style={{ width: 304 }}>
-                          <VideoPanel reel={reel} onDoubleTap={handleDoubleTapLike} />
+                          {!isMobile && <VideoPanel reel={reel} onDoubleTap={handleDoubleTapLike} />}
                         </div>
 
                         {/* Right: info panel */}
