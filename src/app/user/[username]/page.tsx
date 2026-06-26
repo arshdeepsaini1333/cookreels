@@ -11,8 +11,9 @@ type Props = {
 }
 
 const fetchUser = cache(async (username: string) => {
-  return prisma.user.findUnique({
-    where: { username },
+  try {
+    return await prisma.user.findUnique({
+      where: { username },
     select: {
       id:                true,
       firstName:         true,
@@ -64,6 +65,9 @@ const fetchUser = cache(async (username: string) => {
       },
     },
   })
+  } catch {
+    return null
+  }
 })
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -111,7 +115,9 @@ export default async function Page({ params }: Props) {
 
   // ── Own profile ────────────────────────────────────────────────────────────
   if (session?.userId === user.id) {
-    const [fullUser, friendsCount] = await Promise.all([
+    let fullUser = null, friendsCount = 0
+    try {
+      ;[fullUser, friendsCount] = await Promise.all([
       prisma.user.findUnique({
         where: { id: user.id },
         select: {
@@ -191,6 +197,9 @@ export default async function Page({ params }: Props) {
         },
       }),
     ])
+    } catch {
+      notFound()
+    }
 
     if (!fullUser) notFound()
 
@@ -247,34 +256,41 @@ export default async function Page({ params }: Props) {
   }
 
   // ── Public profile ─────────────────────────────────────────────────────────
-  const [friendsCount, followRelation, currentViewer] = await Promise.all([
-    prisma.user.count({
-      where: {
-        AND: [
-          { followers: { some: { followerId:  user.id } } },
-          { following: { some: { followingId: user.id } } },
-        ],
-      },
-    }),
-    session
-      ? Promise.all([
-          prisma.follow.findFirst({
-            where: { followerId: session.userId, followingId: user.id },
-            select: { id: true, status: true },
-          }),
-          prisma.follow.findFirst({
-            where: { followerId: user.id, followingId: session.userId, status: 'ACCEPTED' },
-            select: { id: true },
-          }),
-        ])
-      : Promise.resolve([null, null] as const),
-    session
-      ? prisma.user.findUnique({
-          where:  { id: session.userId },
-          select: { firstName: true },
-        })
-      : Promise.resolve(null),
-  ])
+  let friendsCount = 0
+  let followRelation: readonly [{ id: string; status: string } | null, { id: string } | null] = [null, null]
+  let currentViewer: { firstName: string } | null = null
+  try {
+    ;[friendsCount, followRelation, currentViewer] = await Promise.all([
+      prisma.user.count({
+        where: {
+          AND: [
+            { followers: { some: { followerId:  user.id } } },
+            { following: { some: { followingId: user.id } } },
+          ],
+        },
+      }),
+      session
+        ? Promise.all([
+            prisma.follow.findFirst({
+              where: { followerId: session.userId, followingId: user.id },
+              select: { id: true, status: true },
+            }),
+            prisma.follow.findFirst({
+              where: { followerId: user.id, followingId: session.userId, status: 'ACCEPTED' },
+              select: { id: true },
+            }),
+          ])
+        : Promise.resolve([null, null] as const),
+      session
+        ? prisma.user.findUnique({
+            where:  { id: session.userId },
+            select: { firstName: true },
+          })
+        : Promise.resolve(null),
+    ])
+  } catch {
+    // DB temporarily unreachable — render page with default/empty social state
+  }
 
   const [fwdRecord, revRecord] = followRelation
   const followStatus: 'none' | 'pending' | 'accepted' = !fwdRecord

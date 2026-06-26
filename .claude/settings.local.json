@@ -69,7 +69,8 @@
       "PowerShell(cd d:\\\\cookreels-main; npx tsc --noEmit --project tsconfig.json 2>&1 | Out-String | Select-String -Pattern \"BoostPage\" -AllMatches | ForEach-Object { $_.Line })",
       "PowerShell(cd d:\\\\cookreels-main; $result = npx tsc --noEmit --project tsconfig.json 2>&1; $result | Where-Object { $_ -match \"BoostPage\" })",
       "Bash(xargs grep -l \"recipe\" -i)",
-      "Bash(mkdir -p \"d:/cookreels-main/src/app/api/messages/conversations/[convId]\")"
+      "Bash(mkdir -p \"d:/cookreels-main/src/app/api/messages/conversations/[convId]\")",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
     ],
     "additionalDirectories": [
       "e:\\Cookreels\\cookreels-main\\src\\app",

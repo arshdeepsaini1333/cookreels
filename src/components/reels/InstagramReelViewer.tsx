@@ -183,7 +183,9 @@ function MobileReelSlot({
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    if (isActive) {
+    // Only play on mobile — DesktopReelViewer handles audio on wider screens.
+    // Both layouts are always in the DOM (CSS md:hidden doesn't stop playback).
+    if (isActive && window.innerWidth < 768) {
       v.muted = true // start muted so autoplay is never blocked
       v.play()
         .then(() => { v.muted = globalMuted })
@@ -192,6 +194,11 @@ function MobileReelSlot({
       v.pause()
     }
   }, [isActive]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pause on unmount so audio stops the instant this slot leaves the DOM.
+  useEffect(() => {
+    return () => { videoRef.current?.pause() }
+  }, [])
 
   const togglePlay = () => {
     const v = videoRef.current
@@ -455,8 +462,9 @@ function DesktopReelViewer({
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    // Sync muted to the newly created video element (key={reel.id} remounts it)
-    // but preserve the user's current mute preference (don't force muted=true)
+    // Only play on desktop — MobileReelSlot handles audio on narrower screens.
+    // Both layouts are always in the DOM (CSS hidden md:block doesn't stop playback).
+    if (window.innerWidth < 768) return
     v.muted = muted
     setPaused(false)
     setFailed(false)
@@ -470,6 +478,12 @@ function DesktopReelViewer({
       v.play().catch(() => setPaused(true))
     })
   }, [reel.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pause immediately on unmount so audio stops before AnimatePresence exit
+  // animation completes — prevents the previous reel's audio from leaking.
+  useEffect(() => {
+    return () => { videoRef.current?.pause() }
+  }, [])
 
   const togglePlay = () => {
     const v = videoRef.current
@@ -951,7 +965,7 @@ export function InstagramReelViewer({
             key={currentReel.id}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
+            exit={{ opacity: 0, y: -12, transition: { duration: 0 } }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           >
             <DesktopReelViewer
