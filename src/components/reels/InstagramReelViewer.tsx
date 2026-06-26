@@ -59,10 +59,63 @@ const GRADIENTS = [
   'from-violet-500 to-purple-600', 'from-cyan-500 to-blue-600',
 ]
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Comment {
+  id: string
+  username: string
+  userAvatar: string | null
+  text: string
+  createdAt: string
+}
+
 // ─── CommentSheet ─────────────────────────────────────────────────────────────
 
-function CommentSheet({ open, onClose, blockComments }: { open: boolean; onClose: () => void; blockComments?: boolean }) {
-  const [comment, setComment] = useState('')
+function CommentSheet({
+  open, onClose, blockComments, reelId, currentUserId,
+}: {
+  open: boolean
+  onClose: () => void
+  blockComments?: boolean
+  reelId: string
+  currentUserId: string | null
+}) {
+  const [comments,   setComments]   = useState<Comment[]>([])
+  const [loading,    setLoading]    = useState(false)
+  const [comment,    setComment]    = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open || blockComments) return
+    setLoading(true)
+    fetch(`/api/reels/${reelId}/comments`)
+      .then(r => r.json())
+      .then(data => setComments(data.comments ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [open, reelId, blockComments])
+
+  const submitComment = async () => {
+    if (!comment.trim() || submitting || !currentUserId) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/reels/${reelId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: comment.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setComments(prev => [...prev, data.comment])
+        setComment('')
+        setTimeout(() => {
+          listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
+        }, 50)
+      }
+    } catch {}
+    setSubmitting(false)
+  }
 
   return (
     <AnimatePresence>
@@ -92,16 +145,57 @@ function CommentSheet({ open, onClose, blockComments }: { open: boolean; onClose
               className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b"
               style={{ borderColor: 'var(--cr-border)' }}
             >
-              <h3 className="text-base font-bold" style={{ color: 'var(--cr-text-1)' }}>Comments</h3>
+              <h3 className="text-base font-bold" style={{ color: 'var(--cr-text-1)' }}>
+                Comments {comments.length > 0 && <span style={{ color: 'var(--cr-text-muted)', fontWeight: 400 }}>({comments.length})</span>}
+              </h3>
               <button onClick={onClose}>
                 <X className="w-5 h-5" style={{ color: 'var(--cr-text-2)' }} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto scrollbar-none px-5 py-4">
-              <p className="text-center text-sm py-12" style={{ color: 'var(--cr-text-muted)' }}>
-                {blockComments ? 'Comments are disabled on this reel.' : 'No comments yet. Be the first!'}
-              </p>
+
+            <div ref={listRef} className="flex-1 overflow-y-auto scrollbar-none px-5 py-4 space-y-4">
+              {blockComments ? (
+                <p className="text-center text-sm py-12" style={{ color: 'var(--cr-text-muted)' }}>
+                  Comments are disabled on this reel.
+                </p>
+              ) : loading ? (
+                <div className="space-y-3 pt-2">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="flex gap-2.5 animate-pulse">
+                      <div className="w-8 h-8 rounded-full flex-shrink-0" style={{ background: 'var(--cr-border)' }} />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-2.5 rounded-full w-1/3" style={{ background: 'var(--cr-border)' }} />
+                        <div className="h-2 rounded-full w-2/3" style={{ background: 'var(--cr-border)' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-sm py-12" style={{ color: 'var(--cr-text-muted)' }}>
+                  No comments yet. Be the first!
+                </p>
+              ) : (
+                comments.map(c => (
+                  <div key={c.id} className="flex gap-2.5">
+                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+                         style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
+                      {c.userAvatar
+                        ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-xs font-bold"
+                               style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
+                            {c.username.slice(0,1).toUpperCase()}
+                          </div>
+                      }
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
+                      <p className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
+
             {!blockComments && (
               <div
                 className="flex-shrink-0 px-4 py-3 border-t"
@@ -110,32 +204,40 @@ function CommentSheet({ open, onClose, blockComments }: { open: boolean; onClose
                   paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
                 }}
               >
-                <div
-                  className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
-                  style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
-                >
-                  <input
-                    type="text"
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    placeholder="Add a comment…"
-                    className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: 'var(--cr-text-1)' }}
-                  />
-                  <AnimatePresence>
-                    {comment.trim() && (
-                      <motion.button
-                        initial={{ opacity: 0, scale: 0.6 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.6 }}
-                        transition={{ duration: 0.14 }}
-                        onClick={() => setComment('')}
-                      >
-                        <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
-                      </motion.button>
-                    )}
-                  </AnimatePresence>
-                </div>
+                {!currentUserId ? (
+                  <p className="text-center text-xs py-1" style={{ color: 'var(--cr-text-muted)' }}>
+                    Sign in to comment
+                  </p>
+                ) : (
+                  <div
+                    className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
+                    style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+                  >
+                    <input
+                      type="text"
+                      value={comment}
+                      onChange={e => setComment(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') submitComment() }}
+                      placeholder="Add a comment…"
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      style={{ color: 'var(--cr-text-1)' }}
+                    />
+                    <AnimatePresence>
+                      {comment.trim() && (
+                        <motion.button
+                          initial={{ opacity: 0, scale: 0.6 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.6 }}
+                          transition={{ duration: 0.14 }}
+                          onClick={submitComment}
+                          disabled={submitting}
+                        >
+                          <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)', opacity: submitting ? 0.5 : 1 }} />
+                        </motion.button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -158,11 +260,12 @@ interface SlotProps {
   onMuteToggle: () => void
   onCommentOpen: () => void
   hideLikeCount?: boolean
+  currentUserId: string | null
 }
 
 function MobileReelSlot({
   reel, index, isActive, creator, initialIsFollowing, isOwnReel,
-  globalMuted, onMuteToggle, onCommentOpen, hideLikeCount,
+  globalMuted, onMuteToggle, onCommentOpen, hideLikeCount, currentUserId,
 }: SlotProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const [paused,    setPaused]    = useState(false)
@@ -173,6 +276,22 @@ function MobileReelSlot({
   const [expanded,  setExpanded]  = useState(false)
   const [failed,    setFailed]    = useState(false)
   const gradient = GRADIENTS[index % GRADIENTS.length]
+
+  // Fetch initial like and save state from the server
+  useEffect(() => {
+    fetch(`/api/reels/${reel.id}/likes`)
+      .then(r => r.json())
+      .then(d => { setLiked(d.liked ?? false); setLikeCount(d.likeCount ?? reel.likeCount) })
+      .catch(() => {})
+  }, [reel.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!currentUserId) return
+    fetch(`/api/reels/${reel.id}/save`)
+      .then(r => r.json())
+      .then(d => setSaved(d.saved ?? false))
+      .catch(() => {})
+  }, [reel.id, currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync muted state with global mute
   useEffect(() => {
@@ -207,9 +326,30 @@ function MobileReelSlot({
     else          { v.pause(); setPaused(true) }
   }
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    setLiked(l => { setLikeCount(c => l ? c - 1 : c + 1); return !l })
+    if (!currentUserId) return
+    const newLiked = !liked
+    setLiked(newLiked)
+    setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1))
+    try {
+      await fetch(`/api/reels/${reel.id}/like`, { method: newLiked ? 'POST' : 'DELETE' })
+    } catch {
+      setLiked(!newLiked)
+      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1)
+    }
+  }
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentUserId) return
+    const newSaved = !saved
+    setSaved(newSaved)
+    try {
+      await fetch(`/api/reels/${reel.id}/save`, { method: newSaved ? 'POST' : 'DELETE' })
+    } catch {
+      setSaved(!newSaved)
+    }
   }
 
   const handleShare = async (e: React.MouseEvent) => {
@@ -318,7 +458,7 @@ function MobileReelSlot({
         <div className="flex flex-col items-center gap-1">
           <motion.button
             whileTap={{ scale: 0.75 }}
-            onClick={e => { e.stopPropagation(); setSaved(s => !s) }}
+            onClick={handleSave}
             aria-label="Save"
           >
             <Bookmark
@@ -442,22 +582,51 @@ interface DesktopProps {
   onBack: () => void
   hideLikeCount?: boolean
   blockComments?: boolean
+  currentUserId: string | null
 }
 
 function DesktopReelViewer({
   reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
-  hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments,
+  hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId,
 }: DesktopProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
-  const [muted,     setMuted]     = useState(false)
-  const [paused,    setPaused]    = useState(false)
-  const [liked,     setLiked]     = useState(false)
-  const [likeCount, setLikeCount] = useState(reel.likeCount)
-  const [saved,     setSaved]     = useState(false)
-  const [following, setFollowing] = useState(initialIsFollowing)
-  const [failed,    setFailed]    = useState(false)
-  const [comment,   setComment]   = useState('')
+  const listRef     = useRef<HTMLDivElement>(null)
+  const [muted,      setMuted]      = useState(false)
+  const [paused,     setPaused]     = useState(false)
+  const [liked,      setLiked]      = useState(false)
+  const [likeCount,  setLikeCount]  = useState(reel.likeCount)
+  const [saved,      setSaved]      = useState(false)
+  const [following,  setFollowing]  = useState(initialIsFollowing)
+  const [failed,     setFailed]     = useState(false)
+  const [comment,    setComment]    = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [comments,   setComments]   = useState<Comment[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
   const gradient = GRADIENTS[reelIndex % GRADIENTS.length]
+
+  // Fetch initial like/save state and comments when reel changes
+  useEffect(() => {
+    fetch(`/api/reels/${reel.id}/likes`)
+      .then(r => r.json())
+      .then(d => { setLiked(d.liked ?? false); setLikeCount(d.likeCount ?? reel.likeCount) })
+      .catch(() => {})
+
+    if (currentUserId) {
+      fetch(`/api/reels/${reel.id}/save`)
+        .then(r => r.json())
+        .then(d => setSaved(d.saved ?? false))
+        .catch(() => {})
+    }
+
+    if (!blockComments) {
+      setCommentsLoading(true)
+      fetch(`/api/reels/${reel.id}/comments`)
+        .then(r => r.json())
+        .then(d => setComments(d.comments ?? []))
+        .catch(() => {})
+        .finally(() => setCommentsLoading(false))
+    }
+  }, [reel.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const v = videoRef.current
@@ -500,8 +669,49 @@ function DesktopReelViewer({
     setMuted(v.muted)
   }
 
-  const handleLike = () => {
-    setLiked(l => { setLikeCount(c => l ? c - 1 : c + 1); return !l })
+  const handleLike = async () => {
+    if (!currentUserId) return
+    const newLiked = !liked
+    setLiked(newLiked)
+    setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1))
+    try {
+      await fetch(`/api/reels/${reel.id}/like`, { method: newLiked ? 'POST' : 'DELETE' })
+    } catch {
+      setLiked(!newLiked)
+      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!currentUserId) return
+    const newSaved = !saved
+    setSaved(newSaved)
+    try {
+      await fetch(`/api/reels/${reel.id}/save`, { method: newSaved ? 'POST' : 'DELETE' })
+    } catch {
+      setSaved(!newSaved)
+    }
+  }
+
+  const submitComment = async () => {
+    if (!comment.trim() || submitting || !currentUserId) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/reels/${reel.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: comment.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setComments(prev => [...prev, data.comment])
+        setComment('')
+        setTimeout(() => {
+          listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
+        }, 50)
+      }
+    } catch {}
+    setSubmitting(false)
   }
 
   const handleShare = async () => {
@@ -680,7 +890,7 @@ function DesktopReelViewer({
             </div>
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-3 min-h-0">
+            <div ref={listRef} className="flex-1 overflow-y-auto scrollbar-thin px-5 py-4 space-y-3 min-h-0">
               <h2
                 className="font-bold text-base leading-snug"
                 style={{ fontFamily: 'var(--font-heading)', color: 'var(--cr-text-1)' }}
@@ -700,14 +910,14 @@ function DesktopReelViewer({
                     className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"
                     style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-muted)' }}
                   >
-                    <Heart className="w-3 h-3" /> {fmt(reel.likeCount)} likes
+                    <Heart className="w-3 h-3" /> {fmt(likeCount)} likes
                   </span>
                 )}
                 <span
                   className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"
                   style={{ background: 'var(--cr-bg-surface)', color: 'var(--cr-text-muted)' }}
                 >
-                  <MessageCircle className="w-3 h-3" /> {fmt(reel.commentCount)} comments
+                  <MessageCircle className="w-3 h-3" /> {fmt(comments.length || reel.commentCount)} comments
                 </span>
               </div>
 
@@ -717,10 +927,43 @@ function DesktopReelViewer({
                   <p className="text-xs text-center py-6" style={{ color: 'var(--cr-text-muted)' }}>
                     Comments are disabled on this reel.
                   </p>
-                ) : (
+                ) : commentsLoading ? (
+                  <div className="space-y-3">
+                    {[1,2].map(i => (
+                      <div key={i} className="flex gap-2 animate-pulse">
+                        <div className="w-7 h-7 rounded-full flex-shrink-0" style={{ background: 'var(--cr-border)' }} />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-2 rounded-full w-1/3" style={{ background: 'var(--cr-border)' }} />
+                          <div className="h-2 rounded-full w-2/3" style={{ background: 'var(--cr-border)' }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : comments.length === 0 ? (
                   <p className="text-xs text-center py-6" style={{ color: 'var(--cr-text-muted)' }}>
                     No comments yet. Be the first!
                   </p>
+                ) : (
+                  <div className="space-y-3">
+                    {comments.map(c => (
+                      <div key={c.id} className="flex gap-2">
+                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"
+                             style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
+                          {c.userAvatar
+                            ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
+                                   style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
+                                {c.username.slice(0,1).toUpperCase()}
+                              </div>
+                          }
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
+                          <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
@@ -732,8 +975,9 @@ function DesktopReelViewer({
                   <motion.button
                     whileTap={{ scale: 0.8 }}
                     onClick={handleLike}
+                    disabled={!currentUserId}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-full"
-                    style={{ color: liked ? '#F5C518' : 'var(--cr-text-muted)' }}
+                    style={{ color: liked ? '#F5C518' : 'var(--cr-text-muted)', opacity: !currentUserId ? 0.5 : 1 }}
                   >
                     <Heart
                       className="w-5 h-5"
@@ -746,16 +990,19 @@ function DesktopReelViewer({
                   <button
                     className="flex items-center gap-1.5 px-3 py-2 rounded-full"
                     style={{ color: 'var(--cr-text-muted)' }}
+                    onClick={() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })}
                   >
                     <MessageCircle className="w-5 h-5" />
+                    <span className="text-xs font-semibold tabular-nums">{fmt(comments.length || reel.commentCount)}</span>
                   </button>
                 </div>
                 <div className="flex items-center">
                   <motion.button
                     whileTap={{ scale: 0.82 }}
-                    onClick={() => setSaved(s => !s)}
+                    onClick={handleSave}
+                    disabled={!currentUserId}
                     className="w-9 h-9 rounded-full flex items-center justify-center"
-                    style={{ color: saved ? '#F5C518' : 'var(--cr-text-muted)' }}
+                    style={{ color: saved ? '#F5C518' : 'var(--cr-text-muted)', opacity: !currentUserId ? 0.5 : 1 }}
                   >
                     <Bookmark
                       className="w-5 h-5"
@@ -777,6 +1024,10 @@ function DesktopReelViewer({
                 <p className="text-xs text-center px-4 pb-4" style={{ color: 'var(--cr-text-muted)' }}>
                   Comments are disabled on this reel.
                 </p>
+              ) : !currentUserId ? (
+                <p className="text-xs text-center px-4 pb-4" style={{ color: 'var(--cr-text-muted)' }}>
+                  Sign in to comment
+                </p>
               ) : (
                 <div className="flex items-center gap-2.5 px-4 pb-4">
                   <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
@@ -796,7 +1047,7 @@ function DesktopReelViewer({
                       type="text"
                       value={comment}
                       onChange={e => setComment(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' && comment.trim()) setComment('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') submitComment() }}
                       placeholder="Add a comment…"
                       className="flex-1 bg-transparent text-sm outline-none min-w-0"
                       style={{ color: 'var(--cr-text-1)' }}
@@ -808,9 +1059,10 @@ function DesktopReelViewer({
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.6 }}
                           transition={{ duration: 0.14 }}
-                          onClick={() => setComment('')}
+                          onClick={submitComment}
+                          disabled={submitting}
                         >
-                          <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)' }} />
+                          <Send className="w-4 h-4" style={{ color: 'var(--cr-accent)', opacity: submitting ? 0.5 : 1 }} />
                         </motion.button>
                       )}
                     </AnimatePresence>
@@ -828,7 +1080,7 @@ function DesktopReelViewer({
 // ─── InstagramReelViewer (main export) ────────────────────────────────────────
 
 export function InstagramReelViewer({
-  initialReelId, allReels, creator, currentUserId: _currentUserId,
+  initialReelId, allReels, creator, currentUserId,
   initialIsFollowing, isOwnReel, hideLikeCount = false, blockComments = false,
 }: InstagramReelViewerProps) {
   const router = useRouter()
@@ -946,6 +1198,7 @@ export function InstagramReelViewer({
               onMuteToggle={() => setGlobalMuted(m => !m)}
               onCommentOpen={() => setCommentSheetOpen(true)}
               hideLikeCount={hideLikeCount}
+              currentUserId={currentUserId}
             />
           ))}
         </div>
@@ -955,6 +1208,8 @@ export function InstagramReelViewer({
           open={commentSheetOpen}
           onClose={() => setCommentSheetOpen(false)}
           blockComments={blockComments}
+          reelId={currentReel.id}
+          currentUserId={currentUserId}
         />
       </div>
 
@@ -982,6 +1237,7 @@ export function InstagramReelViewer({
               onBack={() => router.back()}
               hideLikeCount={hideLikeCount}
               blockComments={blockComments}
+              currentUserId={currentUserId}
             />
           </motion.div>
         </AnimatePresence>
