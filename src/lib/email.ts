@@ -1,19 +1,13 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT ?? '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+if (!process.env.RESEND_API_KEY) {
+  throw new Error('RESEND_API_KEY environment variable is not set')
 }
 
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM = process.env.EMAIL_FROM ?? 'CookReels <noreply@cookreels.com>'
+
 function buildOtpEmailHtml(firstName: string, otp: string): string {
-  // Split OTP into individual digits for spaced display
   const digits = otp.split('').join('&nbsp;&nbsp;')
 
   return `<!DOCTYPE html>
@@ -189,32 +183,32 @@ function buildPasswordResetEmailHtml(firstName: string, otp: string): string {
 </html>`
 }
 
-export async function sendPasswordResetEmail(
-  email: string,
-  firstName: string,
-  otp: string,
-): Promise<void> {
-  const transporter = createTransporter()
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? '"CookReels" <noreply@cookreels.com>',
-    to: email,
-    subject: 'Reset Your CookReels Password',
-    html: buildPasswordResetEmailHtml(firstName, otp),
-    text: `Hello ${firstName},\n\nWe received a request to reset your CookReels password.\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.\n\nThanks,\nCookReels Team`,
-  })
-}
-
 export async function sendVerificationEmail(
   email: string,
   firstName: string,
   otp: string,
 ): Promise<void> {
-  const transporter = createTransporter()
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM ?? '"CookReels" <noreply@cookreels.com>',
+  const { error } = await resend.emails.send({
+    from: FROM,
     to: email,
     subject: 'Verify your CookReels account',
     html: buildOtpEmailHtml(firstName, otp),
     text: `Hi ${firstName},\n\nYour CookReels verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you didn't create this account, you can safely ignore this email.\n\nThanks,\nCookReels Team`,
   })
+  if (error) throw new Error(`Failed to send verification email: ${error.message}`)
+}
+
+export async function sendPasswordResetEmail(
+  email: string,
+  firstName: string,
+  otp: string,
+): Promise<void> {
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Reset Your CookReels Password',
+    html: buildPasswordResetEmailHtml(firstName, otp),
+    text: `Hello ${firstName},\n\nWe received a request to reset your CookReels password.\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you did not request a password reset, you can safely ignore this email.\n\nThanks,\nCookReels Team`,
+  })
+  if (error) throw new Error(`Failed to send password reset email: ${error.message}`)
 }
