@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, UserPlus, ChefHat, Users, Heart,
   Flame, Check, Sparkles, X, ChevronDown,
-  UserCheck, UserX, Loader2, Eye, Clapperboard,
+  UserCheck, UserX, Loader2, Eye, Trophy,
 } from 'lucide-react'
 import {
   useSocialCounts, useFriends, useFollowers, useFollowing, useAllUsers,
@@ -82,16 +82,15 @@ type TrendingRecipe = {
   user: TrendingRecipeUser
 }
 
-type TrendingReel = {
+type TopCreator = {
   id: string
-  title: string
-  likeCount: number
-  viewCount: number
-  thumbnailUrl: string | null
-  videoUrl: string
-  duration: number | null
-  gradient: string | null
-  user: TrendingRecipeUser
+  username: string
+  firstName: string
+  lastName: string
+  profileImage: string | null
+  isVerified: boolean
+  cuisineSpecialty: string | null
+  postCount: number
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -527,47 +526,6 @@ function LoadMoreBtn({ onClick, fetching }: { onClick: () => void; fetching: boo
 
 
 
-/* ─── Trending reel thumbnail ────────────────────────────── */
-
-function TrendingReelThumb({ url, gradient, title }: { url: string | null; gradient: string | null; title: string }) {
-  const [state, setState] = useState<'loading' | 'loaded' | 'error'>(url ? 'loading' : 'error')
-  const grad = gradient ?? 'from-violet-500 to-indigo-500'
-
-  return (
-    <>
-      {state === 'loading' && (
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute inset-0 bg-zinc-800/70" />
-          <div
-            className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite]"
-            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)' }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Clapperboard className="w-4 h-4 text-zinc-400" />
-          </div>
-        </div>
-      )}
-
-      {state === 'error' && (
-        <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br ${grad}`}>
-          <Clapperboard className="w-4 h-4 text-white/70" />
-        </div>
-      )}
-
-      {url && state !== 'error' && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt={title}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${state === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
-          onLoad={() => setState('loaded')}
-          onError={() => setState('error')}
-        />
-      )}
-    </>
-  )
-}
-
 /* ─── Right sidebar (desktop) ────────────────────────────── */
 
 function RightPanel() {
@@ -576,8 +534,8 @@ function RightPanel() {
   const [actLoading,   setActLoading]   = useState(true)
   const [recipes,      setRecipes]      = useState<TrendingRecipe[]>([])
   const [recLoading,   setRecLoading]   = useState(true)
-  const [reels,        setReels]        = useState<TrendingReel[]>([])
-  const [reelLoading,  setReelLoading]  = useState(true)
+  const [creators,     setCreators]     = useState<TopCreator[]>([])
+  const [creatorsLoading, setCreatorsLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/social/following/recent-posts')
@@ -597,22 +555,79 @@ function RightPanel() {
       .catch(() => {})
       .finally(() => setRecLoading(false))
 
-    fetch('/api/reels/trending')
+    fetch('/api/users/top-creators')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d?.reels) {
-          const reelList: TrendingReel[] = d.reels as TrendingReel[]
-          setReels(shuffle(reelList).slice(0, 3))
+        if (d?.creators) {
+          setCreators(shuffle(d.creators as TopCreator[]).slice(0, 3))
         }
       })
       .catch(() => {})
-      .finally(() => setReelLoading(false))
+      .finally(() => setCreatorsLoading(false))
   }, [])
 
   return (
     <div className="flex flex-col gap-4 w-72 shrink-0">
 
       <motion.div {...fadeSlide(0.12)} className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-xl border border-zinc-200/70 dark:border-zinc-700/50 rounded-3xl p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-4">
+          <Trophy className="w-4 h-4 text-[#B38B00] dark:text-[#f6c68b]" />
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Top Creators</h3>
+        </div>
+
+        {creatorsLoading ? (
+          <div className="flex flex-col gap-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 animate-pulse">
+                <div className="w-10 h-10 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full w-3/4" />
+                  <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : creators.length === 0 ? (
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-4">No top creators yet.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {creators.map((c) => {
+              const grad = avatarGradient(c.username)
+              const showPhoto = c.profileImage && !/googleusercontent\.com/i.test(c.profileImage)
+              const initial = `${c.firstName?.[0] ?? ''}${c.lastName?.[0] ?? ''}`.toUpperCase() || '?'
+              return (
+                <div key={c.id} className="flex items-center gap-3 group">
+                  <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br ${grad} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
+                    {showPhoto
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={c.profileImage!} alt={c.firstName} className="w-full h-full object-cover" />
+                      : <span>{initial}</span>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                      {c.firstName} {c.lastName}
+                      {c.isVerified && <Check className="inline w-3 h-3 ml-1 text-[#F5C518]" strokeWidth={3} />}
+                    </p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">@{c.username}</p>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5" />{c.postCount} posts
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/user/${c.username}`)}
+                    className="shrink-0 px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#F5C518] to-[#FFD84D] text-[#1A1A1A] text-[10px] font-bold shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    View
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </motion.div>
+
+      <motion.div {...fadeSlide(0.18)} className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-xl border border-zinc-200/70 dark:border-zinc-700/50 rounded-3xl p-5 shadow-sm">
         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm mb-4">Friend Activity</h3>
 
         {actLoading ? (
@@ -669,7 +684,7 @@ function RightPanel() {
         )}
       </motion.div>
 
-      <motion.div {...fadeSlide(0.18)} className="bg-gradient-to-br from-[#F5C518]/10 to-[#FFD84D]/5 dark:from-[#f6c68b]/8 dark:to-[#e8952a]/4 border border-[#F5C518]/25 dark:border-[#f6c68b]/25 rounded-3xl p-5 shadow-sm">
+      <motion.div {...fadeSlide(0.24)} className="bg-gradient-to-br from-[#F5C518]/10 to-[#FFD84D]/5 dark:from-[#f6c68b]/8 dark:to-[#e8952a]/4 border border-[#F5C518]/25 dark:border-[#f6c68b]/25 rounded-3xl p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-4">
           <Flame className="w-4 h-4 text-[#B38B00] dark:text-[#e8952a]" />
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Trending Recipes</h3>
@@ -709,58 +724,6 @@ function RightPanel() {
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">by {r.user.firstName || r.user.username}</p>
                   <p className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-0.5 mt-0.5">
                     <Heart className="w-2.5 h-2.5 text-rose-400 fill-rose-400" />{fmtCount(r.likeCount)}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </motion.div>
-
-      <motion.div {...fadeSlide(0.24)} className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-xl border border-zinc-200/70 dark:border-zinc-700/50 rounded-3xl p-5 shadow-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-4 h-4 text-violet-500 dark:text-violet-400" />
-          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Trending Reels</h3>
-        </div>
-
-        {reelLoading ? (
-          <div className="flex flex-col gap-2.5">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="w-10 h-14 rounded-xl bg-zinc-200 dark:bg-zinc-700 shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full w-4/5" />
-                  <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full w-1/2" />
-                  <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full w-2/5" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : reels.length === 0 ? (
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 text-center py-4">No trending reels yet.</p>
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {reels.map(r => (
-              <button
-                key={r.id}
-                onClick={() => router.push(`/reel/${r.id}`)}
-                className="flex items-center gap-3 cursor-pointer group w-full text-left"
-              >
-                {/* Portrait thumbnail */}
-                <div className="w-10 h-14 rounded-xl overflow-hidden shrink-0 shadow-sm relative">
-                  <TrendingReelThumb url={r.thumbnailUrl} gradient={r.gradient} title={r.title} />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-5 h-5 rounded-full bg-white/90 flex items-center justify-center">
-                      <svg className="w-2.5 h-2.5 text-zinc-900 ml-0.5" viewBox="0 0 8 10" fill="currentColor"><path d="M0 0l8 5-8 5V0z"/></svg>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-zinc-800 dark:text-zinc-200 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">{r.title}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">@{r.user.username}</p>
-                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 flex items-center gap-2 mt-0.5">
-                    <span className="flex items-center gap-0.5"><Eye className="w-2.5 h-2.5" />{fmtCount(r.viewCount)}</span>
-                    <span className="flex items-center gap-0.5"><Heart className="w-2.5 h-2.5 text-rose-400 fill-rose-400" />{fmtCount(r.likeCount)}</span>
                   </p>
                 </div>
               </button>

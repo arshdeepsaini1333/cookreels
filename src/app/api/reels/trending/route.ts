@@ -8,13 +8,9 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const since = new Date()
-  since.setDate(since.getDate() - 15)
-
   const reels = await prisma.reel.findMany({
     where: {
       isPublished: true,
-      createdAt: { gte: since },
     },
     select: {
       id: true,

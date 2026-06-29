@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
   Play, Heart, Star, Clock, ArrowRight,
-  ChefHat, Flame, Quote, Plus, ChevronLeft, ChevronRight,
+  ChefHat, Flame, Quote, Plus, ChevronLeft, ChevronRight, X,
 } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
 import { AddContentModal } from '@/components/shared/AddContentModal'
@@ -435,10 +436,484 @@ interface TrendingReelItem {
   thumbnailUrl: string | null
   videoUrl: string
   gradient: string | null
-  user: { username: string }
+  user: {
+    id?: string
+    username: string
+    firstName?: string
+    lastName?: string
+    profileImage?: string | null
+    isVerified?: boolean
+  }
   trendingScore: number
 }
 
+interface ReelComment {
+  id: string
+  username: string
+  userAvatar: string | null
+  text: string
+  createdAt: string
+}
+
+
+type AnyReel = TrendingReelItem | typeof trendingReels[0]
+
+const MODAL_GRAD_PAIRS = [
+  '#F5C518,#FFB800', '#FF6B6B,#FF4757', '#A29BFE,#6C5CE7',
+  '#55EFC4,#00B894', '#FD79A8,#E84393', '#74B9FF,#0984E3',
+]
+function modalAvatarGrad(name: string) {
+  return MODAL_GRAD_PAIRS[name.charCodeAt(0) % MODAL_GRAD_PAIRS.length]
+}
+
+function ModalUserAvatar({ username, profileImage, size = 40 }: { username: string; profileImage?: string | null; size?: number }) {
+  const [err, setErr] = useState(false)
+  const showImg = profileImage && !/googleusercontent\.com/i.test(profileImage) && !err
+  const grad = modalAvatarGrad(username)
+  return (
+    <div
+      className="rounded-full flex items-center justify-center font-bold flex-shrink-0 overflow-hidden"
+      style={{
+        width: size, height: size, fontSize: size * 0.38,
+        background: showImg ? 'transparent' : `linear-gradient(135deg,${grad})`,
+        color: '#1A1A1A',
+      }}
+    >
+      {showImg
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={profileImage!} alt={username} className="w-full h-full object-cover" onError={() => setErr(true)} />
+        : username[0]?.toUpperCase() ?? '?'
+      }
+    </div>
+  )
+}
+
+function ReelModal({
+  reels,
+  index,
+  isOpen,
+  onClose,
+  onChange,
+}: {
+  reels: AnyReel[]
+  index: number
+  isOpen: boolean
+  onClose: () => void
+  onChange: (i: number) => void
+}) {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+
+  const safeIdx = Math.max(0, Math.min(index, reels.length - 1))
+  const reel    = reels[safeIdx]
+  const isReal  = 'user' in reel
+  const hasPrev = safeIdx > 0
+  const hasNext = safeIdx < reels.length - 1
+
+  // direction: 1 = forward (next), -1 = backward (prev)
+  const [navDir, setNavDir] = useState(0)
+
+  // Video
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const [muted, setMuted] = useState(true)
+  const mutedRef = useRef(true) // stable ref for callback ref closure
+
+  // Like
+  const [liked, setLiked] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [likePending, setLikePending] = useState(false)
+
+  // Comments
+  const [comments, setComments] = useState<ReelComment[]>([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [commentCount, setCommentCount] = useState(0)
+  const [newComment, setNewComment] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const commentsEndRef = useRef<HTMLDivElement>(null)
+
+  // Follow
+  const [following, setFollowing] = useState(false)
+  const [followPending, setFollowPending] = useState(false)
+
+  // Resolve display values
+  const videoUrl     = isReal ? (reel as TrendingReelItem).videoUrl     : null
+  const thumbUrl     = isReal ? (reel as TrendingReelItem).thumbnailUrl  : (reel as typeof trendingReels[0]).image
+  const gradient     = isReal ? ((reel as TrendingReelItem).gradient ?? 'from-orange-600 to-rose-600') : (reel as typeof trendingReels[0]).gradient
+  const duration     = isReal ? fmtDuration((reel as TrendingReelItem).duration) : (reel as typeof trendingReels[0]).duration
+  const user         = isReal ? (reel as TrendingReelItem).user : null
+  const username     = user?.username ?? (reel as typeof trendingReels[0]).creator
+  const displayName  = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : username
+  const profileImage = user?.profileImage ?? null
+  const isVerified   = user?.isVerified ?? false
+
+  // Keyboard
+  useEffect(() => {
+    if (!isOpen) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft'  && hasPrev) go(safeIdx - 1)
+      if (e.key === 'ArrowRight' && hasNext)  go(safeIdx + 1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, safeIdx, hasPrev, hasNext]) // eslint-disable-line
+
+  // Fetch comments + like status when reel changes
+  useEffect(() => {
+    if (!isReal || !isOpen) return
+    const id = (reel as TrendingReelItem).id
+    setComments([])
+    setCommentsLoading(true)
+    setLiked(false)
+    setLikeCount((reel as TrendingReelItem).likeCount)
+    setCommentCount((reel as TrendingReelItem).commentCount)
+    setFollowing(false)
+    Promise.all([
+      fetch(`/api/reels/${id}/comments`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/reels/${id}/likes`).then(r => r.ok ? r.json() : null),
+    ]).then(([cData, lData]) => {
+      if (cData?.comments)             setComments(cData.comments)
+      if (cData?.commentCount != null) setCommentCount(cData.commentCount)
+      if (lData?.liked     != null)    setLiked(lData.liked)
+      if (lData?.likeCount != null)    setLikeCount(lData.likeCount)
+    }).catch(() => {}).finally(() => setCommentsLoading(false))
+  }, [isReal, safeIdx]) // eslint-disable-line
+
+  // Sync muted to stable ref so callback ref closure always sees latest value
+  useEffect(() => {
+    mutedRef.current = muted
+    if (videoRef.current) videoRef.current.muted = muted
+  }, [muted])
+
+  // Play when src changes (navigation between reels while modal is open)
+  useEffect(() => {
+    if (!isOpen || !videoUrl) return
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = 0
+    v.muted = true
+    v.play().then(() => { v.muted = mutedRef.current }).catch(() => {})
+  }, [videoUrl]) // eslint-disable-line
+
+  // Callback ref: fires synchronously the moment the <video> element
+  // is actually in the DOM — bypasses AnimatePresence's internal render
+  // delay that makes useEffect([isOpen]) see videoRef.current as null.
+  function videoCallbackRef(el: HTMLVideoElement | null) {
+    videoRef.current = el
+    if (!el) return
+    el.muted = true
+    el.play().then(() => { el.muted = mutedRef.current }).catch(() => {})
+  }
+
+  function go(newIdx: number) {
+    setNavDir(newIdx > safeIdx ? 1 : -1)
+    onChange(newIdx)
+  }
+
+  async function toggleLike() {
+    if (!isReal || likePending) return
+    const id = (reel as TrendingReelItem).id
+    setLikePending(true)
+    const wasLiked = liked
+    setLiked(!wasLiked)
+    setLikeCount(c => wasLiked ? c - 1 : c + 1)
+    try {
+      await fetch(`/api/reels/${id}/like`, { method: wasLiked ? 'DELETE' : 'POST' })
+    } catch {
+      setLiked(wasLiked)
+      setLikeCount(c => wasLiked ? c + 1 : c - 1)
+    } finally { setLikePending(false) }
+  }
+
+  async function postComment(e: React.FormEvent) {
+    e.preventDefault()
+    const text = newComment.trim()
+    if (!text || !isReal || submitting) return
+    const id = (reel as TrendingReelItem).id
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/reels/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setComments(prev => [...prev, data.comment])
+        setCommentCount(data.commentCount)
+        setNewComment('')
+        setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 60)
+      }
+    } catch {} finally { setSubmitting(false) }
+  }
+
+  async function toggleFollow() {
+    if (followPending || !isReal) return
+    const userId = (reel as TrendingReelItem).user.id
+    if (!userId) return
+    setFollowPending(true)
+    const was = following
+    setFollowing(!was)
+    try {
+      await fetch('/api/social/follow', {
+        method: was ? 'DELETE' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: userId }),
+      })
+    } catch { setFollowing(was) }
+    finally { setFollowPending(false) }
+  }
+
+  // Theme tokens
+  const bg        = isDark ? '#1C1C1E' : '#FFFFFF'
+  const borderCol = isDark ? '#2C2C2E' : '#E8E8E8'
+  const textPri   = isDark ? '#F5F5F5' : '#1A1A1A'
+  const textSec   = isDark ? '#8E8E93' : '#6B7280'
+  const chipBg    = isDark ? '#2C2C2E' : '#F3F4F6'
+
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          key="reel-modal-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          onClick={onClose}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.80)', backdropFilter: 'blur(6px)' }}
+        >
+          {/* Prev arrow */}
+          {hasPrev && (
+            <button
+              onClick={e => { e.stopPropagation(); go(safeIdx - 1) }}
+              className="absolute left-3 sm:left-6 z-10 w-11 h-11 rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
+              style={{ background: 'rgba(255,255,255,0.10)' }}
+            >
+              <ChevronLeft size={22} />
+            </button>
+          )}
+
+          {/* Card — never remounts on navigation */}
+          <div
+            onClick={e => e.stopPropagation()}
+            className="relative flex rounded-[20px] overflow-hidden"
+            style={{
+              width: 'min(94vw, 860px)',
+              height: 'min(90vh, 560px)',
+              background: bg,
+              border: `1px solid ${borderCol}`,
+              boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+            }}
+          >
+            {/* ── Left: video — stable, src changes on nav ── */}
+            <div className="relative flex-shrink-0 bg-black" style={{ width: '40%' }}>
+              {videoUrl ? (
+                <video
+                  ref={videoCallbackRef}
+                  src={videoUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  loop playsInline
+                />
+              ) : thumbUrl ? (
+                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${thumbUrl})` }} />
+              ) : (
+                <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
+
+              {/* Counter + mute */}
+              <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
+                <span className="px-2.5 py-1 rounded-full text-white text-[11px] font-bold" style={{ background: 'rgba(0,0,0,0.52)' }}>
+                  {safeIdx + 1} / {reels.length}
+                </span>
+                {videoUrl && (
+                  <button
+                    onClick={() => setMuted(m => !m)}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
+                    style={{ background: 'rgba(0,0,0,0.52)' }}
+                  >
+                    {muted ? '🔇' : '🔊'}
+                  </button>
+                )}
+              </div>
+
+              {duration && (
+                <div className="absolute bottom-3 left-3 px-2 py-0.5 rounded-md text-white text-[10px] font-bold" style={{ background: 'rgba(0,0,0,0.52)' }}>
+                  {duration}
+                </div>
+              )}
+            </div>
+
+            {/* ── Right: info — slides directionally on nav ── */}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={safeIdx}
+                initial={{ opacity: 0, x: navDir * 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -navDir * 28 }}
+                transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
+                className="flex-1 flex flex-col min-w-0 overflow-hidden"
+                style={{ borderLeft: `1px solid ${borderCol}` }}
+              >
+                {/* Close */}
+                <button
+                  onClick={onClose}
+                  className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+                  style={{ background: isDark ? 'rgba(55,55,60,0.9)' : 'rgba(240,240,240,0.9)', color: textSec }}
+                >
+                  <X size={15} />
+                </button>
+
+                {/* User row */}
+                <div className="flex items-center gap-3 px-4 py-3 pr-12 flex-shrink-0" style={{ borderBottom: `1px solid ${borderCol}` }}>
+                  <ModalUserAvatar username={username} profileImage={profileImage} size={44} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-sm truncate" style={{ color: textPri }}>{displayName}</span>
+                      {isVerified && (
+                        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="none">
+                          <circle cx="10" cy="10" r="10" fill="#F5C518" />
+                          <path d="M6 10l2.5 2.5L14 7" stroke="#1A1A1A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-xs" style={{ color: textSec }}>@{username}</span>
+                  </div>
+                  {isReal && user?.id && (
+                    <button
+                      onClick={toggleFollow}
+                      disabled={followPending}
+                      className="flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all"
+                      style={{
+                        background: following ? 'transparent' : 'linear-gradient(135deg,#F5C518,#FFB800)',
+                        color: following ? textSec : '#1A1A1A',
+                        border: following ? `1px solid ${borderCol}` : 'none',
+                      }}
+                    >
+                      {following ? 'Following' : 'Follow'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Title + pills */}
+                <div className="px-4 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${borderCol}` }}>
+                  <h3 className="font-bold text-[15px] leading-snug mb-2.5" style={{ color: textPri }}>{reel.title}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium" style={{ background: chipBg, color: textSec }}>
+                      <Heart size={11} style={{ fill: liked ? '#FF4757' : 'none', stroke: liked ? '#FF4757' : 'currentColor' }} />
+                      {fmtNum(likeCount)} likes
+                    </span>
+                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium" style={{ background: chipBg, color: textSec }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      {commentCount} comments
+                    </span>
+                  </div>
+                </div>
+
+                {/* Comments list */}
+                <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3.5" style={{ minHeight: 0 }}>
+                  <p className="text-sm font-semibold" style={{ color: textPri }}>Comments</p>
+                  {commentsLoading ? (
+                    <div className="space-y-3">
+                      {[0, 1, 2].map(i => (
+                        <div key={i} className="flex gap-2.5 animate-pulse">
+                          <div className="w-8 h-8 rounded-full flex-shrink-0" style={{ background: chipBg }} />
+                          <div className="flex-1 space-y-1.5 pt-1">
+                            <div className="h-2.5 rounded-full w-24" style={{ background: chipBg }} />
+                            <div className="h-2 rounded-full w-40"  style={{ background: chipBg }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : comments.length === 0 ? (
+                    <p className="text-sm text-center py-8" style={{ color: textSec }}>No comments yet. Be the first!</p>
+                  ) : (
+                    comments.map(c => (
+                      <div key={c.id} className="flex gap-2.5">
+                        <ModalUserAvatar username={c.username} profileImage={c.userAvatar} size={32} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-xs font-semibold" style={{ color: textPri }}>@{c.username}</span>
+                            <span className="text-[10px]"           style={{ color: textSec }}>{timeAgo(c.createdAt)}</span>
+                          </div>
+                          <p className="text-xs mt-0.5 leading-relaxed" style={{ color: textSec }}>{c.text}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={commentsEndRef} />
+                </div>
+
+                {/* Action bar */}
+                <div className="flex-shrink-0 px-4 py-2.5 flex items-center gap-5" style={{ borderTop: `1px solid ${borderCol}` }}>
+                  <button onClick={toggleLike} className="flex items-center gap-1.5 transition-transform active:scale-90">
+                    <Heart size={20} style={{ fill: liked ? '#FF4757' : 'none', stroke: liked ? '#FF4757' : textSec, transition: 'all 0.18s' }} />
+                    <span className="text-sm font-medium" style={{ color: textSec }}>{fmtNum(likeCount)}</span>
+                  </button>
+                  <button className="flex items-center gap-1.5">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={textSec} strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span className="text-sm font-medium" style={{ color: textSec }}>{commentCount}</span>
+                  </button>
+                  <div className="ml-auto flex items-center gap-3.5">
+                    <button>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={textSec} strokeWidth="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                    </button>
+                    <button>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={textSec} strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Comment input */}
+                <form
+                  onSubmit={postComment}
+                  className="flex-shrink-0 px-4 py-3 flex items-center gap-3"
+                  style={{ borderTop: `1px solid ${borderCol}` }}
+                >
+                  <ModalUserAvatar username="me" profileImage={null} size={36} />
+                  <input
+                    value={newComment}
+                    onChange={e => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 text-sm rounded-full px-4 py-2 outline-none"
+                    style={{ background: chipBg, color: textPri, border: 'none' }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(e as unknown as React.FormEvent) } }}
+                  />
+                  {newComment.trim() && (
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="text-xs font-bold px-3 py-1.5 rounded-full flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                    >
+                      {submitting ? '…' : 'Post'}
+                    </button>
+                  )}
+                </form>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* Next arrow */}
+          {hasNext && (
+            <button
+              onClick={e => { e.stopPropagation(); go(safeIdx + 1) }}
+              className="absolute right-3 sm:right-6 z-10 w-11 h-11 rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
+              style={{ background: 'rgba(255,255,255,0.10)' }}
+            >
+              <ChevronRight size={22} />
+            </button>
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
 
 function TrendingReels() {
   const sectionRef = useRef<HTMLDivElement>(null)
@@ -446,12 +921,12 @@ function TrendingReels() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const { theme } = useTheme()
   const isDark = theme === 'dark'
-  const router = useRouter()
 
   const [reels, setReels] = useState<TrendingReelItem[]>([])
   const [loading, setLoading] = useState(true)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
+  const [modalIdx, setModalIdx] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/reels/trending')
@@ -595,13 +1070,7 @@ function TrendingReels() {
                 custom={i}
                 whileHover={{ y: -7, scale: 1.03 }}
                 transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-                onClick={() => {
-                  if (isReal) {
-                    router.push(`/reel/${(reel as TrendingReelItem).id}`)
-                  } else {
-                    router.push('/reels')
-                  }
-                }}
+                onClick={() => setModalIdx(i)}
                 className="relative flex-shrink-0 w-36 sm:w-40 rounded-[20px] overflow-hidden cursor-pointer group [scroll-snap-align:start]"
                 style={{
                   aspectRatio: '9/15',
@@ -659,6 +1128,15 @@ function TrendingReels() {
         }
       </div>
       </div>
+
+      {/* Reel popup modal */}
+      <ReelModal
+        reels={activeReels as AnyReel[]}
+        index={modalIdx ?? 0}
+        isOpen={modalIdx !== null}
+        onClose={() => setModalIdx(null)}
+        onChange={setModalIdx}
+      />
 
     </motion.section>
   )

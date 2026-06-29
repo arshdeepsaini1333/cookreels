@@ -71,7 +71,8 @@
       "Bash(xargs grep -l \"recipe\" -i)",
       "Bash(mkdir -p \"d:/cookreels-main/src/app/api/messages/conversations/[convId]\")",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
-      "Bash(xargs grep -l \"SMTP_\\\\|EMAIL_\\\\|RESEND\")"
+      "Bash(xargs grep -l \"SMTP_\\\\|EMAIL_\\\\|RESEND\")",
+      "Bash(xargs grep -l \"TrendingReels\")"
     ],
     "additionalDirectories": [
       "e:\\Cookreels\\cookreels-main\\src\\app",
