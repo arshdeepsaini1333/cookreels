@@ -518,6 +518,15 @@ function ReelModal({
   const [muted, setMuted] = useState(true)
   const mutedRef = useRef(true) // stable ref for callback ref closure
 
+  // Touch swipe (mobile navigation)
+  const touchStartX = useRef(0)
+  function onTouchStart(e: React.TouchEvent) { touchStartX.current = e.touches[0].clientX }
+  function onTouchEnd(e: React.TouchEvent) {
+    const dx = touchStartX.current - e.changedTouches[0].clientX
+    if (dx > 50 && hasNext) go(safeIdx + 1)
+    else if (dx < -50 && hasPrev) go(safeIdx - 1)
+  }
+
   // Like
   const [liked, setLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
@@ -683,14 +692,14 @@ function ReelModal({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
           onClick={onClose}
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] flex items-center justify-center md:p-4"
           style={{ background: 'rgba(0,0,0,0.80)', backdropFilter: 'blur(6px)' }}
         >
           {/* Prev arrow */}
           {hasPrev && (
             <button
               onClick={e => { e.stopPropagation(); go(safeIdx - 1) }}
-              className="absolute left-3 sm:left-6 z-10 w-11 h-11 rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
+              className="absolute left-2 md:left-6 z-10 hidden md:flex w-11 h-11 rounded-full items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
               style={{ background: 'rgba(255,255,255,0.10)' }}
             >
               <ChevronLeft size={22} />
@@ -700,17 +709,25 @@ function ReelModal({
           {/* Card — never remounts on navigation */}
           <div
             onClick={e => e.stopPropagation()}
-            className="relative flex rounded-[20px] overflow-hidden"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            className="relative flex flex-col md:flex-row overflow-hidden w-full h-full md:w-[94vw] md:max-w-[860px] md:h-[90vh] md:max-h-[560px] md:rounded-[20px]"
             style={{
-              width: 'min(94vw, 860px)',
-              height: 'min(90vh, 560px)',
               background: bg,
               border: `1px solid ${borderCol}`,
               boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
             }}
           >
+            {/* Close — outside AnimatePresence so it doesn't animate on reel change */}
+            <button
+              onClick={onClose}
+              className="absolute top-3 right-3 z-30 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
+              style={{ background: isDark ? 'rgba(55,55,60,0.9)' : 'rgba(240,240,240,0.9)', color: textSec }}
+            >
+              <X size={15} />
+            </button>
             {/* ── Left: video — stable, src changes on nav ── */}
-            <div className="relative flex-shrink-0 bg-black" style={{ width: '40%' }}>
+            <div className="relative flex-shrink-0 bg-black w-full h-[52vh] md:h-full md:w-[40%]">
               {videoUrl ? (
                 <video
                   ref={videoCallbackRef}
@@ -726,7 +743,7 @@ function ReelModal({
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-black/10 pointer-events-none" />
 
               {/* Counter + mute */}
-              <div className="absolute top-3 inset-x-3 flex items-center justify-between z-10">
+              <div className="absolute top-3 left-3 right-3 md:right-3 flex items-center justify-between z-10 pr-10 md:pr-0">
                 <span className="px-2.5 py-1 rounded-full text-white text-[11px] font-bold" style={{ background: 'rgba(0,0,0,0.52)' }}>
                   {safeIdx + 1} / {reels.length}
                 </span>
@@ -748,6 +765,9 @@ function ReelModal({
               )}
             </div>
 
+            {/* Separator: horizontal on mobile, vertical on desktop */}
+            <div className="h-px md:h-auto md:w-px flex-shrink-0" style={{ background: borderCol }} />
+
             {/* ── Right: info — slides directionally on nav ── */}
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
@@ -757,19 +777,9 @@ function ReelModal({
                 exit={{ opacity: 0, x: -navDir * 28 }}
                 transition={{ duration: 0.14, ease: [0.25, 0.46, 0.45, 0.94] }}
                 className="flex-1 flex flex-col min-w-0 overflow-hidden"
-                style={{ borderLeft: `1px solid ${borderCol}` }}
               >
-                {/* Close */}
-                <button
-                  onClick={onClose}
-                  className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full flex items-center justify-center transition-colors"
-                  style={{ background: isDark ? 'rgba(55,55,60,0.9)' : 'rgba(240,240,240,0.9)', color: textSec }}
-                >
-                  <X size={15} />
-                </button>
-
                 {/* User row */}
-                <div className="flex items-center gap-3 px-4 py-3 pr-12 flex-shrink-0" style={{ borderBottom: `1px solid ${borderCol}` }}>
+                <div className="flex items-center gap-3 px-4 py-3 md:pr-12 flex-shrink-0" style={{ borderBottom: `1px solid ${borderCol}` }}>
                   <ModalUserAvatar username={username} profileImage={profileImage} size={44} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -902,7 +912,7 @@ function ReelModal({
           {hasNext && (
             <button
               onClick={e => { e.stopPropagation(); go(safeIdx + 1) }}
-              className="absolute right-3 sm:right-6 z-10 w-11 h-11 rounded-full flex items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
+              className="absolute right-2 md:right-6 z-10 hidden md:flex w-11 h-11 rounded-full items-center justify-center border border-white/20 text-white transition-all hover:bg-white/15 hover:scale-105"
               style={{ background: 'rgba(255,255,255,0.10)' }}
             >
               <ChevronRight size={22} />
