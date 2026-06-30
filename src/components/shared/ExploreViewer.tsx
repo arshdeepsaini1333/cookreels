@@ -1012,6 +1012,8 @@ export function ExploreViewer({
         title={item?.data.title ?? ''}
         url={typeof window !== 'undefined' ? window.location.href : ''}
         currentUserId={currentUserId}
+        contentType={item?.type === 'reel' ? 'reel' : 'recipe'}
+        contentId={item?.data.id}
       />
     </>
   )

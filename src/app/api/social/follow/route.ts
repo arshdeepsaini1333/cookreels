@@ -63,6 +63,14 @@ export async function DELETE(req: Request) {
       where: { followerId: session.userId, followingId: targetUserId },
     })
 
+    await prisma.notification.deleteMany({
+      where: {
+        senderId: session.userId,
+        recipientId: targetUserId,
+        type: { in: [NotificationType.FOLLOW, NotificationType.FOLLOW_REQUEST] },
+      },
+    })
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('[follow DELETE]', error)

@@ -566,6 +566,8 @@ export function ReelViewerModal({
         title={reel?.title ?? ''}
         url={typeof window !== 'undefined' ? window.location.href : ''}
         currentUserId={currentUserId}
+        contentType="reel"
+        contentId={reel?.id}
       />
     </>
   )

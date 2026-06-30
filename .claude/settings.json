@@ -7,7 +7,10 @@
       "Bash(node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/_test_cursor.mjs)",
       "Bash(grep -E \"\\(^[^/]*page\\\\.tsx$|home\\)\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in {**d.get\\('dependencies',{}\\),**d.get\\('devDependencies',{}\\)}.items\\(\\)}, indent=2\\)\\)\")",
-      "Bash(xargs grep -l \"trending\\\\|Trending\")"
+      "Bash(xargs grep -l \"trending\\\\|Trending\")",
+      "Bash(xargs grep -l \"use server\")",
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -5 {}')",
+      "Bash(xargs wc -l)"
     ]
   }
 }

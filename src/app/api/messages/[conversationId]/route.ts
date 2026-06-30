@@ -46,6 +46,18 @@ export async function GET(req: NextRequest, { params }: Context) {
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       sender: { select: { id: true, firstName: true, lastName: true, profileImage: true } },
+      sharedReel: {
+        select: {
+          id: true, title: true, thumbnailUrl: true, duration: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      },
+      sharedRecipe: {
+        select: {
+          id: true, title: true, coverImage: true, cookTime: true,
+          user: { select: { firstName: true, lastName: true } },
+        },
+      },
     },
   })
 

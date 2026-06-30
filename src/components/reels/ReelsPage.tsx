@@ -819,6 +819,8 @@ const ReelCard = memo(function ReelCard({
         title={reel.recipeTitle}
         url={`${typeof window !== 'undefined' ? window.location.origin : ''}/reel/${reel.id}`}
         currentUserId={currentUserId}
+        contentType="reel"
+        contentId={reel.id}
       />
     </div>
   )

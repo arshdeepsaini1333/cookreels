@@ -867,6 +867,8 @@ export function RecipeViewerModal({
         title={recipe?.title ?? ''}
         url={typeof window !== 'undefined' ? window.location.href : ''}
         currentUserId={currentUserId}
+        contentType="recipe"
+        contentId={recipe?.id}
       />
     </>
   )

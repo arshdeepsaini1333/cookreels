@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import {
   Search, Send, ArrowLeft, MoreVertical,
   MessageCircle, Smile, ImageIcon, Check, CheckCheck,
-  ChefHat, X, Loader2, Trash2, Ban,
+  ChefHat, X, Loader2, Trash2, Ban, Play, Clock,
 } from 'lucide-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
 
@@ -21,9 +22,26 @@ interface ConvUser {
 
 interface LastMessage {
   content: string
+  messageType?: string
   senderId: string
   status: 'SENT' | 'DELIVERED' | 'READ'
   createdAt: string
+}
+
+interface SharedReel {
+  id: string
+  title: string
+  thumbnailUrl: string | null
+  duration: number | null
+  user: { firstName: string; lastName: string }
+}
+
+interface SharedRecipe {
+  id: string
+  title: string
+  coverImage: string | null
+  cookTime: number | null
+  user: { firstName: string; lastName: string }
 }
 
 interface Conversation {
@@ -49,6 +67,9 @@ interface Message {
   senderId: string
   content: string
   imageUrl: string | null
+  messageType: string
+  sharedReel: SharedReel | null
+  sharedRecipe: SharedRecipe | null
   status: 'SENT' | 'DELIVERED' | 'READ'
   deletedForEveryone: boolean
   deletedForUserIds: string[]
@@ -186,9 +207,13 @@ function ConversationItem({
 }: {
   conv: Conversation; isActive: boolean; currentUserId: string; onClick: () => void
 }) {
-  const preview = conv.lastMessage
-    ? (conv.lastMessage.senderId === currentUserId ? 'You: ' : '') +
-      (conv.lastMessage.content || '📷 Photo')
+  const previewBody = conv.lastMessage
+    ? conv.lastMessage.messageType === 'REEL_SHARE'   ? '🎥 Shared a Reel'
+    : conv.lastMessage.messageType === 'RECIPE_SHARE' ? '🍲 Shared a Recipe'
+    : conv.lastMessage.content || '📷 Photo'
+    : null
+  const preview = previewBody
+    ? (conv.lastMessage?.senderId === currentUserId ? 'You: ' : '') + previewBody
     : 'Start a conversation'
 
   return (
@@ -226,6 +251,143 @@ function ConversationItem({
             </span>
           ) : null}
         </div>
+      </div>
+    </motion.button>
+  )
+}
+
+// ── SharedReelCard ─────────────────────────────────────────────────────────────
+
+function SharedReelCard({ reel, isMine }: { reel: SharedReel; isMine: boolean }) {
+  const router = useRouter()
+  const creatorName = `${reel.user.firstName} ${reel.user.lastName}`
+  const durSec      = reel.duration ?? 0
+  const durStr      = durSec > 0 ? `${Math.floor(durSec / 60)}:${String(durSec % 60).padStart(2, '0')}` : null
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={() => router.push(`/reel/${reel.id}`)}
+      className="w-full overflow-hidden text-left rounded-2xl"
+      style={{
+        background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
+        border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
+        maxWidth:   260,
+      }}
+    >
+      {/* Label */}
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+        <span className="text-xs">🎥</span>
+        <span className="text-[11px] font-semibold opacity-70"
+          style={{ color: isMine ? 'inherit' : 'var(--cr-text-muted)' }}>
+          Shared a Reel
+        </span>
+      </div>
+
+      {/* Thumbnail */}
+      <div className="relative mx-2 mb-2 rounded-xl overflow-hidden" style={{ aspectRatio: '9/16', background: '#1a1a1a', maxHeight: 180 }}>
+        {reel.thumbnailUrl ? (
+          <img src={reel.thumbnailUrl} alt={reel.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg,rgba(245,197,24,0.15),rgba(0,0,0,0.6))' }}>
+            <ChefHat className="w-8 h-8 opacity-50" style={{ color: '#F5C518' }} />
+          </div>
+        )}
+        {/* Play overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
+            <Play className="w-5 h-5 text-white fill-white" style={{ marginLeft: 2 }} />
+          </div>
+        </div>
+        {/* Duration badge */}
+        {durStr && (
+          <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+            style={{ background: 'rgba(0,0,0,0.65)' }}>
+            <Clock className="w-2.5 h-2.5 text-white" />
+            <span className="text-[10px] font-semibold text-white">{durStr}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div className="px-3 pb-3">
+        <p className="text-sm font-bold leading-tight truncate"
+          style={{ color: isMine ? 'inherit' : 'var(--cr-text-primary)' }}>
+          {reel.title}
+        </p>
+        <p className="text-[11px] mt-0.5 truncate"
+          style={{ color: isMine ? 'rgba(255,255,255,0.7)' : 'var(--cr-text-muted)' }}>
+          {creatorName}
+        </p>
+        <p className="text-[11px] mt-1.5 font-semibold"
+          style={{ color: '#F5C518' }}>
+          Tap to watch ›
+        </p>
+      </div>
+    </motion.button>
+  )
+}
+
+// ── SharedRecipeCard ────────────────────────────────────────────────────────────
+
+function SharedRecipeCard({ recipe, isMine }: { recipe: SharedRecipe; isMine: boolean }) {
+  const router      = useRouter()
+  const creatorName = `${recipe.user.firstName} ${recipe.user.lastName}`
+  const cookStr     = recipe.cookTime ? `${recipe.cookTime} min` : null
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={() => router.push(`/recipe/${recipe.id}`)}
+      className="w-full overflow-hidden text-left rounded-2xl"
+      style={{
+        background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
+        border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
+        maxWidth:   260,
+      }}
+    >
+      {/* Label */}
+      <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+        <span className="text-xs">🍲</span>
+        <span className="text-[11px] font-semibold opacity-70"
+          style={{ color: isMine ? 'inherit' : 'var(--cr-text-muted)' }}>
+          Shared a Recipe
+        </span>
+      </div>
+
+      {/* Cover image */}
+      <div className="relative mx-2 mb-2 rounded-xl overflow-hidden" style={{ aspectRatio: '4/3', background: '#1a1a1a' }}>
+        {recipe.coverImage ? (
+          <img src={recipe.coverImage} alt={recipe.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg,rgba(245,197,24,0.15),rgba(0,0,0,0.6))' }}>
+            <ChefHat className="w-8 h-8 opacity-50" style={{ color: '#F5C518' }} />
+          </div>
+        )}
+        {/* Recipe badge */}
+        <div className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+          style={{ background: 'rgba(245,197,24,0.90)' }}>
+          <ChefHat className="w-2.5 h-2.5" style={{ color: '#1A1A1A' }} />
+          <span className="text-[10px] font-bold" style={{ color: '#1A1A1A' }}>Recipe</span>
+        </div>
+      </div>
+
+      {/* Info */}
+      <div className="px-3 pb-3">
+        <p className="text-sm font-bold leading-tight truncate"
+          style={{ color: isMine ? 'inherit' : 'var(--cr-text-primary)' }}>
+          {recipe.title}
+        </p>
+        <p className="text-[11px] mt-0.5 truncate"
+          style={{ color: isMine ? 'rgba(255,255,255,0.7)' : 'var(--cr-text-muted)' }}>
+          by {creatorName}{cookStr ? ` · ${cookStr}` : ''}
+        </p>
+        <p className="text-[11px] mt-1.5 font-semibold" style={{ color: '#F5C518' }}>
+          Tap to view ›
+        </p>
       </div>
     </motion.button>
   )
@@ -312,23 +474,30 @@ function MessageBubble({
       </div>
 
       <div className={`max-w-[65%] sm:max-w-[55%] flex flex-col gap-1 ${isMine ? 'items-end' : 'items-start'}`}>
-        <div className="overflow-hidden" style={
-          isMine
-            ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', borderRadius: '18px 18px 4px 18px' }
-            : { background: 'var(--cr-bg-card)', color: 'var(--cr-text-1)', border: '1px solid var(--cr-border)', borderRadius: '18px 18px 18px 4px' }
-        }>
-          {hasImage && (
-            <img src={message.imageUrl!} alt="attachment"
-              className="block w-full max-w-[260px] object-cover"
-              style={{ borderRadius: hasText ? '0' : 'inherit' }} />
-          )}
-          {hasText && (
-            <p className="px-3.5 py-2 text-sm leading-relaxed break-words"
-              style={{ fontWeight: isMine ? 500 : 400 }}>
-              {message.content}
-            </p>
-          )}
-        </div>
+        {/* Shared content cards render outside the bubble wrapper */}
+        {message.messageType === 'REEL_SHARE' && message.sharedReel ? (
+          <SharedReelCard reel={message.sharedReel} isMine={isMine} />
+        ) : message.messageType === 'RECIPE_SHARE' && message.sharedRecipe ? (
+          <SharedRecipeCard recipe={message.sharedRecipe} isMine={isMine} />
+        ) : (
+          <div className="overflow-hidden" style={
+            isMine
+              ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', borderRadius: '18px 18px 4px 18px' }
+              : { background: 'var(--cr-bg-card)', color: 'var(--cr-text-1)', border: '1px solid var(--cr-border)', borderRadius: '18px 18px 18px 4px' }
+          }>
+            {hasImage && (
+              <img src={message.imageUrl!} alt="attachment"
+                className="block w-full max-w-[260px] object-cover"
+                style={{ borderRadius: hasText ? '0' : 'inherit' }} />
+            )}
+            {hasText && (
+              <p className="px-3.5 py-2 text-sm leading-relaxed break-words"
+                style={{ fontWeight: isMine ? 500 : 400 }}>
+                {message.content}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Timestamp + read receipt */}
         <div className={`flex items-center gap-1 px-1 ${isMine ? 'flex-row-reverse' : ''}`}>
@@ -577,6 +746,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   const pollingRef    = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const hasAutoOpened = useRef(false)
+  const activeConvRef = useRef<string | null>(null)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -609,6 +779,9 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
     finally { setLoadingMsgs(false) }
   }, [])
 
+  // Keep activeConvRef in sync for SSE handler
+  useEffect(() => { activeConvRef.current = activeConv?.id ?? null }, [activeConv?.id])
+
   // Poll active conversation
   useEffect(() => {
     if (!activeConv?.id) return
@@ -628,6 +801,46 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
 
     return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
   }, [activeConv?.id])
+
+  // SSE subscription for real-time incoming messages
+  useEffect(() => {
+    const es = new EventSource('/api/messages/events')
+    es.addEventListener('message:new', (e: MessageEvent) => {
+      try {
+        const { conversationId, message } = JSON.parse(e.data) as {
+          conversationId: string
+          message: Message & { createdAt: string; updatedAt: string }
+        }
+        // Append to active conversation
+        setMessages(prev => {
+          if (prev.length && prev[0].conversationId === conversationId) {
+            if (prev.some(m => m.id === message.id)) return prev
+            return [...prev, message]
+          }
+          return prev
+        })
+        // Update conversations list preview + unread count
+        setConversations(prev => {
+          const previewText =
+            message.messageType === 'REEL_SHARE'   ? '🎥 Shared a Reel'
+          : message.messageType === 'RECIPE_SHARE' ? '🍲 Shared a Recipe'
+          : message.content || '📷 Photo'
+          const updated = prev.map(c =>
+            c.id === conversationId
+              ? {
+                  ...c,
+                  lastMessage:   { content: previewText, messageType: message.messageType, senderId: message.senderId, status: message.status, createdAt: message.createdAt },
+                  lastMessageAt: message.createdAt,
+                  unreadCount:   c.id !== activeConvRef.current ? c.unreadCount + 1 : 0,
+                }
+              : c
+          )
+          return [...updated].sort((a, b) => (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''))
+        })
+      } catch { /* ignore */ }
+    })
+    return () => es.close()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -735,6 +948,9 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
       senderId:           currentUserId,
       content,
       imageUrl:           uploadedImageUrl,
+      messageType:        uploadedImageUrl ? 'IMAGE' : 'TEXT',
+      sharedReel:         null,
+      sharedRecipe:       null,
       status:             'SENT',
       deletedForEveryone: false,
       deletedForUserIds:  [],

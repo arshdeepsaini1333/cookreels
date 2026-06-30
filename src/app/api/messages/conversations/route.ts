@@ -38,7 +38,7 @@ export async function GET() {
             orderBy: { createdAt: 'desc' },
             take:    1,
             where:   { deletedForEveryone: false },
-            select:  { content: true, imageUrl: true, senderId: true, status: true, createdAt: true },
+            select:  { content: true, imageUrl: true, messageType: true, senderId: true, status: true, createdAt: true },
           },
           _count: {
             select: {
@@ -72,10 +72,13 @@ export async function GET() {
         },
         lastMessage: last
           ? {
-              content:   last.content || (last.imageUrl ? '📷 Photo' : ''),
-              senderId:  last.senderId,
-              status:    last.status,
-              createdAt: last.createdAt,
+              content: last.messageType === 'REEL_SHARE' ? '🎥 Shared a Reel'
+                     : last.messageType === 'RECIPE_SHARE' ? '🍲 Shared a Recipe'
+                     : last.content || (last.imageUrl ? '📷 Photo' : ''),
+              messageType: last.messageType,
+              senderId:    last.senderId,
+              status:      last.status,
+              createdAt:   last.createdAt,
             }
           : null,
         unreadCount:   conv._count.messages,

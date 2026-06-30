@@ -35,6 +35,8 @@ enum NotificationType {
   REEL_COMMENT
   RECIPE_LIKE
   RECIPE_COMMENT
+  REEL_SHARE
+  RECIPE_SHARE
 }
 
 enum FollowStatus {
@@ -56,6 +58,14 @@ enum MessageStatus {
   SENT
   DELIVERED
   READ
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  REEL_SHARE
+  RECIPE_SHARE
+  SYSTEM
 }
 
 enum ConvStatus {
@@ -279,6 +289,7 @@ model Recipe {
   tags         RecipeTag[]
   notifications Notification[]
   activities   Activity[]
+  sharedInMessages Message[]   @relation("RecipeSharedMessages")
 
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @default(now())
@@ -323,6 +334,7 @@ model Reel {
   notifications Notification[]
   activities   Activity[]
   campaigns    Campaign[]
+  sharedInMessages Message[]   @relation("ReelSharedMessages")
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now())
@@ -626,12 +638,17 @@ model Message {
   senderId            String
   content             String        @db.Text
   imageUrl            String?
+  messageType         MessageType   @default(TEXT)
+  sharedReelId        String?
+  sharedRecipeId      String?
   status              MessageStatus @default(SENT)
   deletedForEveryone  Boolean       @default(false)
   deletedForUserIds   String[]      @default([])
 
   conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  sharedReel     Reel?         @relation("ReelSharedMessages",    fields: [sharedReelId],   references: [id], onDelete: SetNull)
+  sharedRecipe   Recipe?       @relation("RecipeSharedMessages",  fields: [sharedRecipeId], references: [id], onDelete: SetNull)
 
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

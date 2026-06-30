@@ -79,5 +79,9 @@ export async function DELETE(_req: Request, { params }: Params) {
     userId,
   })
 
+  await prisma.notification.deleteMany({
+    where: { senderId: userId, reelId: id, type: NotificationType.REEL_LIKE },
+  })
+
   return NextResponse.json({ likeCount, liked: false })
 }

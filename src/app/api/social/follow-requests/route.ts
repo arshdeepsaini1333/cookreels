@@ -90,6 +90,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ success: true, action: 'accepted' })
     } else {
       await prisma.follow.delete({ where: { id: followRecord.id } })
+      await prisma.notification.deleteMany({
+        where: {
+          senderId: requesterId,
+          recipientId: session.userId,
+          type: NotificationType.FOLLOW_REQUEST,
+        },
+      })
       return NextResponse.json({ success: true, action: 'declined' })
     }
   } catch (error) {

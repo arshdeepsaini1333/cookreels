@@ -66,6 +66,16 @@ function buildText(input: CreateInput): string {
         ? `${name} commented on your reel "${input.reelTitle}".`
         : `${name} commented on your reel.`
 
+    case NotificationType.REEL_SHARE:
+      return input.reelTitle
+        ? `${name} shared a reel "${input.reelTitle}" with you.`
+        : `${name} shared a reel with you.`
+
+    case NotificationType.RECIPE_SHARE:
+      return input.recipeTitle
+        ? `${name} shared a recipe "${input.recipeTitle}" with you.`
+        : `${name} shared a recipe with you.`
+
     default:
       return `${name} interacted with your content.`
   }
