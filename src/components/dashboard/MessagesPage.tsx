@@ -737,11 +737,13 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   const [isDeclining,      setIsDeclining]      = useState(false)
 
   const endRef        = useRef<HTMLDivElement>(null)
+  const msgAreaRef    = useRef<HTMLDivElement>(null)
   const inputRef      = useRef<HTMLTextAreaElement>(null)
   const pollingRef    = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const hasAutoOpened = useRef(false)
   const activeConvRef = useRef<string | null>(null)
+  const isNearBottom  = useRef(true)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -837,8 +839,18 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
     return () => es.close()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  // Auto-scroll only when user is already near the bottom
+  useEffect(() => {
+    if (isNearBottom.current) {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages])
+
+  // When switching conversations, always jump to bottom and reset the near-bottom flag
+  useEffect(() => {
+    isNearBottom.current = true
+    endRef.current?.scrollIntoView({ behavior: 'auto' })
+  }, [activeConv?.id])
 
   // Close context menu on scroll
   useEffect(() => {
@@ -1270,9 +1282,16 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
               </div>
 
               {/* ── Messages Area ────────────────────────────────────────── */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1 min-h-0 msg-scroll"
+              <div
+                ref={msgAreaRef}
+                className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1 min-h-0 msg-scroll"
                 style={{ background: 'var(--cr-bg-surface)' }}
                 onClick={() => { setContextMenu(null); setShowHeaderMenu(false) }}
+                onScroll={() => {
+                  const el = msgAreaRef.current
+                  if (!el) return
+                  isNearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+                }}
               >
                 {loadingMsgs ? (
                   <MsgSkeleton />
