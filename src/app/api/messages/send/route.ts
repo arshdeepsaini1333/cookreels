@@ -90,13 +90,13 @@ export async function POST(req: NextRequest) {
         sharedReel: {
           select: {
             id: true, title: true, thumbnailUrl: true, videoUrl: true, duration: true,
-            user: { select: { firstName: true, lastName: true } },
+            user: { select: { id: true, firstName: true, lastName: true, username: true, privateAccount: true } },
           },
         },
         sharedRecipe: {
           select: {
             id: true, title: true, coverImage: true, cookTime: true,
-            user: { select: { firstName: true, lastName: true } },
+            user: { select: { id: true, firstName: true, lastName: true, username: true, privateAccount: true } },
           },
         },
       },
@@ -110,28 +110,63 @@ export async function POST(req: NextRequest) {
     }),
   ])
 
-  // Publish SSE event so recipient receives message in real-time
-  const serialized = {
+  // Compute viewerCanSee for a private creator — checks follow status for the given viewer
+  async function canViewPrivate(creatorId: string, isPrivate: boolean, forUserId: string) {
+    if (!isPrivate || creatorId === forUserId) return true
+    const accepted = await prisma.follow.findFirst({
+      where: { followerId: forUserId, followingId: creatorId, status: 'ACCEPTED' },
+      select: { id: true },
+    })
+    return !!accepted
+  }
+
+  const [recipientCanSeeReel, senderCanSeeReel, recipientCanSeeRecipe, senderCanSeeRecipe] = await Promise.all([
+    message.sharedReel
+      ? canViewPrivate(message.sharedReel.user.id, message.sharedReel.user.privateAccount, recipientId)
+      : Promise.resolve(true),
+    message.sharedReel
+      ? canViewPrivate(message.sharedReel.user.id, message.sharedReel.user.privateAccount, session.userId)
+      : Promise.resolve(true),
+    message.sharedRecipe
+      ? canViewPrivate(message.sharedRecipe.user.id, message.sharedRecipe.user.privateAccount, recipientId)
+      : Promise.resolve(true),
+    message.sharedRecipe
+      ? canViewPrivate(message.sharedRecipe.user.id, message.sharedRecipe.user.privateAccount, session.userId)
+      : Promise.resolve(true),
+  ])
+
+  function shapeReel(canSee: boolean) {
+    if (!message.sharedReel) return null
+    const r = message.sharedReel
+    return {
+      id: r.id, title: r.title, thumbnailUrl: r.thumbnailUrl, videoUrl: r.videoUrl, duration: r.duration,
+      user: { firstName: r.user.firstName, lastName: r.user.lastName, username: r.user.username },
+      viewerCanSee: canSee,
+    }
+  }
+
+  function shapeRecipe(canSee: boolean) {
+    if (!message.sharedRecipe) return null
+    const r = message.sharedRecipe
+    return {
+      id: r.id, title: r.title, coverImage: r.coverImage, cookTime: r.cookTime,
+      user: { firstName: r.user.firstName, lastName: r.user.lastName, username: r.user.username },
+      viewerCanSee: canSee,
+    }
+  }
+
+  const base = {
     ...message,
     createdAt: message.createdAt.toISOString(),
     updatedAt: message.updatedAt.toISOString(),
   }
-  sseBus.publish(`messages:${recipientId}`, 'message:new', { conversationId, message: serialized })
 
-  // Send in-app notification for share types
-  if (messageType === 'REEL_SHARE' && sharedReelId) {
-    const reel = await prisma.reel.findFirst({ where: { id: sharedReelId }, select: { title: true } })
-    if (reel) {
-      createNotification({
-        recipientId,
-        senderId:       session.userId,
-        senderUsername: session.username,
-        type:           NotificationType.REEL_SHARE,
-        reelId:         sharedReelId,
-        reelTitle:      reel.title,
-      }).catch(() => {})
-    }
-  } else if (messageType === 'RECIPE_SHARE' && sharedRecipeId) {
+  // Publish SSE event so recipient receives message in real-time
+  const recipientMsg = { ...base, sharedReel: shapeReel(recipientCanSeeReel), sharedRecipe: shapeRecipe(recipientCanSeeRecipe) }
+  sseBus.publish(`messages:${recipientId}`, 'message:new', { conversationId, message: recipientMsg })
+
+  // Send in-app notification for recipe shares only
+  if (messageType === 'RECIPE_SHARE' && sharedRecipeId) {
     const recipe = await prisma.recipe.findFirst({ where: { id: sharedRecipeId }, select: { title: true } })
     if (recipe) {
       createNotification({
@@ -145,5 +180,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ message: serialized })
+  return NextResponse.json({ message: { ...base, sharedReel: shapeReel(senderCanSeeReel), sharedRecipe: shapeRecipe(senderCanSeeRecipe) } })
 }

@@ -15,6 +15,7 @@ import { useRecipeSave } from '@/hooks/useRecipeSave'
 import { useRecipeComments } from '@/hooks/useRecipeComments'
 import { CommentList, CommentInput } from '@/components/shared/CommentSection'
 import { ShareModal } from '@/components/shared/ShareModal'
+import { GuestBanner } from '@/components/shared/GuestBanner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,9 @@ export function RecipeViewerModal({
     <AnimatePresence>
       {isOpen && (
         <>
+          {/* Guest banner for unauthenticated viewers */}
+          {!currentUserId && <GuestBanner />}
+
           {/* Backdrop — desktop only */}
           <motion.div
             key="rv-bg"

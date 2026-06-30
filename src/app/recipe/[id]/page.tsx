@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { RecipeDeepLinkClient } from './RecipeDeepLinkClient'
+import { PrivateProfileWall } from '@/components/shared/PrivateProfileWall'
 import type { ProfileUser } from '@/components/profile/ProfilePage'
 
 type Props = { params: Promise<{ id: string }> }
@@ -63,19 +64,44 @@ export default async function RecipePage({ params }: Props) {
       createdAt:   true,
       user: {
         select: {
-          id:           true,
-          username:     true,
-          firstName:    true,
-          lastName:     true,
-          profileImage: true,
-          isVerified:   true,
-          bio:          true,
+          id:             true,
+          username:       true,
+          firstName:      true,
+          lastName:       true,
+          profileImage:   true,
+          isVerified:     true,
+          bio:            true,
+          privateAccount: true,
         },
       },
     },
   })
 
   if (!recipe) notFound()
+
+  // ── Private account guard ──────────────────────────────────────────────────
+  const isOwner = session?.userId === recipe.userId
+  let canView   = !recipe.user.privateAccount || isOwner
+
+  if (!canView && session) {
+    const accepted = await prisma.follow.findFirst({
+      where: { followerId: session.userId, followingId: recipe.userId, status: 'ACCEPTED' },
+      select: { id: true },
+    })
+    canView = !!accepted
+  }
+
+  if (!canView) {
+    return (
+      <PrivateProfileWall
+        creatorName={`${recipe.user.firstName} ${recipe.user.lastName}`.trim()}
+        creatorUsername={recipe.user.username}
+        creatorAvatar={recipe.user.profileImage}
+        standalone={true}
+      />
+    )
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // Fetch all published recipes from this creator so the carousel works.
   const userRecipes = await prisma.recipe.findMany({

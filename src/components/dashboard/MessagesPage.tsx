@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import {
   Search, Send, ArrowLeft, MoreVertical,
   MessageCircle, Smile, ImageIcon, Check, CheckCheck,
-  ChefHat, X, Loader2, Trash2, Ban, Play, Clock,
+  ChefHat, X, Loader2, Trash2, Ban, Play, Clock, Lock,
 } from 'lucide-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
@@ -35,7 +35,8 @@ interface SharedReel {
   thumbnailUrl: string | null
   videoUrl: string
   duration: number | null
-  user: { firstName: string; lastName: string }
+  user: { firstName: string; lastName: string; username: string }
+  viewerCanSee: boolean
 }
 
 interface SharedRecipe {
@@ -43,7 +44,8 @@ interface SharedRecipe {
   title: string
   coverImage: string | null
   cookTime: number | null
-  user: { firstName: string; lastName: string }
+  user: { firstName: string; lastName: string; username: string }
+  viewerCanSee: boolean
 }
 
 interface Conversation {
@@ -261,21 +263,73 @@ function ConversationItem({
 // ── SharedReelCard ─────────────────────────────────────────────────────────────
 
 function SharedReelCard({ reel, isMine }: { reel: SharedReel; isMine: boolean }) {
-  const router = useRouter()
+  const router      = useRouter()
   const creatorName = `${reel.user.firstName} ${reel.user.lastName}`
   const durSec      = reel.duration ?? 0
   const durStr      = durSec > 0 ? `${Math.floor(durSec / 60)}:${String(durSec % 60).padStart(2, '0')}` : null
 
+  const cardStyle = {
+    background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
+    border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
+    maxWidth:   260,
+  }
+
+  // ── Private account: block the content ────────────────────────────────────
+  if (!reel.viewerCanSee) {
+    return (
+      <div className="w-full overflow-hidden rounded-2xl" style={cardStyle}>
+        {/* Label */}
+        <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+          <span className="text-xs">🎥</span>
+          <span className="text-[11px] font-semibold opacity-70"
+            style={{ color: isMine ? 'inherit' : 'var(--cr-text-muted)' }}>
+            Shared a Reel
+          </span>
+        </div>
+
+        {/* Private wall */}
+        <div
+          className="mx-2 mb-2 rounded-xl flex flex-col items-center justify-center gap-2 py-6 px-4"
+          style={{ background: isMine ? 'rgba(255,255,255,0.06)' : 'var(--cr-bg-main)' }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+          >
+            <Lock className="w-5 h-5" style={{ color: 'var(--cr-text-muted)' }} />
+          </div>
+          <p className="text-xs font-semibold text-center" style={{ color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--cr-text-1)' }}>
+            This account is private
+          </p>
+          <p className="text-[11px] text-center leading-snug" style={{ color: isMine ? 'rgba(255,255,255,0.55)' : 'var(--cr-text-muted)' }}>
+            Follow @{reel.user.username} to see this reel
+          </p>
+          <button
+            onClick={e => { e.stopPropagation(); window.location.href = `/user/${reel.user.username}` }}
+            className="mt-1 px-4 py-1.5 rounded-full text-[11px] font-bold transition-opacity hover:opacity-90"
+            style={{ background: '#F5C518', color: '#1A1A1A' }}
+          >
+            Visit Profile
+          </button>
+        </div>
+
+        {/* Creator name only */}
+        <div className="px-3 pb-3">
+          <p className="text-[11px] truncate" style={{ color: isMine ? 'rgba(255,255,255,0.6)' : 'var(--cr-text-muted)' }}>
+            {creatorName}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal card ────────────────────────────────────────────────────────────
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={() => router.push(`/reel/${reel.id}`)}
       className="w-full overflow-hidden text-left rounded-2xl"
-      style={{
-        background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
-        border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
-        maxWidth:   260,
-      }}
+      style={cardStyle}
     >
       {/* Label */}
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
@@ -289,14 +343,12 @@ function SharedReelCard({ reel, isMine }: { reel: SharedReel; isMine: boolean })
       {/* Thumbnail */}
       <div className="relative mx-2 mb-2 rounded-xl overflow-hidden" style={{ aspectRatio: '9/16', background: '#1a1a1a', maxHeight: 180 }}>
         <ReelThumbnail videoUrl={reel.videoUrl} thumbnailUrl={reel.thumbnailUrl} />
-        {/* Play overlay */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}>
             <Play className="w-5 h-5 text-white fill-white" style={{ marginLeft: 2 }} />
           </div>
         </div>
-        {/* Duration badge */}
         {durStr && (
           <div className="absolute bottom-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md"
             style={{ background: 'rgba(0,0,0,0.65)' }}>
@@ -316,8 +368,7 @@ function SharedReelCard({ reel, isMine }: { reel: SharedReel; isMine: boolean })
           style={{ color: isMine ? 'rgba(255,255,255,0.7)' : 'var(--cr-text-muted)' }}>
           {creatorName}
         </p>
-        <p className="text-[11px] mt-1.5 font-semibold"
-          style={{ color: '#F5C518' }}>
+        <p className="text-[11px] mt-1.5 font-semibold" style={{ color: '#F5C518' }}>
           Tap to watch ›
         </p>
       </div>
@@ -332,16 +383,68 @@ function SharedRecipeCard({ recipe, isMine }: { recipe: SharedRecipe; isMine: bo
   const creatorName = `${recipe.user.firstName} ${recipe.user.lastName}`
   const cookStr     = recipe.cookTime ? `${recipe.cookTime} min` : null
 
+  const cardStyle = {
+    background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
+    border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
+    maxWidth:   260,
+  }
+
+  // ── Private account: block the content ─────────────────────────────────────
+  if (!recipe.viewerCanSee) {
+    return (
+      <div className="w-full overflow-hidden rounded-2xl" style={cardStyle}>
+        {/* Label */}
+        <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
+          <span className="text-xs">🍲</span>
+          <span className="text-[11px] font-semibold opacity-70"
+            style={{ color: isMine ? 'inherit' : 'var(--cr-text-muted)' }}>
+            Shared a Recipe
+          </span>
+        </div>
+
+        {/* Private wall */}
+        <div
+          className="mx-2 mb-2 rounded-xl flex flex-col items-center justify-center gap-2 py-6 px-4"
+          style={{ background: isMine ? 'rgba(255,255,255,0.06)' : 'var(--cr-bg-main)' }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center"
+            style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+          >
+            <Lock className="w-5 h-5" style={{ color: 'var(--cr-text-muted)' }} />
+          </div>
+          <p className="text-xs font-semibold text-center" style={{ color: isMine ? 'rgba(255,255,255,0.85)' : 'var(--cr-text-1)' }}>
+            This account is private
+          </p>
+          <p className="text-[11px] text-center leading-snug" style={{ color: isMine ? 'rgba(255,255,255,0.55)' : 'var(--cr-text-muted)' }}>
+            Follow @{recipe.user.username} to see this recipe
+          </p>
+          <button
+            onClick={() => { window.location.href = `/user/${recipe.user.username}` }}
+            className="mt-1 px-4 py-1.5 rounded-full text-[11px] font-bold transition-opacity hover:opacity-90"
+            style={{ background: '#F5C518', color: '#1A1A1A' }}
+          >
+            Visit Profile
+          </button>
+        </div>
+
+        {/* Creator name only */}
+        <div className="px-3 pb-3">
+          <p className="text-[11px] truncate" style={{ color: isMine ? 'rgba(255,255,255,0.6)' : 'var(--cr-text-muted)' }}>
+            {creatorName}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal card ─────────────────────────────────────────────────────────────
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
       onClick={() => router.push(`/recipe/${recipe.id}`)}
       className="w-full overflow-hidden text-left rounded-2xl"
-      style={{
-        background: isMine ? 'rgba(0,0,0,0.12)' : 'var(--cr-bg-surface)',
-        border:     `1px solid ${isMine ? 'rgba(255,255,255,0.15)' : 'var(--cr-border)'}`,
-        maxWidth:   260,
-      }}
+      style={cardStyle}
     >
       {/* Label */}
       <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1.5">
@@ -362,7 +465,6 @@ function SharedRecipeCard({ recipe, isMine }: { recipe: SharedRecipe; isMine: bo
             <ChefHat className="w-8 h-8 opacity-50" style={{ color: '#F5C518' }} />
           </div>
         )}
-        {/* Recipe badge */}
         <div className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md"
           style={{ background: 'rgba(245,197,24,0.90)' }}>
           <ChefHat className="w-2.5 h-2.5" style={{ color: '#1A1A1A' }} />

@@ -168,6 +168,7 @@ export default function LoginForm() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [otpState, setOtpState] = useState<{ show: true; email: string; message: string } | { show: false }>({ show: false })
   const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [nextUrl, setNextUrl] = useState('/')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -177,6 +178,9 @@ export default function LoginForm() {
     else if (err === 'fb_cancelled') setServerError('Facebook sign-in was cancelled.')
     else if (err === 'fb_failed') setServerError('Facebook sign-in failed. Please try again.')
     else if (err === 'fb_no_email') setServerError('Your Facebook account has no verified email. Please use another sign-in method.')
+
+    const next = params.get('next')
+    if (next) setNextUrl(next)
 
     const prefillEmail = params.get('email')
     if (prefillEmail) {
@@ -228,7 +232,7 @@ export default function LoginForm() {
       })
 
       if (res.ok) {
-        router.push('/')
+        router.push(nextUrl)
         return
       }
 
@@ -258,7 +262,7 @@ export default function LoginForm() {
       <OtpModal
         email={otpState.email}
         message={otpState.message}
-        onSuccess={() => router.push('/')}
+        onSuccess={() => router.push(nextUrl)}
         onClose={() => setOtpState({ show: false })}
       />
     )}

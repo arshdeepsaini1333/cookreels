@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const uid = session.userId
   const tab = req.nextUrl.searchParams.get('tab')
   // tab: 'all' | 'trending' | 'recent' | 'recipes' | 'reels' | null (week-based, unused now)
 
@@ -39,7 +40,15 @@ export async function GET(req: NextRequest) {
 
     const [recipes, reels] = await Promise.all([
       prisma.recipe.findMany({
-        where: { isPublished: true, createdAt: { gte: since } },
+        where: {
+          isPublished: true,
+          createdAt: { gte: since },
+          OR: [
+            { userId: uid },
+            { user: { privateAccount: false } },
+            { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+          ],
+        },
         select: {
           id: true, title: true, coverImage: true,
           cookTime: true, prepTime: true, likeCount: true,
@@ -57,7 +66,15 @@ export async function GET(req: NextRequest) {
         take: TRENDING_RECIPES,
       }),
       prisma.reel.findMany({
-        where: { isPublished: true, createdAt: { gte: since } },
+        where: {
+          isPublished: true,
+          createdAt: { gte: since },
+          OR: [
+            { userId: uid },
+            { user: { privateAccount: false } },
+            { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+          ],
+        },
         select: {
           id: true, title: true, description: true, videoUrl: true, thumbnailUrl: true,
           likeCount: true, viewCount: true, duration: true,
@@ -89,7 +106,15 @@ export async function GET(req: NextRequest) {
 
     const [recipes, reels] = await Promise.all([
       prisma.recipe.findMany({
-        where: { isPublished: true, createdAt: { gte: since } },
+        where: {
+          isPublished: true,
+          createdAt: { gte: since },
+          OR: [
+            { userId: uid },
+            { user: { privateAccount: false } },
+            { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+          ],
+        },
         select: {
           id: true, title: true, coverImage: true,
           cookTime: true, prepTime: true, likeCount: true,
@@ -106,7 +131,15 @@ export async function GET(req: NextRequest) {
         take: RECENT_RECIPES,
       }),
       prisma.reel.findMany({
-        where: { isPublished: true, createdAt: { gte: since } },
+        where: {
+          isPublished: true,
+          createdAt: { gte: since },
+          OR: [
+            { userId: uid },
+            { user: { privateAccount: false } },
+            { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+          ],
+        },
         select: {
           id: true, title: true, description: true, videoUrl: true, thumbnailUrl: true,
           likeCount: true, viewCount: true, duration: true,
@@ -144,7 +177,14 @@ export async function GET(req: NextRequest) {
     const [recipes, reels] = await Promise.all([
       tab !== 'reels'
         ? prisma.recipe.findMany({
-            where: { isPublished: true },
+            where: {
+              isPublished: true,
+              OR: [
+                { userId: uid },
+                { user: { privateAccount: false } },
+                { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+              ],
+            },
             select: {
               id: true, title: true, coverImage: true,
               cookTime: true, prepTime: true, likeCount: true,
@@ -164,7 +204,14 @@ export async function GET(req: NextRequest) {
         : Promise.resolve([] as any[]),
       tab !== 'recipes'
         ? prisma.reel.findMany({
-            where: { isPublished: true },
+            where: {
+              isPublished: true,
+              OR: [
+                { userId: uid },
+                { user: { privateAccount: false } },
+                { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+              ],
+            },
             select: {
               id: true, title: true, description: true, videoUrl: true, thumbnailUrl: true,
               likeCount: true, viewCount: true, duration: true,
@@ -210,7 +257,15 @@ export async function GET(req: NextRequest) {
 
   const [recipes, reels, olderRecipesCount, olderReelsCount] = await Promise.all([
     prisma.recipe.findMany({
-      where: { isPublished: true, createdAt: { gte: start, lt: end } },
+      where: {
+        isPublished: true,
+        createdAt: { gte: start, lt: end },
+        OR: [
+          { userId: uid },
+          { user: { privateAccount: false } },
+          { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+        ],
+      },
       select: {
         id: true, title: true, coverImage: true,
         cookTime: true, prepTime: true, likeCount: true,
@@ -220,7 +275,15 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.reel.findMany({
-      where: { isPublished: true, createdAt: { gte: start, lt: end } },
+      where: {
+        isPublished: true,
+        createdAt: { gte: start, lt: end },
+        OR: [
+          { userId: uid },
+          { user: { privateAccount: false } },
+          { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
+        ],
+      },
       select: {
         id: true, title: true, description: true, videoUrl: true, thumbnailUrl: true,
         likeCount: true, viewCount: true, duration: true,

@@ -38,6 +38,11 @@ export async function GET(req: NextRequest) {
       where: {
         isPublished: true,
         title: { contains: q, mode: 'insensitive' },
+        OR: [
+          { userId: session.userId },
+          { user: { privateAccount: false } },
+          { user: { followers: { some: { followerId: session.userId, status: 'ACCEPTED' } } } },
+        ],
       },
       select: {
         id: true, title: true, coverImage: true,
@@ -58,6 +63,11 @@ export async function GET(req: NextRequest) {
       where: {
         isPublished: true,
         title: { contains: q, mode: 'insensitive' },
+        OR: [
+          { userId: session.userId },
+          { user: { privateAccount: false } },
+          { user: { followers: { some: { followerId: session.userId, status: 'ACCEPTED' } } } },
+        ],
       },
       select: {
         id: true, title: true, description: true, videoUrl: true,

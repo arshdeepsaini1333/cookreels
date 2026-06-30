@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import SignupPage from '@/components/auth/SignupPage'
 import OtpModal from '@/components/auth/OtpModal'
@@ -10,6 +10,13 @@ type OtpState = { show: true; email: string; message: string } | { show: false }
 export default function SignupClient() {
   const router = useRouter()
   const [otpState, setOtpState] = useState<OtpState>({ show: false })
+  const [nextUrl, setNextUrl] = useState('/')
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const next = params.get('next')
+    if (next) setNextUrl(next)
+  }, [])
 
   const handleSignup = async (data: {
     firstName: string
@@ -40,7 +47,7 @@ export default function SignupClient() {
       return
     }
 
-    router.push('/')
+    router.push(nextUrl)
   }
 
   return (
@@ -50,7 +57,7 @@ export default function SignupClient() {
         <OtpModal
           email={otpState.email}
           message={otpState.message}
-          onSuccess={() => router.push('/')}
+          onSuccess={() => router.push(nextUrl)}
           onClose={() => setOtpState({ show: false })}
         />
       )}

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 
 type Params = { params: Promise<{ id: string }> }
@@ -6,6 +7,7 @@ type Params = { params: Promise<{ id: string }> }
 export async function GET(_req: Request, { params }: Params) {
   try {
     const { id } = await params
+    const session = await getSession()
 
     const reel = await prisma.reel.findUnique({
       where: { id, isPublished: true },
@@ -23,12 +25,13 @@ export async function GET(_req: Request, { params }: Params) {
         createdAt:    true,
         user: {
           select: {
-            id:           true,
-            username:     true,
-            firstName:    true,
-            lastName:     true,
-            profileImage: true,
-            isVerified:   true,
+            id:             true,
+            username:       true,
+            firstName:      true,
+            lastName:       true,
+            profileImage:   true,
+            isVerified:     true,
+            privateAccount: true,
           },
         },
       },
@@ -36,6 +39,22 @@ export async function GET(_req: Request, { params }: Params) {
 
     if (!reel) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+
+    const isOwner = session?.userId === reel.user.id
+    let canView   = !reel.user.privateAccount || isOwner
+    if (!canView && session) {
+      const accepted = await prisma.follow.findFirst({
+        where: { followerId: session.userId, followingId: reel.user.id, status: 'ACCEPTED' },
+        select: { id: true },
+      })
+      canView = !!accepted
+    }
+    if (!canView) {
+      return NextResponse.json(
+        { message: 'This account is private', privateAccount: true },
+        { status: 403 }
+      )
     }
 
     return NextResponse.json({

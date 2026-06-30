@@ -205,6 +205,7 @@ export async function fetchReelsFeedCursor(
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
       WHERE r."isPublished" = true AND r."userId" != ${userId}
+        AND (u."privateAccount" = false OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed
@@ -274,6 +275,7 @@ export async function fetchReelById(
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
       WHERE r."isPublished" = true AND r.id = ${reelId}
+        AND (u."privateAccount" = false OR r."userId" = ${userId} OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed
@@ -338,6 +340,7 @@ export async function fetchReelsFeed(
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
       WHERE r."isPublished" = true AND r."userId" != ${userId}
+        AND (u."privateAccount" = false OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed

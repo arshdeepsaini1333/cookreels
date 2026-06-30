@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { RecipeDeepLinkClient } from '@/app/recipe/[id]/RecipeDeepLinkClient'
+import { PrivateProfileWall } from '@/components/shared/PrivateProfileWall'
 import type { ProfileUser } from '@/components/profile/ProfilePage'
 
 type Props = { params: Promise<{ id: string }> }
@@ -26,19 +27,44 @@ export default async function RecipeModalPage({ params }: Props) {
       createdAt:   true,
       user: {
         select: {
-          id:           true,
-          username:     true,
-          firstName:    true,
-          lastName:     true,
-          profileImage: true,
-          isVerified:   true,
-          bio:          true,
+          id:             true,
+          username:       true,
+          firstName:      true,
+          lastName:       true,
+          profileImage:   true,
+          isVerified:     true,
+          bio:            true,
+          privateAccount: true,
         },
       },
     },
   })
 
   if (!recipe) notFound()
+
+  // ── Private account guard ──────────────────────────────────────────────────
+  const isOwner = session?.userId === recipe.userId
+  let canView   = !recipe.user.privateAccount || isOwner
+
+  if (!canView && session) {
+    const accepted = await prisma.follow.findFirst({
+      where: { followerId: session.userId, followingId: recipe.userId, status: 'ACCEPTED' },
+      select: { id: true },
+    })
+    canView = !!accepted
+  }
+
+  if (!canView) {
+    return (
+      <PrivateProfileWall
+        creatorName={`${recipe.user.firstName} ${recipe.user.lastName}`.trim()}
+        creatorUsername={recipe.user.username}
+        creatorAvatar={recipe.user.profileImage}
+        standalone={false}
+      />
+    )
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // Pre-fetch this creator's recipes so the carousel works without a client-side round-trip.
   const userRecipes = await prisma.recipe.findMany({

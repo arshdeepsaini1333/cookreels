@@ -49,13 +49,13 @@ export async function GET(req: NextRequest, { params }: Context) {
       sharedReel: {
         select: {
           id: true, title: true, thumbnailUrl: true, videoUrl: true, duration: true,
-          user: { select: { firstName: true, lastName: true } },
+          user: { select: { id: true, firstName: true, lastName: true, username: true, privateAccount: true } },
         },
       },
       sharedRecipe: {
         select: {
           id: true, title: true, coverImage: true, cookTime: true,
-          user: { select: { firstName: true, lastName: true } },
+          user: { select: { id: true, firstName: true, lastName: true, username: true, privateAccount: true } },
         },
       },
     },
@@ -67,7 +67,52 @@ export async function GET(req: NextRequest, { params }: Context) {
 
   const nextCursor = hasMore ? messages[0]?.id ?? null : null
 
-  return NextResponse.json({ messages, nextCursor })
+  // Collect all private creator IDs (reels + recipes) in one batch follow check
+  const privateIds = new Set<string>()
+  for (const m of messages) {
+    if (m.sharedReel?.user.privateAccount   && m.sharedReel.user.id   !== session.userId) privateIds.add(m.sharedReel.user.id)
+    if (m.sharedRecipe?.user.privateAccount && m.sharedRecipe.user.id !== session.userId) privateIds.add(m.sharedRecipe.user.id)
+  }
+  const followedSet = new Set<string>()
+  if (privateIds.size > 0) {
+    const accepted = await prisma.follow.findMany({
+      where: { followerId: session.userId, followingId: { in: [...privateIds] }, status: 'ACCEPTED' },
+      select: { followingId: true },
+    })
+    accepted.forEach(f => followedSet.add(f.followingId))
+  }
+
+  const canSee = (creatorId: string, isPrivate: boolean) =>
+    !isPrivate || creatorId === session.userId || followedSet.has(creatorId)
+
+  const serialized = messages.map(m => ({
+    ...m,
+    createdAt: m.createdAt.toISOString(),
+    updatedAt: m.updatedAt.toISOString(),
+    sharedReel: m.sharedReel
+      ? {
+          id:           m.sharedReel.id,
+          title:        m.sharedReel.title,
+          thumbnailUrl: m.sharedReel.thumbnailUrl,
+          videoUrl:     m.sharedReel.videoUrl,
+          duration:     m.sharedReel.duration,
+          user: { firstName: m.sharedReel.user.firstName, lastName: m.sharedReel.user.lastName, username: m.sharedReel.user.username },
+          viewerCanSee: canSee(m.sharedReel.user.id, m.sharedReel.user.privateAccount),
+        }
+      : null,
+    sharedRecipe: m.sharedRecipe
+      ? {
+          id:          m.sharedRecipe.id,
+          title:       m.sharedRecipe.title,
+          coverImage:  m.sharedRecipe.coverImage,
+          cookTime:    m.sharedRecipe.cookTime,
+          user: { firstName: m.sharedRecipe.user.firstName, lastName: m.sharedRecipe.user.lastName, username: m.sharedRecipe.user.username },
+          viewerCanSee: canSee(m.sharedRecipe.user.id, m.sharedRecipe.user.privateAccount),
+        }
+      : null,
+  }))
+
+  return NextResponse.json({ messages: serialized, nextCursor })
 }
 
 // DELETE /api/messages/[conversationId] — clear chat for current user

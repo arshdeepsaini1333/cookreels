@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { ShareModal } from '@/components/shared/ShareModal'
+import { GuestBanner } from '@/components/shared/GuestBanner'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -589,6 +590,7 @@ interface DesktopProps {
   onPrev: () => void
   onNext: () => void
   onBack: () => void
+  showBanner?: boolean
   hideLikeCount?: boolean
   blockComments?: boolean
   currentUserId: string | null
@@ -596,7 +598,7 @@ interface DesktopProps {
 
 function DesktopReelViewer({
   reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
-  hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId,
+  hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId, showBanner,
 }: DesktopProps) {
   const videoRef    = useRef<HTMLVideoElement>(null)
   const listRef     = useRef<HTMLDivElement>(null)
@@ -734,8 +736,8 @@ function DesktopReelViewer({
       <button
         onClick={onBack}
         aria-label="Go back"
-        className="fixed top-4 left-4 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
-        style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}
+        className="fixed left-4 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+        style={{ top: showBanner ? '60px' : '16px', background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
@@ -1167,8 +1169,13 @@ export function InstagramReelViewer({
 
   const currentReel = allReels[activeIndex]
 
+  const showBanner = !currentUserId
+
   return (
     <>
+      {/* Guest banner for unauthenticated viewers */}
+      {showBanner && <GuestBanner />}
+
       {/* ════ MOBILE: full-screen snap scroll ════ */}
       <div
         className="md:hidden fixed inset-0 bg-black"
@@ -1180,7 +1187,7 @@ export function InstagramReelViewer({
           aria-label="Go back"
           className="fixed w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center"
           style={{
-            top:   'calc(16px + env(safe-area-inset-top, 0px))',
+            top:   showBanner ? 'calc(60px + env(safe-area-inset-top, 0px))' : 'calc(16px + env(safe-area-inset-top, 0px))',
             left:  '16px',
             zIndex: 30,
           }}
@@ -1253,6 +1260,7 @@ export function InstagramReelViewer({
               hideLikeCount={hideLikeCount}
               blockComments={blockComments}
               currentUserId={currentUserId}
+              showBanner={showBanner}
             />
           </motion.div>
         </AnimatePresence>

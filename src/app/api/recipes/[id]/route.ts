@@ -25,14 +25,15 @@ export async function GET(_req: Request, { params }: Params) {
         createdAt:    true,
         user: {
           select: {
-            id:           true,
-            username:     true,
-            firstName:    true,
-            lastName:     true,
-            profileImage: true,
-            isVerified:   true,
-            hideLikeCount: true,
-            blockComments: true,
+            id:             true,
+            username:       true,
+            firstName:      true,
+            lastName:       true,
+            profileImage:   true,
+            isVerified:     true,
+            hideLikeCount:  true,
+            blockComments:  true,
+            privateAccount: true,
           },
         },
         comments: {
@@ -53,6 +54,23 @@ export async function GET(_req: Request, { params }: Params) {
 
     if (!recipe) {
       return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+
+    // Private account guard
+    const isOwner = session?.userId === recipe.user.id
+    let canView   = !recipe.user.privateAccount || isOwner
+    if (!canView && session) {
+      const accepted = await prisma.follow.findFirst({
+        where: { followerId: session.userId, followingId: recipe.user.id, status: 'ACCEPTED' },
+        select: { id: true },
+      })
+      canView = !!accepted
+    }
+    if (!canView) {
+      return NextResponse.json(
+        { message: 'This account is private', privateAccount: true },
+        { status: 403 }
+      )
     }
 
     const liked = session
