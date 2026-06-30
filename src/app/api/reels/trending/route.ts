@@ -11,6 +11,7 @@ export async function GET() {
   const reels = await prisma.reel.findMany({
     where: {
       isPublished: true,
+      user: { privateAccount: false },
     },
     select: {
       id: true,

@@ -350,8 +350,15 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
   const openViewer = useCallback((items: ExploreItem[], idx: number) => {
     const item = items[idx]
     if (!item) return
-    if (item.type === 'recipe') router.push(`/recipe/${item.data.id}`)
-    else                        router.push(`/reel/${item.data.id}`)
+    if (item.type === 'recipe') {
+      const ids = items.filter(i => i.type === 'recipe').map(i => i.data.id)
+      try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'recipe', ids })) } catch {}
+      router.push(`/recipe/${item.data.id}`)
+    } else {
+      const ids = items.filter(i => i.type === 'reel').map(i => i.data.id)
+      try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'reel', ids })) } catch {}
+      router.push(`/reel/${item.data.id}`)
+    }
   }, [router])
 
   // No-op: items tracking is no longer needed since we use URL-based navigation.

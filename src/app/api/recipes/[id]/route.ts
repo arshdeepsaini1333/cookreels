@@ -34,6 +34,8 @@ export async function GET(_req: Request, { params }: Params) {
             hideLikeCount:  true,
             blockComments:  true,
             privateAccount: true,
+            bio:            true,
+            _count: { select: { recipes: { where: { isPublished: true } } } },
           },
         },
         comments: {
@@ -99,6 +101,8 @@ export async function GET(_req: Request, { params }: Params) {
         lastName:     recipe.user.lastName,
         profileImage: recipe.user.profileImage,
         isVerified:   recipe.user.isVerified,
+        bio:          recipe.user.bio,
+        topChef:      recipe.user._count.recipes >= 10,
       },
       comments: recipe.comments.map(c => ({
         id:        c.id,

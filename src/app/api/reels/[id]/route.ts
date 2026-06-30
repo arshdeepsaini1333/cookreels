@@ -18,6 +18,7 @@ export async function GET(_req: Request, { params }: Params) {
         videoUrl:     true,
         thumbnailUrl: true,
         likeCount:    true,
+        commentCount: true,
         viewCount:    true,
         duration:     true,
         gradient:     true,
@@ -32,6 +33,9 @@ export async function GET(_req: Request, { params }: Params) {
             profileImage:   true,
             isVerified:     true,
             privateAccount: true,
+            hideLikeCount:  true,
+            blockComments:  true,
+            _count: { select: { recipes: { where: { isPublished: true } } } },
           },
         },
       },
@@ -42,14 +46,15 @@ export async function GET(_req: Request, { params }: Params) {
     }
 
     const isOwner = session?.userId === reel.user.id
-    let canView   = !reel.user.privateAccount || isOwner
-    if (!canView && session) {
+    let isFollowing = false
+    if (session && !isOwner) {
       const accepted = await prisma.follow.findFirst({
         where: { followerId: session.userId, followingId: reel.user.id, status: 'ACCEPTED' },
         select: { id: true },
       })
-      canView = !!accepted
+      isFollowing = !!accepted
     }
+    const canView = !reel.user.privateAccount || isOwner || isFollowing
     if (!canView) {
       return NextResponse.json(
         { message: 'This account is private', privateAccount: true },
@@ -64,11 +69,16 @@ export async function GET(_req: Request, { params }: Params) {
       videoUrl:     reel.videoUrl,
       thumbnailUrl: reel.thumbnailUrl,
       likeCount:    reel.likeCount,
+      commentCount: reel.commentCount,
       viewCount:    reel.viewCount,
       duration:     reel.duration,
       gradient:     reel.gradient,
       emoji:        reel.emoji,
       createdAt:    reel.createdAt.toISOString(),
+      isOwner,
+      isFollowing,
+      hideLikeCount: reel.user.hideLikeCount,
+      blockComments: reel.user.blockComments,
       user: {
         id:           reel.user.id,
         username:     reel.user.username,
@@ -76,6 +86,7 @@ export async function GET(_req: Request, { params }: Params) {
         lastName:     reel.user.lastName,
         profileImage: reel.user.profileImage,
         isVerified:   reel.user.isVerified,
+        topChef:      reel.user._count.recipes >= 10,
       },
     })
   } catch (error) {

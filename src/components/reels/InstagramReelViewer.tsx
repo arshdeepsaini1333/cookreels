@@ -4,12 +4,18 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ChevronLeft, Heart, MessageCircle, Bookmark, Share2,
+  ChevronLeft, ChevronRight, Heart, MessageCircle, Bookmark, Share2,
   Volume2, VolumeX, BadgeCheck, Play, X, Send,
-  ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { GuestBanner } from '@/components/shared/GuestBanner'
+
+// Horizontal slide-in/out, direction-aware (mirrors RecipeViewerModal's slideV)
+const slideV = {
+  enter:  (d: number) => ({ x: d >= 0 ? '100%' : '-100%' }),
+  center: { x: 0 },
+  exit:   (d: number) => ({ x: d >= 0 ? '-100%' : '100%' }),
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +49,11 @@ export interface InstagramReelViewerProps {
   isOwnReel: boolean
   hideLikeCount?: boolean
   blockComments?: boolean
+  /** Context-aware navigation: navigate outside the creator's reel list */
+  ctxPrev?: () => void
+  ctxNext?: () => void
+  ctxHasPrev?: boolean
+  ctxHasNext?: boolean
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -269,6 +280,7 @@ function MobileReelSlot({
   reel, index, isActive, creator, initialIsFollowing, isOwnReel,
   globalMuted, onMuteToggle, onCommentOpen, hideLikeCount, currentUserId,
 }: SlotProps) {
+  const router      = useRouter()
   const videoRef    = useRef<HTMLVideoElement>(null)
   const [paused,    setPaused]    = useState(false)
   const [liked,     setLiked]     = useState(false)
@@ -505,31 +517,36 @@ function MobileReelSlot({
       >
         {/* Creator row */}
         <div className="flex items-center gap-2.5 mb-2.5">
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/40 flex-shrink-0">
-            {creator.avatar
-              ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
-              : <div
-                  className="w-full h-full flex items-center justify-center font-bold text-sm"
-                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                >
-                  {creator.name.slice(0, 1).toUpperCase()}
-                </div>
-            }
-          </div>
+          <div
+            className="flex items-center gap-2.5 min-w-0 cursor-pointer"
+            onClick={e => { e.stopPropagation(); router.push(`/user/${creator.username.replace(/^@/, '')}`) }}
+          >
+            <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/40 flex-shrink-0">
+              {creator.avatar
+                ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
+                : <div
+                    className="w-full h-full flex items-center justify-center font-bold text-sm"
+                    style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                  >
+                    {creator.name.slice(0, 1).toUpperCase()}
+                  </div>
+              }
+            </div>
 
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              className="text-white font-semibold text-sm leading-none truncate"
-              style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}
-            >
-              {creator.username}
-            </span>
-            {creator.verified && (
-              <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#F5C518' }} />
-            )}
-            {creator.topChef && (
-              <span className="text-xs flex-shrink-0">👑</span>
-            )}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="text-white font-semibold text-sm leading-none truncate"
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}
+              >
+                {creator.username}
+              </span>
+              {creator.verified && (
+                <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#F5C518' }} />
+              )}
+              {creator.topChef && (
+                <span className="text-xs flex-shrink-0">👑</span>
+              )}
+            </div>
           </div>
 
           {!isOwnReel && (
@@ -600,6 +617,7 @@ function DesktopReelViewer({
   reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
   hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId, showBanner,
 }: DesktopProps) {
+  const router      = useRouter()
   const videoRef    = useRef<HTMLVideoElement>(null)
   const listRef     = useRef<HTMLDivElement>(null)
   const [muted,      setMuted]      = useState(false)
@@ -730,42 +748,33 @@ function DesktopReelViewer({
 
   return (
     <>
-    <div className="flex min-h-screen" style={{ background: 'var(--cr-bg-main)' }}>
-
-      {/* Back button */}
-      <button
-        onClick={onBack}
-        aria-label="Go back"
-        className="fixed left-4 z-50 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
-        style={{ top: showBanner ? '60px' : '16px', background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-
-      {/* Prev reel button */}
+      {/* Prev / Next — recipe-modal style, outside the card */}
       {hasPrev && (
         <button
-          onClick={onPrev}
+          onClick={(e) => { e.stopPropagation(); onPrev() }}
           aria-label="Previous reel"
-          className="fixed left-4 z-40 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
-          style={{ top: '50%', transform: 'translateY(-50%)', background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm
+                     flex items-center justify-center hover:bg-white/30 transition-colors z-10"
         >
-          <ChevronUp className="w-5 h-5" />
+          <ChevronLeft className="w-6 h-6 text-white" />
         </button>
       )}
       {hasNext && (
         <button
-          onClick={onNext}
+          onClick={(e) => { e.stopPropagation(); onNext() }}
           aria-label="Next reel"
-          className="fixed right-4 z-40 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
-          style={{ top: '50%', transform: 'translateY(-50%)', background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', color: 'var(--cr-text-1)' }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/15 backdrop-blur-sm
+                     flex items-center justify-center hover:bg-white/30 transition-colors z-10"
         >
-          <ChevronDown className="w-5 h-5" />
+          <ChevronRight className="w-6 h-6 text-white" />
         </button>
       )}
 
-      {/* Centered card */}
-      <div className="flex-1 flex items-center justify-center p-6 pt-16">
+      {/* Centered card — click outside to close */}
+      <div
+        className="absolute inset-0 flex items-center justify-center p-4 lg:p-6"
+        onClick={onBack}
+      >
         <div
           className="flex rounded-3xl overflow-hidden w-full"
           style={{
@@ -774,6 +783,7 @@ function DesktopReelViewer({
             background: 'var(--cr-bg-card)',
             boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(245,197,24,0.06)',
           }}
+          onClick={e => e.stopPropagation()}
         >
           {/* ── Video panel ── */}
           <div
@@ -823,11 +833,6 @@ function DesktopReelViewer({
 
             {/* Top-right: counter + mute */}
             <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-              {totalReels > 1 && (
-                <div className="text-[11px] font-semibold text-white bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
-                  {reelIndex + 1} / {totalReels}
-                </div>
-              )}
               <button
                 onClick={toggleMute}
                 className="w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center"
@@ -848,37 +853,42 @@ function DesktopReelViewer({
               className="flex-shrink-0 flex items-center gap-3 px-5 py-4 border-b"
               style={{ borderColor: 'var(--cr-border)' }}
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0"
-                   style={{ '--tw-ring-color': 'var(--cr-accent)' } as React.CSSProperties}>
-                {creator.avatar
-                  ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
-                  : <div
-                      className="w-full h-full flex items-center justify-center font-bold text-sm"
-                      style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                    >
-                      {creator.name.slice(0, 1).toUpperCase()}
-                    </div>
-                }
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-sm truncate" style={{ color: 'var(--cr-text-1)' }}>
-                    {creator.name}
-                  </span>
-                  {creator.verified && (
-                    <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cr-accent)' }} />
-                  )}
-                  {creator.topChef && (
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                      style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                    >
-                      👑
-                    </span>
-                  )}
+              <div
+                className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                onClick={() => router.push(`/user/${creator.username.replace(/^@/, '')}`)}
+              >
+                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0"
+                     style={{ '--tw-ring-color': 'var(--cr-accent)' } as React.CSSProperties}>
+                  {creator.avatar
+                    ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
+                    : <div
+                        className="w-full h-full flex items-center justify-center font-bold text-sm"
+                        style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                      >
+                        {creator.name.slice(0, 1).toUpperCase()}
+                      </div>
+                  }
                 </div>
-                <span className="text-xs" style={{ color: 'var(--cr-text-muted)' }}>{creator.username}</span>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-sm truncate" style={{ color: 'var(--cr-text-1)' }}>
+                      {creator.name}
+                    </span>
+                    {creator.verified && (
+                      <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--cr-accent)' }} />
+                    )}
+                    {creator.topChef && (
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                      >
+                        👑
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--cr-text-muted)' }}>{creator.username}</span>
+                </div>
               </div>
 
               {!isOwnReel && (
@@ -894,6 +904,15 @@ function DesktopReelViewer({
                   {following ? 'Following' : 'Follow'}
                 </motion.button>
               )}
+
+              {/* X close button — same as recipe modal */}
+              <button
+                onClick={onBack}
+                aria-label="Close"
+                className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+              >
+                <X className="w-5 h-5" style={{ color: 'var(--cr-text-2)' }} />
+              </button>
             </div>
 
             {/* Scrollable content */}
@@ -1080,16 +1099,15 @@ function DesktopReelViewer({
           </div>
         </div>
       </div>
-    </div>
-    <ShareModal
-      isOpen={shareOpen}
-      onClose={() => setShareOpen(false)}
-      title={reel.title}
-      url={`${typeof window !== 'undefined' ? window.location.origin : ''}/reel/${reel.id}`}
-      currentUserId={currentUserId ?? undefined}
-      contentType="reel"
-      contentId={reel.id}
-    />
+      <ShareModal
+        isOpen={shareOpen}
+        onClose={() => setShareOpen(false)}
+        title={reel.title}
+        url={`${typeof window !== 'undefined' ? window.location.origin : ''}/reel/${reel.id}`}
+        currentUserId={currentUserId ?? undefined}
+        contentType="reel"
+        contentId={reel.id}
+      />
     </>
   )
 }
@@ -1099,6 +1117,7 @@ function DesktopReelViewer({
 export function InstagramReelViewer({
   initialReelId, allReels, creator, currentUserId,
   initialIsFollowing, isOwnReel, hideLikeCount = false, blockComments = false,
+  ctxPrev, ctxNext, ctxHasPrev, ctxHasNext,
 }: InstagramReelViewerProps) {
   const router = useRouter()
   const initialIndex = Math.max(0, allReels.findIndex(r => r.id === initialReelId))
@@ -1106,10 +1125,14 @@ export function InstagramReelViewer({
   const [activeIndex,       setActiveIndex]       = useState(initialIndex)
   const [globalMuted,       setGlobalMuted]       = useState(false)
   const [commentSheetOpen,  setCommentSheetOpen]  = useState(false)
+  const [direction,         setDirection]         = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const mobileSwipeX = useRef<number | null>(null)
+  const mobileSwipeY = useRef<number | null>(null)
 
-  const hasPrev = activeIndex > 0
-  const hasNext = activeIndex < allReels.length - 1
+  const inCtxMode = ctxPrev !== undefined || ctxNext !== undefined
+  const hasPrev = inCtxMode ? !!ctxHasPrev : activeIndex > 0
+  const hasNext = inCtxMode ? !!ctxHasNext : activeIndex < allReels.length - 1
 
   // Prevent body scroll on mobile
   useEffect(() => {
@@ -1154,16 +1177,29 @@ export function InstagramReelViewer({
     }
   }, [allReels.length])
 
+  // Direction-aware navigation — sets slide direction, then delegates to ctx or local nav.
+  const goPrev = useCallback(() => {
+    setDirection(-1)
+    if (inCtxMode) ctxPrev?.()
+    else navigateTo(activeIndex - 1)
+  }, [inCtxMode, ctxPrev, navigateTo, activeIndex])
+
+  const goNext = useCallback(() => {
+    setDirection(1)
+    if (inCtxMode) ctxNext?.()
+    else navigateTo(activeIndex + 1)
+  }, [inCtxMode, ctxNext, navigateTo, activeIndex])
+
   // Keyboard navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (commentSheetOpen) return
-      if (e.key === 'ArrowUp'   || e.key === 'ArrowLeft')  navigateTo(activeIndex - 1)
-      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') navigateTo(activeIndex + 1)
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') goPrev()
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') goNext()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [activeIndex, commentSheetOpen, navigateTo])
+  }, [commentSheetOpen, goPrev, goNext])
 
   if (allReels.length === 0) return null
 
@@ -1195,34 +1231,77 @@ export function InstagramReelViewer({
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>
 
-        {/* Vertical snap-scroll container */}
+        {/* Vertical snap-scroll container (non-ctx) / horizontal slide container (ctx) */}
         <div
           ref={setContainerRef}
-          onScroll={handleScroll}
-          className="h-full w-full scrollbar-none"
-          style={{
+          onScroll={inCtxMode ? undefined : handleScroll}
+          className={inCtxMode ? 'h-full w-full relative overflow-hidden' : 'h-full w-full scrollbar-none'}
+          style={inCtxMode ? undefined : {
             overflowY:             'scroll',
             scrollSnapType:        'y mandatory',
             WebkitOverflowScrolling: 'touch',
             overscrollBehavior:    'none',
           } as React.CSSProperties}
+          onTouchStart={inCtxMode ? (e) => {
+            mobileSwipeX.current = e.touches[0].clientX
+            mobileSwipeY.current = e.touches[0].clientY
+          } : undefined}
+          onTouchEnd={inCtxMode ? (e) => {
+            if (mobileSwipeX.current === null) return
+            const dx = mobileSwipeX.current - e.changedTouches[0].clientX
+            const dy = Math.abs((mobileSwipeY.current ?? 0) - e.changedTouches[0].clientY)
+            if (Math.abs(dx) > 60 && Math.abs(dx) > dy) {
+              if (dx > 0) goNext()
+              else goPrev()
+            }
+            mobileSwipeX.current = mobileSwipeY.current = null
+          } : undefined}
         >
-          {allReels.map((reel, i) => (
-            <MobileReelSlot
-              key={reel.id}
-              reel={reel}
-              index={i}
-              isActive={i === activeIndex}
-              creator={creator}
-              initialIsFollowing={initialIsFollowing}
-              isOwnReel={isOwnReel}
-              globalMuted={globalMuted}
-              onMuteToggle={() => setGlobalMuted(m => !m)}
-              onCommentOpen={() => setCommentSheetOpen(true)}
-              hideLikeCount={hideLikeCount}
-              currentUserId={currentUserId}
-            />
-          ))}
+          {inCtxMode ? (
+            <AnimatePresence custom={direction} initial={false}>
+              <motion.div
+                key={currentReel.id}
+                custom={direction}
+                variants={slideV}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: 'spring', stiffness: 360, damping: 36 }}
+                className="absolute inset-0"
+              >
+                <MobileReelSlot
+                  reel={currentReel}
+                  index={activeIndex}
+                  isActive={true}
+                  creator={creator}
+                  initialIsFollowing={initialIsFollowing}
+                  isOwnReel={isOwnReel}
+                  globalMuted={globalMuted}
+                  onMuteToggle={() => setGlobalMuted(m => !m)}
+                  onCommentOpen={() => setCommentSheetOpen(true)}
+                  hideLikeCount={hideLikeCount}
+                  currentUserId={currentUserId}
+                />
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            allReels.map((reel, i) => (
+              <MobileReelSlot
+                key={reel.id}
+                reel={reel}
+                index={i}
+                isActive={i === activeIndex}
+                creator={creator}
+                initialIsFollowing={initialIsFollowing}
+                isOwnReel={isOwnReel}
+                globalMuted={globalMuted}
+                onMuteToggle={() => setGlobalMuted(m => !m)}
+                onCommentOpen={() => setCommentSheetOpen(true)}
+                hideLikeCount={hideLikeCount}
+                currentUserId={currentUserId}
+              />
+            ))
+          )}
         </div>
 
         {/* Comment bottom sheet */}
@@ -1236,14 +1315,17 @@ export function InstagramReelViewer({
       </div>
 
       {/* ════ DESKTOP: centered card layout ════ */}
-      <div className="hidden md:block">
-        <AnimatePresence mode="wait">
+      <div className="hidden md:block md:h-full relative overflow-hidden">
+        <AnimatePresence custom={direction} initial={false}>
           <motion.div
             key={currentReel.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12, transition: { duration: 0 } }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            custom={direction}
+            variants={slideV}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'spring', stiffness: 360, damping: 36 }}
+            className="absolute inset-0"
           >
             <DesktopReelViewer
               reel={currentReel}
@@ -1254,8 +1336,8 @@ export function InstagramReelViewer({
               isOwnReel={isOwnReel}
               hasPrev={hasPrev}
               hasNext={hasNext}
-              onPrev={() => navigateTo(activeIndex - 1)}
-              onNext={() => navigateTo(activeIndex + 1)}
+              onPrev={goPrev}
+              onNext={goNext}
               onBack={() => router.back()}
               hideLikeCount={hideLikeCount}
               blockComments={blockComments}

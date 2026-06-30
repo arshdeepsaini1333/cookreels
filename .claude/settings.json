@@ -11,7 +11,12 @@
       "Bash(xargs grep -l \"use server\")",
       "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -5 {}')",
       "Bash(xargs wc -l)",
-      "Bash(xargs grep -l \"Change Password\\\\|change password\\\\|currentPassword\")"
+      "Bash(xargs grep -l \"Change Password\\\\|change password\\\\|currentPassword\")",
+      "Bash(ls -la \"d:\\\\cookreels-main\\\\\")",
+      "Read(//d//**)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(netstat -ano)"
     ]
   }
 }

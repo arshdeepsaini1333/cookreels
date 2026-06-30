@@ -1083,6 +1083,10 @@ function TrendingReels() {
                 transition={{ type: 'spring', stiffness: 340, damping: 26 }}
                 onClick={() => {
                   if ('user' in reel) {
+                    const ids = (activeReels as AnyReel[])
+                      .filter((r): r is TrendingReelItem => 'user' in r)
+                      .map(r => r.id)
+                    try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'reel', ids })) } catch {}
                     router.push(`/reel/${(reel as TrendingReelItem).id}`)
                   } else {
                     setModalIdx(i)
@@ -1278,7 +1282,11 @@ function RecommendedSection({
                 whileHover={{ y: -7 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 26 }}
                 className="group rounded-[24px] overflow-hidden cursor-pointer transition-shadow duration-300"
-                onClick={() => router.push(`/recipe/${recipe.id}`)}
+                onClick={() => {
+                  const ids = recipes.map(r => r.id)
+                  try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'recipe', ids })) } catch {}
+                  router.push(`/recipe/${recipe.id}`)
+                }}
                 style={{
                   background: isDark ? '#2B2B2D' : '#FFFFFF',
                   border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,

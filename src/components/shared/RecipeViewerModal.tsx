@@ -39,6 +39,11 @@ export interface RecipeViewerModalProps {
   skipUrlManagement?: boolean
   /** Called with the active recipe id whenever it changes (replaces internal replaceState). */
   onUrlChange?: (id: string) => void
+  /** Context-aware navigation: navigate outside the creator's recipe list */
+  onCtxPrev?: () => void
+  onCtxNext?: () => void
+  ctxHasPrev?: boolean
+  ctxHasNext?: boolean
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,6 +117,7 @@ export function RecipeViewerModal({
   recipes, initialIndex, user, users, isOpen, onClose,
   currentUserAvatar, currentUserName, currentUserId,
   skipUrlManagement, onUrlChange,
+  onCtxPrev, onCtxNext, ctxHasPrev, ctxHasNext,
 }: RecipeViewerModalProps) {
   const router = useRouter()
 
@@ -142,8 +148,9 @@ export function RecipeViewerModal({
 
   const recipe     = recipes[index]
   const activeUser = (users && users[index]) ?? user
-  const hasPrev    = index > 0
-  const hasNext    = index < recipes.length - 1
+  const inCtxMode  = onCtxPrev !== undefined || onCtxNext !== undefined
+  const hasPrev    = inCtxMode ? !!ctxHasPrev : index > 0
+  const hasNext    = inCtxMode ? !!ctxHasNext : index < recipes.length - 1
 
   // ── Real like/comment state via hooks ──────────────────────────────────────
   const {
@@ -218,11 +225,16 @@ export function RecipeViewerModal({
 
   const navigate = useCallback((dir: number) => {
     setDirection(dir)
+    if (inCtxMode) {
+      if (dir < 0) onCtxPrev?.()
+      else onCtxNext?.()
+      return
+    }
     setIndex(i => {
       const n = i + dir
       return n >= 0 && n < recipes.length ? n : i
     })
-  }, [recipes.length])
+  }, [inCtxMode, onCtxPrev, onCtxNext, recipes.length])
 
   useEffect(() => {
     if (!isOpen) return
@@ -377,7 +389,7 @@ export function RecipeViewerModal({
                   </button>
 
                   <button
-                    onClick={() => { onClose(); router.push(`/user/${activeUser.username}`) }}
+                    onClick={() => router.push(`/user/${activeUser.username}`)}
                     className="flex items-center gap-2 min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
                   >
                     <div
@@ -407,11 +419,6 @@ export function RecipeViewerModal({
                     </div>
                   </button>
 
-                  {recipes.length > 1 && (
-                    <span className="text-xs font-semibold flex-shrink-0 tabular-nums" style={{ color: 'var(--cr-text-muted)' }}>
-                      {index + 1}/{recipes.length}
-                    </span>
-                  )}
                 </div>
 
                 {/* Animated + scrollable body */}
@@ -625,7 +632,7 @@ export function RecipeViewerModal({
                   style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
                 >
                   <button
-                    onClick={() => { onClose(); router.push(`/user/${activeUser.username}`) }}
+                    onClick={() => router.push(`/user/${activeUser.username}`)}
                     className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-80 transition-opacity"
                   >
                     <div
@@ -688,11 +695,6 @@ export function RecipeViewerModal({
                             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm ${DIFF_COLOR[diffKey] ?? ''}`}>
                               {DIFF_LABEL[diffKey] ?? diffKey}
                             </span>
-                          </div>
-                        )}
-                        {recipes.length > 1 && (
-                          <div className="absolute top-3 right-3 z-10 text-[11px] font-semibold text-white bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
-                            {index + 1} / {recipes.length}
                           </div>
                         )}
                       </div>

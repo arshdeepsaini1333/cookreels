@@ -57,9 +57,9 @@ export async function GET(req: Request) {
         }
       : {};
 
-    const recipeWhere  = { ...catFilter, ...qFilter, isPublished: true };
+    const recipeWhere  = { ...catFilter, ...qFilter, isPublished: true, user: { privateAccount: false } };
     const reelQFilter  = q ? { title: { contains: q, mode: "insensitive" as const } } : {};
-    const reelWhere    = { ...catFilter, ...reelQFilter, isPublished: true };
+    const reelWhere    = { ...catFilter, ...reelQFilter, isPublished: true, user: { privateAccount: false } };
 
     const recipeLimit = type === "reel"   ? 0 : type === "recipe" ? limit : Math.ceil(limit * 0.67);
     const reelLimit   = type === "recipe" ? 0 : type === "reel"   ? limit : limit - recipeLimit;

@@ -617,8 +617,16 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridAutoRows: ROW_HEIGHT }}>
         {items.map((item, idx) =>
           item.type === 'reel'
-            ? <ReelCard   key={`reel-${item.data.id}`}   reel={item.data}   idx={idx} height="100%" onClick={() => router.push(`/reel/${item.data.id}`)} />
-            : <RecipeCard key={`recipe-${item.data.id}`} recipe={item.data} idx={idx} height="100%" onClick={() => router.push(`/recipe/${item.data.id}`)} />
+            ? <ReelCard   key={`reel-${item.data.id}`}   reel={item.data}   idx={idx} height="100%" onClick={() => {
+                const ids = items.filter(i => i.type === 'reel').map(i => String(i.data.id))
+                try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'reel', ids })) } catch {}
+                router.push(`/reel/${item.data.id}`)
+              }} />
+            : <RecipeCard key={`recipe-${item.data.id}`} recipe={item.data} idx={idx} height="100%" onClick={() => {
+                const ids = items.filter(i => i.type === 'recipe').map(i => String(i.data.id))
+                try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'recipe', ids })) } catch {}
+                router.push(`/recipe/${item.data.id}`)
+              }} />
         )}
       </div>
     </>
@@ -687,7 +695,11 @@ function CategoryCarouselLive({ section }: { section: typeof LIVE_SECTIONS[0] })
             ))
           : recipes.map((recipe, i) => (
               <div key={recipe.id} className="flex-none w-52 sm:w-56" style={{ height: 180 }}>
-                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => router.push(`/recipe/${recipe.id}`)} />
+                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => {
+                  const ids = recipes.map(r => String(r.id))
+                  try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'recipe', ids })) } catch {}
+                  router.push(`/recipe/${recipe.id}`)
+                }} />
               </div>
             ))
         }
@@ -744,7 +756,11 @@ function TrendingSection() {
             ))
           : reels.map((reel, i) => (
               <motion.div key={reel.id} variants={cardReveal}>
-                <ReelCard reel={reel} onClick={() => router.push(`/reel/${reel.id}`)} />
+                <ReelCard reel={reel} onClick={() => {
+                  const ids = reels.map(r => String(r.id))
+                  try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'reel', ids })) } catch {}
+                  router.push(`/reel/${reel.id}`)
+                }} />
               </motion.div>
             ))
         }
@@ -800,7 +816,11 @@ function TrendingRecipesSection() {
             ))
           : recipes.map((recipe, i) => (
               <motion.div key={recipe.id} variants={cardReveal}>
-                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => router.push(`/recipe/${recipe.id}`)} />
+                <RecipeCard recipe={recipe} idx={i} height="100%" onClick={() => {
+                  const ids = recipes.map(r => String(r.id))
+                  try { sessionStorage.setItem('__cr_nav_ctx', JSON.stringify({ type: 'recipe', ids })) } catch {}
+                  router.push(`/recipe/${recipe.id}`)
+                }} />
               </motion.div>
             ))
         }
