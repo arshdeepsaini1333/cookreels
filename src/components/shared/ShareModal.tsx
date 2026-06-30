@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Link2, Check, Search, Send, Clock, Users } from 'lucide-react'
+import { X, Link2, Check, Search, Send } from 'lucide-react'
 
 // ─── Platform config ──────────────────────────────────────────────────────────
 
@@ -73,8 +73,6 @@ interface SharePerson {
   username: string
   avatar: string | null
   isOnline?: boolean
-  lastMessageAt?: string | null
-  hasConversation: boolean
 }
 
 export interface ShareModalProps {
@@ -225,59 +223,23 @@ export function ShareModal({
     if (!currentUserId) return
     setLoading(true)
     try {
-      // Fetch recent conversations + friends in parallel
-      const [convRes, friendRes] = await Promise.all([
-        fetch('/api/messages/conversations'),
-        fetch(`/api/social/friends?limit=40${query ? `&search=${encodeURIComponent(query)}` : ''}`),
-      ])
-      const convData   = convRes.ok   ? await convRes.json()   : { conversations: [] }
-      const friendData = friendRes.ok ? await friendRes.json() : { friends: [] }
+      // Show 5 mutual friends initially; when searching fetch up to 30
+      const limit = query ? 30 : 5
+      const params = new URLSearchParams({ limit: String(limit) })
+      if (query) params.set('search', query)
+      const res  = await fetch(`/api/social/friends?${params}`)
+      const data = res.ok ? await res.json() : { friends: [] }
 
-      // Build recent chat people (have an existing conversation, ordered by lastMessageAt)
-      const recentConvs = (convData.conversations ?? []) as {
-        id: string | null; user: { id: string; name: string; username: string; avatar: string | null; isOnline: boolean }; lastMessageAt: string | null
+      const rawFriends = (data.users ?? []) as {
+        id: string; firstName: string; lastName: string; username: string; profileImage: string | null; isOnline?: boolean
       }[]
-      const recentIds = new Set<string>()
-      const recent: SharePerson[] = recentConvs
-        .filter(c => c.id !== null) // only actual conversations
-        .map(c => {
-          recentIds.add(c.user.id)
-          return {
-            id:              c.user.id,
-            name:            c.user.name,
-            username:        c.user.username,
-            avatar:          c.user.avatar,
-            isOnline:        c.user.isOnline,
-            lastMessageAt:   c.lastMessageAt,
-            hasConversation: true,
-          }
-        })
-
-      // Friends without an existing conversation
-      const rawFriends = (friendData.friends ?? []) as {
-        id: string; firstName: string; lastName: string; username: string; profileImage: string | null
-      }[]
-      const fresh: SharePerson[] = rawFriends
-        .filter(f => !recentIds.has(f.id))
-        .map(f => ({
-          id:              f.id,
-          name:            `${f.firstName} ${f.lastName}`,
-          username:        f.username,
-          avatar:          f.profileImage,
-          isOnline:        undefined,
-          lastMessageAt:   null,
-          hasConversation: false,
-        }))
-
-      // If search query filter recent chats by name/username
-      const filteredRecent = query
-        ? recent.filter(p =>
-            p.name.toLowerCase().includes(query.toLowerCase()) ||
-            p.username.toLowerCase().includes(query.toLowerCase())
-          )
-        : recent
-
-      setPeople([...filteredRecent, ...fresh])
+      setPeople(rawFriends.map(f => ({
+        id:       f.id,
+        name:     `${f.firstName} ${f.lastName}`,
+        username: f.username,
+        avatar:   f.profileImage,
+        isOnline: f.isOnline,
+      })))
     } catch { /* ignore */ }
     setLoading(false)
   }, [currentUserId])
@@ -361,9 +323,6 @@ export function ShareModal({
 
   if (!mounted) return null
 
-  // Split people into recent vs fresh for section headers
-  const recentPeople = people.filter(p => p.hasConversation)
-  const freshPeople  = people.filter(p => !p.hasConversation)
   const pt = platforms(url, title)
 
   return createPortal(
@@ -486,11 +445,11 @@ export function ShareModal({
                       </div>
                     </div>
 
-                    {/* People list */}
+                    {/* Friends list */}
                     <div className="px-4 pb-2" style={{ maxHeight: 340, overflowY: 'auto' }}>
                       {loading ? (
                         <div className="space-y-2 py-1">
-                          {[0, 1, 2, 3].map(i => (
+                          {[0, 1, 2, 3, 4].map(i => (
                             <div key={i} className="flex items-center gap-3 py-1.5">
                               <div className="w-10 h-10 rounded-full animate-pulse shrink-0" style={{ background: 'var(--cr-border)' }} />
                               <div className="flex-1 space-y-2">
@@ -502,54 +461,24 @@ export function ShareModal({
                         </div>
                       ) : people.length === 0 ? (
                         <p className="text-sm py-8 text-center" style={{ color: 'var(--cr-text-muted)' }}>
-                          {search ? 'No people found' : 'No friends yet'}
+                          {search ? 'No friends found' : 'No friends yet'}
                         </p>
                       ) : (
                         <div className="space-y-0.5">
-                          {/* Recent chats section */}
-                          {recentPeople.length > 0 && (
-                            <>
-                              {!search && (
-                                <div className="flex items-center gap-1.5 px-2 py-2">
-                                  <Clock className="w-3 h-3 shrink-0" style={{ color: 'var(--cr-text-muted)' }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cr-text-muted)' }}>
-                                    Recent
-                                  </span>
-                                </div>
-                              )}
-                              {recentPeople.map(p => (
-                                <PersonRow
-                                  key={p.id}
-                                  person={p}
-                                  isSelected={selected.has(p.id)}
-                                  isSent={sent.has(p.id)}
-                                  onToggle={() => togglePerson(p.id)}
-                                />
-                              ))}
-                            </>
-                          )}
-
-                          {/* Fresh friends section */}
-                          {freshPeople.length > 0 && (
-                            <>
-                              {!search && recentPeople.length > 0 && (
-                                <div className="flex items-center gap-1.5 px-2 py-2 mt-1">
-                                  <Users className="w-3 h-3 shrink-0" style={{ color: 'var(--cr-text-muted)' }} />
-                                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--cr-text-muted)' }}>
-                                    Friends
-                                  </span>
-                                </div>
-                              )}
-                              {freshPeople.map(p => (
-                                <PersonRow
-                                  key={p.id}
-                                  person={p}
-                                  isSelected={selected.has(p.id)}
-                                  isSent={sent.has(p.id)}
-                                  onToggle={() => togglePerson(p.id)}
-                                />
-                              ))}
-                            </>
+                          {people.map(p => (
+                            <PersonRow
+                              key={p.id}
+                              person={p}
+                              isSelected={selected.has(p.id)}
+                              isSent={sent.has(p.id)}
+                              onToggle={() => togglePerson(p.id)}
+                            />
+                          ))}
+                          {/* Hint to search for more when showing the initial 5 */}
+                          {!search && people.length >= 5 && (
+                            <p className="text-xs text-center py-3" style={{ color: 'var(--cr-text-muted)' }}>
+                              Search above to find more friends
+                            </p>
                           )}
                         </div>
                       )}
