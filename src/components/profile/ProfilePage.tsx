@@ -33,7 +33,7 @@ export interface ProfileUser {
   avatar: string | null
   backgroundPicture?: string | null
   cuisineSpecialty: string | null
-  hasPassword: boolean
+  hasPassword?: boolean
 }
 
 export interface ProfileStats {
@@ -448,7 +448,7 @@ function AvatarFallback({ name }: { name: string }) {
 
 // ─── SettingsDrawer ───────────────────────────────────────────────────────────
 
-function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetPassword, hasPassword }: { open: boolean; onClose: () => void; onEditProfile: () => void; onChangePassword: () => void; onSetPassword: () => void; hasPassword: boolean }) {
+function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetPassword, hasPassword }: { open: boolean; onClose: () => void; onEditProfile: () => void; onChangePassword: () => void; onSetPassword: () => void; hasPassword?: boolean }) {
   const { theme, toggleTheme } = useTheme()
   const [privacy, setPrivacy] = useState({ hideLikeCount: false, blockComments: false, privateAccount: false })
   const [loaded, setLoaded] = useState(false)
