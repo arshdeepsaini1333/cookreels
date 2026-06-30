@@ -8,6 +8,7 @@ import {
   Volume2, VolumeX, BadgeCheck, Play, X, Send,
   ChevronUp, ChevronDown,
 } from 'lucide-react'
+import { ShareModal } from '@/components/shared/ShareModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -275,6 +276,7 @@ function MobileReelSlot({
   const [following, setFollowing] = useState(initialIsFollowing)
   const [expanded,  setExpanded]  = useState(false)
   const [failed,    setFailed]    = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const gradient = GRADIENTS[index % GRADIENTS.length]
 
   // Fetch initial like and save state from the server
@@ -352,18 +354,15 @@ function MobileReelSlot({
     }
   }
 
-  const handleShare = async (e: React.MouseEvent) => {
+  const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation()
-    try {
-      const url = `${window.location.origin}/reel/${reel.id}`
-      if (navigator.share) await navigator.share({ title: reel.title, url })
-      else await navigator.clipboard.writeText(url)
-    } catch {}
+    setShareOpen(true)
   }
 
   const caption = reel.description || reel.title
 
   return (
+    <>
     <div
       className="relative flex-shrink-0 overflow-hidden"
       style={{ width: '100vw', height: '100dvh', scrollSnapAlign: 'start' }}
@@ -563,6 +562,16 @@ function MobileReelSlot({
         </div>
       </div>
     </div>
+    <ShareModal
+      isOpen={shareOpen}
+      onClose={() => setShareOpen(false)}
+      title={reel.title}
+      url={`${typeof window !== 'undefined' ? window.location.origin : ''}/reel/${reel.id}`}
+      currentUserId={currentUserId ?? undefined}
+      contentType="reel"
+      contentId={reel.id}
+    />
+    </>
   )
 }
 
@@ -602,6 +611,7 @@ function DesktopReelViewer({
   const [submitting, setSubmitting] = useState(false)
   const [comments,   setComments]   = useState<Comment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [shareOpen,  setShareOpen]  = useState(false)
   const gradient = GRADIENTS[reelIndex % GRADIENTS.length]
 
   // Fetch initial like/save state and comments when reel changes
@@ -714,15 +724,10 @@ function DesktopReelViewer({
     setSubmitting(false)
   }
 
-  const handleShare = async () => {
-    try {
-      const url = `${window.location.origin}/reel/${reel.id}`
-      if (navigator.share) await navigator.share({ title: reel.title, url })
-      else await navigator.clipboard.writeText(url)
-    } catch {}
-  }
+  const handleShare = () => setShareOpen(true)
 
   return (
+    <>
     <div className="flex min-h-screen" style={{ background: 'var(--cr-bg-main)' }}>
 
       {/* Back button */}
@@ -1074,6 +1079,16 @@ function DesktopReelViewer({
         </div>
       </div>
     </div>
+    <ShareModal
+      isOpen={shareOpen}
+      onClose={() => setShareOpen(false)}
+      title={reel.title}
+      url={`${typeof window !== 'undefined' ? window.location.origin : ''}/reel/${reel.id}`}
+      currentUserId={currentUserId ?? undefined}
+      contentType="reel"
+      contentId={reel.id}
+    />
+    </>
   )
 }
 

@@ -9,6 +9,7 @@ import {
   ChefHat, X, Loader2, Trash2, Ban, Play, Clock,
 } from 'lucide-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,6 +33,7 @@ interface SharedReel {
   id: string
   title: string
   thumbnailUrl: string | null
+  videoUrl: string
   duration: number | null
   user: { firstName: string; lastName: string }
 }
@@ -286,14 +288,7 @@ function SharedReelCard({ reel, isMine }: { reel: SharedReel; isMine: boolean })
 
       {/* Thumbnail */}
       <div className="relative mx-2 mb-2 rounded-xl overflow-hidden" style={{ aspectRatio: '9/16', background: '#1a1a1a', maxHeight: 180 }}>
-        {reel.thumbnailUrl ? (
-          <img src={reel.thumbnailUrl} alt={reel.title} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,rgba(245,197,24,0.15),rgba(0,0,0,0.6))' }}>
-            <ChefHat className="w-8 h-8 opacity-50" style={{ color: '#F5C518' }} />
-          </div>
-        )}
+        <ReelThumbnail videoUrl={reel.videoUrl} thumbnailUrl={reel.thumbnailUrl} />
         {/* Play overlay */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-10 h-10 rounded-full flex items-center justify-center"

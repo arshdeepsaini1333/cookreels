@@ -926,6 +926,7 @@ function ReelModal({
 }
 
 function TrendingReels() {
+  const router = useRouter()
   const sectionRef = useRef<HTMLDivElement>(null)
   const inView = useInView(sectionRef, { once: true, margin: '-80px' })
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -1080,7 +1081,13 @@ function TrendingReels() {
                 custom={i}
                 whileHover={{ y: -7, scale: 1.03 }}
                 transition={{ type: 'spring', stiffness: 340, damping: 26 }}
-                onClick={() => setModalIdx(i)}
+                onClick={() => {
+                  if ('user' in reel) {
+                    router.push(`/reel/${(reel as TrendingReelItem).id}`)
+                  } else {
+                    setModalIdx(i)
+                  }
+                }}
                 className="relative flex-shrink-0 w-36 sm:w-40 rounded-[20px] overflow-hidden cursor-pointer group [scroll-snap-align:start]"
                 style={{
                   aspectRatio: '9/15',

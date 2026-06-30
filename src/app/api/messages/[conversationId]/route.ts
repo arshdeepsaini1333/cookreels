@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: Context) {
       sender: { select: { id: true, firstName: true, lastName: true, profileImage: true } },
       sharedReel: {
         select: {
-          id: true, title: true, thumbnailUrl: true, duration: true,
+          id: true, title: true, thumbnailUrl: true, videoUrl: true, duration: true,
           user: { select: { firstName: true, lastName: true } },
         },
       },

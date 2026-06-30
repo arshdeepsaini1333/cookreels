@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         },
         sharedReel: {
           select: {
-            id: true, title: true, thumbnailUrl: true, duration: true,
+            id: true, title: true, thumbnailUrl: true, videoUrl: true, duration: true,
             user: { select: { firstName: true, lastName: true } },
           },
         },
