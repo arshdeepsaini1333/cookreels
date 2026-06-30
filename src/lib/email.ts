@@ -212,3 +212,106 @@ export async function sendPasswordResetEmail(
   })
   if (error) throw new Error(`Failed to send password reset email: ${error.message}`)
 }
+
+function buildSetPasswordEmailHtml(firstName: string, otp: string): string {
+  const digits = otp.split('').join('&nbsp;&nbsp;')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Set your CookReels password</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0a0a;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+
+          <!-- Brand header -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <span style="font-size:24px;font-weight:800;color:#F5C518;letter-spacing:-0.5px;">CookReels</span>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#1c1c1e;border-radius:20px;border:1px solid #2d2d30;overflow:hidden;">
+
+              <!-- Yellow accent bar -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="height:3px;background:linear-gradient(90deg,transparent,#F5C518 40%,#FF9F1C 60%,transparent);"></td>
+                </tr>
+              </table>
+
+              <!-- Body -->
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:36px 36px 28px;">
+
+                    <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#ffffff;">Set Your Password</h1>
+                    <p style="margin:0 0 24px;font-size:14px;color:#a1a1aa;line-height:1.6;">
+                      Hello ${firstName},<br/>
+                      You requested to add a password to your CookReels account. Enter the code below to confirm your email and continue.
+                    </p>
+
+                    <!-- OTP display box -->
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="background:#27272a;border-radius:14px;border:1px solid #3f3f46;padding:24px 16px;">
+                          <div style="font-size:40px;font-weight:800;letter-spacing:12px;color:#F5C518;font-family:'Courier New',Courier,monospace;line-height:1;">
+                            ${digits}
+                          </div>
+                          <div style="margin-top:12px;font-size:12px;color:#71717a;">
+                            This code expires in <strong style="color:#a1a1aa;">10 minutes</strong>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <p style="margin:24px 0 0;font-size:12px;color:#52525b;line-height:1.6;">
+                      If you did not request this, you can safely ignore this email. No action is required.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Footer -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #2d2d30;">
+                <tr>
+                  <td style="padding:16px 36px 24px;">
+                    <p style="margin:0;font-size:11px;color:#52525b;text-align:center;">
+                      &copy; ${new Date().getFullYear()} CookReels &middot; Your culinary journey starts here
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+}
+
+export async function sendSetPasswordEmail(
+  email: string,
+  firstName: string,
+  otp: string,
+): Promise<void> {
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Set Your CookReels Password',
+    html: buildSetPasswordEmailHtml(firstName, otp),
+    text: `Hello ${firstName},\n\nYou requested to add a password to your CookReels account.\n\nYour verification code is: ${otp}\n\nThis code expires in 10 minutes.\n\nIf you did not request this, you can safely ignore this email.\n\nThanks,\nCookReels Team`,
+  })
+  if (error) throw new Error(`Failed to send set-password email: ${error.message}`)
+}

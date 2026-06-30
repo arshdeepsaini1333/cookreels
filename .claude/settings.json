@@ -10,7 +10,8 @@
       "Bash(xargs grep -l \"trending\\\\|Trending\")",
       "Bash(xargs grep -l \"use server\")",
       "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && head -5 {}')",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "Bash(xargs grep -l \"Change Password\\\\|change password\\\\|currentPassword\")"
     ]
   }
 }

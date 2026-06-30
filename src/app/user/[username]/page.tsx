@@ -131,6 +131,7 @@ export default async function Page({ params }: Props) {
           level:     true,
           isVerified: true,
           isOnline:  true,
+          password:  true,
           _count: {
             select: {
               recipes:   { where: { isPublished: true } },
@@ -217,6 +218,7 @@ export default async function Page({ params }: Props) {
           avatar:            fullUser.profileImage,
           backgroundPicture: fullUser.backgroundPicture,
           cuisineSpecialty:  fullUser.cuisineSpecialty,
+          hasPassword:       fullUser.password !== null,
         }}
         stats={{
           recipes:   fullUser._count.recipes,

@@ -18,6 +18,7 @@ import type { SocialListType } from '@/components/profile/SocialListModal'
 import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCropModal'
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
+import { SetPasswordModal } from '@/components/profile/SetPasswordModal'
 // ─── Prop Types (data from server / DB) 
 
 export interface ProfileUser {
@@ -32,6 +33,7 @@ export interface ProfileUser {
   avatar: string | null
   backgroundPicture?: string | null
   cuisineSpecialty: string | null
+  hasPassword: boolean
 }
 
 export interface ProfileStats {
@@ -446,7 +448,7 @@ function AvatarFallback({ name }: { name: string }) {
 
 // ─── SettingsDrawer ───────────────────────────────────────────────────────────
 
-function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword }: { open: boolean; onClose: () => void; onEditProfile: () => void; onChangePassword: () => void }) {
+function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetPassword, hasPassword }: { open: boolean; onClose: () => void; onEditProfile: () => void; onChangePassword: () => void; onSetPassword: () => void; hasPassword: boolean }) {
   const { theme, toggleTheme } = useTheme()
   const [privacy, setPrivacy] = useState({ hideLikeCount: false, blockComments: false, privateAccount: false })
   const [loaded, setLoaded] = useState(false)
@@ -504,7 +506,9 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword }: { op
                 <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
                   {[
                     { icon: <Edit3 className="w-4 h-4" />, label: 'Edit Profile',    onClick: onEditProfile    },
-                    { icon: <Key   className="w-4 h-4" />, label: 'Change Password', onClick: onChangePassword },
+                    hasPassword
+                      ? { icon: <Key className="w-4 h-4" />, label: 'Change Password', onClick: onChangePassword }
+                      : { icon: <Key className="w-4 h-4" />, label: 'Set Password',    onClick: onSetPassword    },
                   ].map((item, i, arr) => (
                     <button
                       key={item.label}
@@ -582,9 +586,10 @@ interface LikedSavedReel {
 
 export function ProfilePage({ user, stats, recipes, reels, collections }: ProfilePageProps) {
   const [activeTab,       setActiveTab]       = useState<ProfileTab>('Recipes')
-  const [showSettings,    setShowSettings]    = useState(false)
-  const [showEditProfile,     setShowEditProfile]     = useState(false)
-  const [showChangePassword,  setShowChangePassword]  = useState(false)
+  const [showSettings,       setShowSettings]       = useState(false)
+  const [showEditProfile,    setShowEditProfile]    = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [showSetPassword,    setShowSetPassword]    = useState(false)
   const [showAddModal,    setShowAddModal]    = useState(false)
   const [savedSet,        setSavedSet]        = useState<Set<string>>(new Set())
   const [isFollowing,     setIsFollowing]     = useState(false)
@@ -1064,6 +1069,8 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         onClose={() => setShowSettings(false)}
         onEditProfile={() => { setShowSettings(false); setShowEditProfile(true) }}
         onChangePassword={() => { setShowSettings(false); setShowChangePassword(true) }}
+        onSetPassword={() => { setShowSettings(false); setShowSetPassword(true) }}
+        hasPassword={user.hasPassword}
       />
 
       {/* Change password modal */}
@@ -1071,6 +1078,13 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
         onSuccess={() => showToast('Password updated!', true)}
+      />
+
+      {/* Set password modal (Google-only accounts) */}
+      <SetPasswordModal
+        open={showSetPassword}
+        onClose={() => setShowSetPassword(false)}
+        onSuccess={() => showToast('Password set! You can now log in with email too.', true)}
       />
 
       {/* Edit profile modal */}
