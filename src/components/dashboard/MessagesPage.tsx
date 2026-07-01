@@ -1259,7 +1259,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
     </AnimatePresence>
 
     <div
-      className="flex overflow-hidden overscroll-contain -mx-4 -mt-6 -mb-20 lg:mx-0 lg:mt-0 lg:mb-0 lg:rounded-2xl h-[calc(100svh-4rem-60px)] lg:h-[calc(100svh-8.5rem)]"
+      className="flex overflow-hidden overscroll-contain -mx-4 -mt-6 -mb-20 lg:mx-0 lg:mt-0 lg:mb-0 lg:rounded-2xl h-[calc(100svh-4rem-var(--bottom-nav-h,64px))] lg:h-[calc(100svh-8.5rem)]"
       style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
     >
       {/* ── Left Sidebar ──────────────────────────────────────────────────── */}

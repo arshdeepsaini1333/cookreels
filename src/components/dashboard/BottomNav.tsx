@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Home, Compass, Film, LayoutGrid, Megaphone } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useRef, useEffect } from 'react'
 import { useTheme } from '@/context/ThemeContext'
 
 const navItems = [
@@ -18,12 +19,28 @@ export function BottomNav() {
   const pathname = usePathname()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const navRef = useRef<HTMLDivElement>(null)
+
+  // Publish the nav's real rendered height (icon+label sizing, padding, safe-area inset —
+  // all content-driven, not a fixed value) as a CSS var so pages that need to fit exactly
+  // above it (e.g. MessagesPage) don't have to guess a pixel number that can drift out of
+  // sync with this component and leave a gap or an overlap.
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const update = () => document.documentElement.style.setProperty('--bottom-nav-h', `${el.offsetHeight}px`)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // Reels page has its own full-screen mobile nav
   if (pathname === '/reels') return null
 
   return (
     <div
+      ref={navRef}
       className="fixed bottom-0 left-0 right-0 z-40 lg:hidden pb-safe backdrop-blur-2xl"
       style={{
         background: isDark ? 'rgba(30,30,31,0.97)' : 'rgba(247,241,217,0.97)',
