@@ -12,6 +12,8 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { AddContentModal } from '@/components/shared/AddContentModal'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { mediaUrl } from '@/lib/mediaUrl'
 
 /* ─── Types ───────────────────────────────────────────────── */
 
@@ -480,8 +482,7 @@ function ModalUserAvatar({ username, profileImage, size = 40 }: { username: stri
       }}
     >
       {showImg
-        // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={profileImage!} alt={username} className="w-full h-full object-cover" onError={() => setErr(true)} />
+        ? <ProtectedImg src={profileImage!} alt={username} className="w-full h-full object-cover" onError={() => setErr(true)} />
         : username[0]?.toUpperCase() ?? '?'
       }
     </div>
@@ -729,14 +730,14 @@ function ReelModal({
             {/* ── Left: video — stable, src changes on nav ── */}
             <div className="relative flex-shrink-0 bg-black w-full h-[52vh] md:h-full md:w-[40%]">
               {videoUrl ? (
-                <video
+                <ProtectedVideo
                   ref={videoCallbackRef}
                   src={videoUrl}
                   className="absolute inset-0 w-full h-full object-cover"
                   loop playsInline
                 />
               ) : thumbUrl ? (
-                <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${thumbUrl})` }} />
+                <div className="absolute inset-0 bg-cover bg-center" onContextMenu={(e) => e.preventDefault()} style={{ backgroundImage: `url(${mediaUrl(thumbUrl)})` }} />
               ) : (
                 <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
               )}
@@ -1109,7 +1110,8 @@ function TrendingReels() {
                 ) : image ? (
                   <div
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-                    style={{ backgroundImage: `url(${image})` }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    style={{ backgroundImage: `url(${mediaUrl(image)})` }}
                   />
                 ) : null}
                 <div className={`absolute inset-0 bg-gradient-to-br ${gradient} ${isReal ? 'opacity-0' : image ? 'opacity-40' : 'opacity-90'}`} />
@@ -1310,7 +1312,8 @@ function RecommendedSection({
                   {recipe.coverImage ? (
                     <div
                       className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-                      style={{ backgroundImage: `url(${recipe.coverImage})` }}
+                      onContextMenu={(e) => e.preventDefault()}
+                      style={{ backgroundImage: `url(${mediaUrl(recipe.coverImage)})` }}
                     />
                   ) : (
                     <div className={`absolute inset-0 bg-gradient-to-br ${gradient} transition-transform duration-500 group-hover:scale-110`} />
@@ -1596,7 +1599,7 @@ function RecentFriends() {
                 style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800, #FF6B35)' }}
               >
                 {friend.profileImage && !/googleusercontent\.com/i.test(friend.profileImage) ? (
-                  <img
+                  <ProtectedImg
                     src={friend.profileImage}
                     alt={friend.displayName}
                     className="w-full h-full rounded-full object-cover"

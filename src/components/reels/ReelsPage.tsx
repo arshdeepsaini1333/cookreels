@@ -21,6 +21,7 @@ import { useReelComments } from '@/hooks/useReelComments'
 import type { ReelCommentItem } from '@/hooks/useReelComments'
 import type { FeedReel } from '@/lib/reelsFeed'
 import { ShareModal } from '@/components/shared/ShareModal'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 export type { FeedReel }
 
@@ -287,7 +288,7 @@ function GlassBtn({
 function CommentAvatar({ src, username }: { src: string | null; username: string }) {
   if (src) {
     return (
-      <img
+      <ProtectedImg
         src={src}
         alt={username}
         className="w-9 h-9 rounded-full object-cover flex-shrink-0"
@@ -606,7 +607,7 @@ const ReelCard = memo(function ReelCard({
 
       {/* Thumbnail — loads instantly, covers gap while the video buffers */}
       {reel.thumbnailUrl && (
-        <img
+        <ProtectedImg
           src={reel.thumbnailUrl}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
@@ -616,7 +617,7 @@ const ReelCard = memo(function ReelCard({
 
       {/* Video — only load source for current and next reel */}
       {!videoFailed && (
-        <video
+        <ProtectedVideo
           ref={videoRef}
           src={reel.videoUrl}
           loop
@@ -752,7 +753,7 @@ const ReelCard = memo(function ReelCard({
       >
         <div className="flex items-center gap-2 mb-1.5">
           {reel.creator.profileImage && !/googleusercontent\.com/i.test(reel.creator.profileImage) ? (
-            <img
+            <ProtectedImg
               src={reel.creator.profileImage}
               alt={reel.creator.username}
               className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/20 shadow-lg"

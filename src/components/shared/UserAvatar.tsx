@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ProtectedImg } from '@/components/shared/ProtectedMedia'
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
@@ -41,8 +42,7 @@ export function UserAvatar({
   return (
     <div className={`${dim} rounded-full overflow-hidden flex-shrink-0 ${className}`}>
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ProtectedImg
           src={src}
           alt={name ?? ''}
           className="w-full h-full object-cover"

@@ -12,6 +12,7 @@ import {
   MapPin, Upload,
 } from 'lucide-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 // ─── Static data matching creation flow ───────────────────────────────────────
 
@@ -427,13 +428,13 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                       </p>
                       <div style={{ borderRadius: 10, overflow: 'hidden', border: `1.5px solid ${bannerSrc || videoSrc ? accentClr + '50' : border}`, background: '#000', minHeight: 100, position: 'relative' }}>
                         {bannerSrc && (
-                          <img src={bannerSrc} alt="Banner" style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block' }} />
+                          <ProtectedImg src={bannerSrc} alt="Banner" style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block' }} />
                         )}
                         {!bannerSrc && videoSrc && (
-                          <video src={videoSrc} controls playsInline style={{ width: '100%', maxHeight: 280, display: 'block', background: '#000' }} />
+                          <ProtectedVideo src={videoSrc} controls playsInline style={{ width: '100%', maxHeight: 280, display: 'block', background: '#000' }} />
                         )}
                         {!bannerSrc && !videoSrc && detail.reelThumbnail && (
-                          <img src={detail.reelThumbnail} alt="Linked reel" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', display: 'block' }} />
+                          <ProtectedImg src={detail.reelThumbnail} alt="Linked reel" style={{ width: '100%', maxHeight: 220, objectFit: 'contain', display: 'block' }} />
                         )}
                         {!bannerSrc && !videoSrc && !detail.reelThumbnail && (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '28px 16px' }}>
@@ -748,7 +749,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                       >
                         {form.bannerUrl ? (
                           <>
-                            <img src={form.bannerUrl} alt="Banner" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} />
+                            <ProtectedImg src={form.bannerUrl} alt="Banner" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block' }} />
                             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'all 0.2s' }}
                               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.45)' }}
                               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '0'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0)' }}>
@@ -784,7 +785,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                       >
                         {form.adVideoUrl ? (
                           <>
-                            <video src={form.adVideoUrl} muted playsInline style={{ width: '100%', maxHeight: 200, objectFit: 'contain', display: 'block', background: '#000' }} />
+                            <ProtectedVideo src={form.adVideoUrl} muted playsInline style={{ width: '100%', maxHeight: 200, objectFit: 'contain', display: 'block', background: '#000' }} />
                             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'all 0.2s' }}
                               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0.45)' }}
                               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '0'; (e.currentTarget as HTMLDivElement).style.background = 'rgba(0,0,0,0)' }}>

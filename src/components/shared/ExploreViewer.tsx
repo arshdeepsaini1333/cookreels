@@ -18,6 +18,7 @@ import { useRecipeComments } from '@/hooks/useRecipeComments'
 import { CommentList, CommentInput } from '@/components/shared/CommentSection'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 // ─── Public types (consumed by ExplorePage) ───────────────────────────────────
 
@@ -170,7 +171,7 @@ const VideoPanel = memo(function VideoPanel({
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden cursor-pointer" onClick={handleClick}>
-      <video
+      <ProtectedVideo
         ref={videoRef}
         src={reel.videoUrl}
         poster={reel.thumbnailUrl ?? undefined}
@@ -238,7 +239,7 @@ function RecipeImagePanel({ recipe, idx }: { recipe: ExploreRecipe; idx: number 
   return (
     <div className="relative w-full h-full overflow-hidden">
       {recipe.coverImage ? (
-        <img
+        <ProtectedImg
           src={recipe.coverImage}
           alt={recipe.title}
           className="absolute inset-0 w-full h-full object-cover"

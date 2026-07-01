@@ -17,6 +17,7 @@ import type { SocialListType } from '@/components/profile/SocialListModal'
 import { ReportModal } from '@/components/shared/ReportModal'
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
 import { BlockConfirmModal } from '@/components/shared/BlockConfirmModal'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ function RecipeCard({ r, idx, onClick }: { r: ProfileRecipe; idx: number; onClic
     >
       <div className="relative aspect-[4/3] overflow-hidden">
         {r.coverImage ? (
-          <img
+          <ProtectedImg
             src={r.coverImage}
             alt={r.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -212,7 +213,7 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
       style={{ aspectRatio: '9/16' }}
     >
       {/* Video as cover — autoplay muted loop */}
-      <video
+      <ProtectedVideo
         src={r.videoUrl}
         autoPlay
         muted
@@ -597,8 +598,7 @@ export function PublicProfilePage({
             style={{ background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' }}
           >
             {user.backgroundPicture && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <ProtectedImg
                 src={user.backgroundPicture}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
@@ -625,7 +625,7 @@ export function PublicProfilePage({
               >
                 <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid var(--cr-bg-card)' }}>
                   {user.avatar
-                    ? <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                    ? <ProtectedImg src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                     : <AvatarFallback name={user.name} />
                   }
                 </div>

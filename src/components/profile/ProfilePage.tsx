@@ -21,6 +21,7 @@ import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCro
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
 import { SetPasswordModal } from '@/components/profile/SetPasswordModal'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 // ─── Prop Types (data from server / DB) 
 
 export interface ProfileUser {
@@ -234,7 +235,7 @@ function RecipeCard({
       {/* Image or gradient placeholder */}
       <div className="relative aspect-[4/3] overflow-hidden">
         {r.coverImage ? (
-          <img
+          <ProtectedImg
             src={r.coverImage}
             alt={r.title}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -308,7 +309,7 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
       style={{ aspectRatio: '9/16' }}
     >
       {/* Video as cover — falls back to thumbnail then gradient */}
-      <video
+      <ProtectedVideo
         src={r.videoUrl}
         autoPlay
         muted
@@ -396,7 +397,7 @@ function SavedCollectionCard({ c }: { c: ProfileCollection }) {
       <div className="grid grid-cols-2 aspect-square">
         {imgs.map((img, i) => (
           <div key={i} className="relative overflow-hidden">
-            <img src={img} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <ProtectedImg src={img} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
           </div>
         ))}
       </div>
@@ -752,7 +753,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
               style={!coverUrl ? { background: 'linear-gradient(135deg, #1a1a1b 0%, #2B2B2D 25%, #3d2810 55%, rgba(245,197,24,0.55) 100%)' } : undefined}
             >
               {coverUrl ? (
-                <img
+                <ProtectedImg
                   src={coverUrl}
                   alt="Cover"
                   className="w-full h-full object-cover"
@@ -797,7 +798,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
               >
                 <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid var(--cr-bg-card)' }}>
                   {avatarUrl
-                    ? <img src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ? <ProtectedImg src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
                     : <AvatarFallback name={user.name} />
                   }
                 </div>

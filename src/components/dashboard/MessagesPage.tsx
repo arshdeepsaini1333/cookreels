@@ -11,6 +11,7 @@ import {
 import LibEmojiPicker, { Theme as EmojiTheme, EmojiStyle, type EmojiClickData } from 'emoji-picker-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { ProtectedImg } from '@/components/shared/ProtectedMedia'
 import { useTheme } from '@/context/ThemeContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ function Avatar({
     <div className="relative shrink-0">
       <div className={`${ring} rounded-full overflow-hidden ring-2 ring-[#F5C518]/25`}>
         {avatar && !/googleusercontent\.com/i.test(avatar) ? (
-          <img src={avatar} alt={name} className="w-full h-full object-cover" />
+          <ProtectedImg src={avatar} alt={name} className="w-full h-full object-cover" />
         ) : (
           <div className={`w-full h-full flex items-center justify-center font-bold ${text}`}
             style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
@@ -453,7 +454,7 @@ function SharedRecipeCard({ recipe, isMine }: { recipe: SharedRecipe; isMine: bo
       {/* Cover image */}
       <div className="relative mx-2 mb-2 rounded-xl overflow-hidden" style={{ aspectRatio: '4/3', background: '#1a1a1a' }}>
         {recipe.coverImage ? (
-          <img src={recipe.coverImage} alt={recipe.title} className="w-full h-full object-cover" />
+          <ProtectedImg src={recipe.coverImage} alt={recipe.title} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"
             style={{ background: 'linear-gradient(135deg,rgba(245,197,24,0.15),rgba(0,0,0,0.6))' }}>
@@ -554,7 +555,7 @@ function MessageBubble({
         {!isMine && showAvatar && (
           <div className="w-6 h-6 rounded-full overflow-hidden ring-1 ring-[#F5C518]/20">
             {message.sender.profileImage && !/googleusercontent\.com/i.test(message.sender.profileImage) ? (
-              <img src={message.sender.profileImage} alt="" className="w-full h-full object-cover" />
+              <ProtectedImg src={message.sender.profileImage} alt="" className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[8px] font-bold"
                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
@@ -578,7 +579,7 @@ function MessageBubble({
               : { background: 'var(--cr-bg-card)', color: 'var(--cr-text-1)', border: '1px solid var(--cr-border)', borderRadius: '18px 18px 18px 4px' }
           }>
             {hasImage && (
-              <img src={message.imageUrl!} alt="attachment"
+              <ProtectedImg src={message.imageUrl!} alt="attachment"
                 className="block w-full max-w-[260px] object-cover"
                 style={{ borderRadius: hasText ? '0' : 'inherit' }} />
             )}

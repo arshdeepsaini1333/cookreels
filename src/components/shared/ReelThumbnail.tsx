@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 interface ReelThumbnailProps {
   videoUrl: string
@@ -53,11 +54,9 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
 
       {/* Thumbnail image */}
       {thumbnailUrl && imgState !== 'error' && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <ProtectedImg
           src={thumbnailUrl}
           alt=""
-          draggable={false}
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${imgState === 'loaded' ? 'opacity-100' : 'opacity-0'} ${imgClassName ?? ''}`}
           onLoad={() => setImgState('loaded')}
           onError={() => setImgState('error')}
@@ -66,7 +65,7 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
 
       {/* Video (lazy — only after entering viewport) */}
       {inView && (
-        <video
+        <ProtectedVideo
           src={videoUrl}
           preload="metadata"
           muted

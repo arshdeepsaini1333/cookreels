@@ -10,6 +10,7 @@ import {
 import { ShareModal } from '@/components/shared/ShareModal'
 import { GuestBanner } from '@/components/shared/GuestBanner'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 // Horizontal slide-in/out, direction-aware (mirrors RecipeViewerModal's slideV)
 const slideV = {
@@ -121,7 +122,7 @@ function CommentSheetItem({ comment: c, currentUserId, reelId, onDelete }: {
       <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
            style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
         {c.userAvatar
-          ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+          ? <ProtectedImg src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-xs font-bold"
                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
               {c.username.slice(0,1).toUpperCase()}
@@ -307,7 +308,7 @@ function CommentSheet({
                   <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
                     {currentUserAvatar
-                      ? <img src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
+                      ? <ProtectedImg src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
                       : <div
                           className="w-full h-full flex items-center justify-center text-[10px] font-bold"
                           style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
@@ -496,7 +497,7 @@ function MobileReelSlot({
       <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
 
       {!failed && (
-        <video
+        <ProtectedVideo
           ref={videoRef}
           src={reel.videoUrl}
           loop
@@ -654,7 +655,7 @@ function MobileReelSlot({
           >
             <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/40 flex-shrink-0">
               {creator.avatar
-                ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
+                ? <ProtectedImg src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
                 : <div
                     className="w-full h-full flex items-center justify-center font-bold text-sm"
                     style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
@@ -758,7 +759,7 @@ function DesktopCommentItem({ comment: c, currentUserId, reelId, onDelete }: {
       <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"
            style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
         {c.userAvatar
-          ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+          ? <ProtectedImg src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
               {c.username.slice(0,1).toUpperCase()}
@@ -1031,7 +1032,7 @@ function DesktopReelViewer({
             </div>
 
             {!failed && (
-              <video
+              <ProtectedVideo
                 ref={videoRef}
                 key={reel.id}
                 src={reel.videoUrl}
@@ -1105,7 +1106,7 @@ function DesktopReelViewer({
                 <div className="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0"
                      style={{ '--tw-ring-color': 'var(--cr-accent)' } as React.CSSProperties}>
                   {creator.avatar
-                    ? <img src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
+                    ? <ProtectedImg src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
                     : <div
                         className="w-full h-full flex items-center justify-center font-bold text-sm"
                         style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
@@ -1304,7 +1305,7 @@ function DesktopReelViewer({
                 <div className="flex items-center gap-2.5 px-4 pb-4">
                   <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
                     {currentUserAvatar
-                      ? <img src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
+                      ? <ProtectedImg src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
                       : <div
                           className="w-full h-full flex items-center justify-center text-[10px] font-bold"
                           style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}

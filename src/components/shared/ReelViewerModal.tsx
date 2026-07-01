@@ -12,6 +12,7 @@ import type { ProfileReel, ProfileUser } from '@/components/profile/ProfilePage'
 import { useReelLikes } from '@/hooks/useReelLikes'
 import { useReelComments } from '@/hooks/useReelComments'
 import { ShareModal } from '@/components/shared/ShareModal'
+import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 
 // ─── Props (unchanged — callers pass the same shape) ──────────────────────────
 
@@ -43,7 +44,7 @@ function Avatar({ src, name, size = 'md' }: { src?: string | null; name: string;
   return (
     <div className={`${dim} rounded-full overflow-hidden flex-shrink-0`}>
       {src && !/googleusercontent\.com/i.test(src)
-        ? <img src={src} alt={name} className="w-full h-full object-cover" />
+        ? <ProtectedImg src={src} alt={name} className="w-full h-full object-cover" />
         : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
             {initials}
@@ -98,7 +99,7 @@ function VideoPlayer({ reel }: { reel: ProfileReel }) {
       onClick={togglePlay}
     >
       {!failed && (
-        <video
+        <ProtectedVideo
           ref={videoRef}
           src={reel.videoUrl}
           poster={reel.thumbnailUrl ?? undefined}
