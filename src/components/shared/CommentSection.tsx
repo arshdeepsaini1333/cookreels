@@ -2,13 +2,16 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Send, Loader2 } from 'lucide-react'
+import { Send, Loader2, MoreHorizontal, Flag, Trash2 } from 'lucide-react'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { ReportModal } from '@/components/shared/ReportModal'
+import type { ReportTargetType } from '@/components/shared/ReportModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface CommentItem {
   id: string
+  userId?: string
   username: string
   userAvatar: string | null
   text: string
@@ -123,6 +126,10 @@ interface CommentListProps {
   emptyMessage?: string
   dark?: boolean
   maxVisible?: number
+  commentType?: ReportTargetType
+  currentUserId?: string | null
+  deleteApiBase?: string   // e.g. /api/recipes/{id}/comments  or /api/reels/{id}/comments
+  onDeleteComment?: (commentId: string) => void
 }
 
 function CommentSkeleton({ dark }: { dark: boolean }) {
@@ -140,11 +147,27 @@ function CommentSkeleton({ dark }: { dark: boolean }) {
 
 export function CommentList({
   comments, loading, error, emptyMessage = 'No comments yet. Be the first!',
-  dark = false, maxVisible,
+  dark = false, maxVisible, commentType, currentUserId,
+  deleteApiBase, onDeleteComment,
 }: CommentListProps) {
   const text1   = dark ? '#fff'      : 'var(--cr-text-1)'
   const text2   = dark ? '#A1A1AA'   : 'var(--cr-text-2)'
   const muted   = dark ? '#52525B'   : 'var(--cr-text-muted)'
+
+  const [reportTarget, setReportTarget] = useState<{ id: string; type: ReportTargetType } | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  async function handleDelete(commentId: string) {
+    if (!deleteApiBase || deletingId) return
+    setDeletingId(commentId)
+    setOpenMenuId(null)
+    try {
+      const res = await fetch(`${deleteApiBase}/${commentId}`, { method: 'DELETE' })
+      if (res.ok) onDeleteComment?.(commentId)
+    } catch {}
+    setDeletingId(null)
+  }
 
   if (loading) {
     return (
@@ -173,30 +196,99 @@ export function CommentList({
   }
 
   return (
-    <div className="space-y-4">
-      <AnimatePresence initial={false}>
-        {visible.map(c => (
-          <motion.div
-            key={c.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex gap-2.5"
-          >
-            <UserAvatar src={c.userAvatar} name={c.username} size="sm" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-1.5 flex-wrap">
-                <span className="text-xs font-semibold" style={{ color: text1 }}>{c.username}</span>
-                {c.createdAt && (
-                  <span className="text-[10px]" style={{ color: muted }}>{fmtDate(c.createdAt)}</span>
-                )}
+    <>
+      {reportTarget && commentType && (
+        <ReportModal
+          isOpen={true}
+          onClose={() => setReportTarget(null)}
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+        />
+      )}
+      <div className="space-y-4">
+        <AnimatePresence initial={false}>
+          {visible.map(c => (
+            <motion.div
+              key={c.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex gap-2.5 group"
+            >
+              <UserAvatar src={c.userAvatar} name={c.username} size="sm" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <span className="text-xs font-semibold" style={{ color: text1 }}>{c.username}</span>
+                  {c.createdAt && (
+                    <span className="text-[10px]" style={{ color: muted }}>{fmtDate(c.createdAt)}</span>
+                  )}
+                </div>
+                <p className="text-xs mt-0.5 leading-relaxed" style={{ color: text2 }}>{c.text}</p>
               </div>
-              <p className="text-xs mt-0.5 leading-relaxed" style={{ color: text2 }}>{c.text}</p>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
-    </div>
+
+              {/* Comment options: Delete (own) or Report (others') */}
+              {currentUserId && (
+                <div className="relative flex-shrink-0 self-start pt-0.5">
+                  <button
+                    onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
+                    className="w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: muted }}
+                    aria-label="Comment options"
+                  >
+                    {deletingId === c.id
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <MoreHorizontal className="w-3.5 h-3.5" />
+                    }
+                  </button>
+
+                  <AnimatePresence>
+                    {openMenuId === c.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                          animate={{ opacity: 1,  scale: 1,    y: 0 }}
+                          exit={{ opacity: 0,    scale: 0.92, y: -4 }}
+                          transition={{ duration: 0.12 }}
+                          className="absolute right-0 top-7 z-20 min-w-[120px] rounded-xl overflow-hidden shadow-lg"
+                          style={{
+                            background: dark ? '#2B2B2D' : '#fff',
+                            border: `1px solid ${dark ? '#343438' : '#E5E5E5'}`,
+                          }}
+                        >
+                          {c.userId === currentUserId ? (
+                            <button
+                              onClick={() => handleDelete(c.id)}
+                              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
+                              style={{ color: '#EF4444' }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete
+                            </button>
+                          ) : commentType ? (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null)
+                                setReportTarget({ id: c.id, type: commentType })
+                              }}
+                              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-xs font-medium transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
+                              style={{ color: '#EF4444' }}
+                            >
+                              <Flag className="w-3.5 h-3.5" />
+                              Report
+                            </button>
+                          ) : null}
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </>
   )
 }
 
@@ -211,13 +303,18 @@ interface CommentSectionProps {
   onSubmit: (text: string) => Promise<boolean>
   currentUserAvatar?: string | null
   currentUserName?: string
+  currentUserId?: string | null
   dark?: boolean
   maxVisible?: number
+  commentType?: ReportTargetType
+  deleteApiBase?: string
+  onDeleteComment?: (commentId: string) => void
 }
 
 export function CommentSection({
   comments, commentCount, loading, submitting, error,
-  onSubmit, currentUserAvatar, currentUserName, dark = false, maxVisible,
+  onSubmit, currentUserAvatar, currentUserName, currentUserId,
+  dark = false, maxVisible, commentType, deleteApiBase, onDeleteComment,
 }: CommentSectionProps) {
   const text1 = dark ? '#fff' : 'var(--cr-text-1)'
   const muted = dark ? '#52525B' : 'var(--cr-text-muted)'
@@ -243,6 +340,10 @@ export function CommentSection({
         error={error}
         dark={dark}
         maxVisible={maxVisible}
+        commentType={commentType}
+        currentUserId={currentUserId}
+        deleteApiBase={deleteApiBase}
+        onDeleteComment={onDeleteComment}
       />
 
       <CommentInput

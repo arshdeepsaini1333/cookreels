@@ -16,6 +16,7 @@ export default async function HomePage() {
     user = await prisma.user.findUnique({
       where: { id: session.userId },
       select: {
+        isBanned: true,
         profileImage: true,
         _count: {
           select: {
@@ -29,6 +30,10 @@ export default async function HomePage() {
     })
   } catch {
     // DB temporarily unreachable — render page without stats
+  }
+
+  if (user?.isBanned) {
+    redirect('/banned')
   }
 
   const profileStats = user

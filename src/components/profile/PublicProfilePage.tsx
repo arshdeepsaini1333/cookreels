@@ -7,13 +7,14 @@ import {
   Share2, MessageCircle,
   UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play,
   Clock, Film, Eye, BadgeCheck,
-  Tag, ChevronRight, Lock,
+  Tag, ChevronRight, Lock, Flag,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
 import type { ProfileRecipe, ProfileReel, ProfileStats, ProfileUser } from './ProfilePage'
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
+import { ReportModal } from '@/components/shared/ReportModal'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -494,6 +495,7 @@ export function PublicProfilePage({
 
   const [shareCopied,    setShareCopied]    = useState(false)
   const [messagePending, setMessagePending] = useState(false)
+  const [reportOpen,     setReportOpen]     = useState(false)
 
   const handleMessage = useCallback(async () => {
     if (messagePending) return
@@ -626,6 +628,18 @@ export function PublicProfilePage({
                   : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
                 }
               </motion.button>
+              {currentUserId && (
+                <motion.button
+                  onClick={() => setReportOpen(true)}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center border transition-all"
+                  style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+                  title="Report user"
+                >
+                  <Flag className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                </motion.button>
+              )}
             </div>
           </div>
         </motion.div>
@@ -721,6 +735,17 @@ export function PublicProfilePage({
                 : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
               }
             </motion.button>
+            {currentUserId && (
+              <motion.button
+                onClick={() => setReportOpen(true)}
+                whileTap={{ scale: 0.97 }}
+                className="w-11 h-11 rounded-full flex items-center justify-center border"
+                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+                title="Report user"
+              >
+                <Flag className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+              </motion.button>
+            )}
           </div>
         </motion.div>
 
@@ -903,6 +928,14 @@ export function PublicProfilePage({
         username={user.username}
         listType={socialModal ?? 'followers'}
         currentUserId={currentUserId}
+      />
+
+      {/* Report user modal */}
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="USER"
+        targetId={user.id}
       />
 
     </DashboardLayout>

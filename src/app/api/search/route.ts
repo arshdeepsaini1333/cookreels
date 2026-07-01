@@ -17,10 +17,14 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get('q') ?? '').trim()
   if (!q) return NextResponse.json({ users: [], recipes: [], reels: [] }, CACHE)
 
+  const uid = session.userId
+
   const [users, recipes, reels] = await Promise.all([
     prisma.user.findMany({
       where: {
-        id: { not: session.userId },
+        id: { not: uid },
+        isBanned: false,
+        NOT: { reportsReceived: { some: { reporterId: uid } } },
         OR: [
           { username:  { contains: q, mode: 'insensitive' } },
           { firstName: { contains: q, mode: 'insensitive' } },
@@ -37,11 +41,14 @@ export async function GET(req: NextRequest) {
     prisma.recipe.findMany({
       where: {
         isPublished: true,
+        isBanned: false,
+        user: { isBanned: false },
+        NOT: { reports: { some: { reporterId: uid } } },
         title: { contains: q, mode: 'insensitive' },
         OR: [
-          { userId: session.userId },
+          { userId: uid },
           { user: { privateAccount: false } },
-          { user: { followers: { some: { followerId: session.userId, status: 'ACCEPTED' } } } },
+          { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
         ],
       },
       select: {
@@ -62,11 +69,14 @@ export async function GET(req: NextRequest) {
     prisma.reel.findMany({
       where: {
         isPublished: true,
+        isBanned: false,
+        user: { isBanned: false },
+        NOT: { reports: { some: { reporterId: uid } } },
         title: { contains: q, mode: 'insensitive' },
         OR: [
-          { userId: session.userId },
+          { userId: uid },
           { user: { privateAccount: false } },
-          { user: { followers: { some: { followerId: session.userId, status: 'ACCEPTED' } } } },
+          { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
         ],
       },
       select: {

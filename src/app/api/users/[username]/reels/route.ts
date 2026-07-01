@@ -37,7 +37,11 @@ export async function GET(req: Request, { params }: Params) {
       )
     }
 
-    const where = { userId: user.id, isPublished: true }
+    const reportFilter = (session && !isOwner)
+      ? { NOT: { reports: { some: { reporterId: session.userId } } } }
+      : {}
+
+    const where = { userId: user.id, isPublished: true, isBanned: false, ...reportFilter }
 
     const [reels, total] = await Promise.all([
       prisma.reel.findMany({

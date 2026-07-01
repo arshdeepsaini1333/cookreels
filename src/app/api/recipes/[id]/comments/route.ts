@@ -18,10 +18,11 @@ export async function GET(_req: Request, { params }: Params) {
   if (!recipe) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const comments = await prisma.recipeComment.findMany({
-    where: { recipeId: id, parentId: null },
+    where: { recipeId: id, parentId: null, isBanned: false },
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,
+      userId: true,
       content: true,
       createdAt: true,
       user: { select: { username: true, profileImage: true } },
@@ -31,6 +32,7 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     comments: comments.map(c => ({
       id: c.id,
+      userId: c.userId,
       username: c.user.username,
       userAvatar: c.user.profileImage,
       text: c.content,
@@ -66,6 +68,7 @@ export async function POST(req: Request, { params }: Params) {
       data: { userId: session.userId, recipeId: id, content },
       select: {
         id: true,
+        userId: true,
         content: true,
         createdAt: true,
         user: { select: { username: true, profileImage: true } },
@@ -80,6 +83,7 @@ export async function POST(req: Request, { params }: Params) {
 
   const commentData = {
     id: comment.id,
+    userId: comment.userId,
     username: comment.user.username,
     userAvatar: comment.user.profileImage,
     text: comment.content,

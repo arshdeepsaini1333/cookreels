@@ -7,8 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronLeft, ChevronRight, Heart, MessageCircle,
   Clock, Share2, Bookmark, BadgeCheck,
-  ChefHat, Flame, Calendar,
+  ChefHat, Flame, Calendar, Flag,
 } from 'lucide-react'
+import { ReportModal } from '@/components/shared/ReportModal'
 import type { ProfileRecipe, ProfileUser } from '@/components/profile/ProfilePage'
 import { useRecipeLikes } from '@/hooks/useRecipeLikes'
 import { useRecipeSave } from '@/hooks/useRecipeSave'
@@ -135,6 +136,7 @@ export function RecipeViewerModal({
   const [index,         setIndex]         = useState(initialIndex)
   const [direction,     setDirection]     = useState(0)
   const [shareOpen,     setShareOpen]     = useState(false)
+  const [reportOpen,    setReportOpen]    = useState(false)
   const [detail,        setDetail]        = useState<RecipeDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [expanded,      setExpanded]      = useState(false)
@@ -163,7 +165,7 @@ export function RecipeViewerModal({
 
   const {
     comments, commentCount, loading: commentsLoading,
-    submitting, error: commentError, addComment,
+    submitting, error: commentError, addComment, deleteComment,
   } = useRecipeComments(recipe?.id ?? '', isOpen)
 
   // ── Fetch description / servings / createdAt (skipped when preloaded) ──────
@@ -494,6 +496,16 @@ export function RecipeViewerModal({
                           <button onClick={handleShare} aria-label="Share" className="p-2.5" style={{ color: 'var(--cr-text-1)' }}>
                             <Share2 className="w-6 h-6" />
                           </button>
+                          {currentUserId && activeUser.id !== currentUserId && (
+                            <button
+                              onClick={() => setReportOpen(true)}
+                              aria-label="Report recipe"
+                              className="p-2.5"
+                              style={{ color: 'var(--cr-text-muted)' }}
+                            >
+                              <Flag className="w-5 h-5" />
+                            </button>
+                          )}
                         </div>
 
                         <motion.button
@@ -593,6 +605,10 @@ export function RecipeViewerModal({
                           loading={commentsLoading}
                           error={commentError}
                           maxVisible={4}
+                          commentType="RECIPE_COMMENT"
+                          currentUserId={currentUserId}
+                          deleteApiBase={recipe ? `/api/recipes/${recipe.id}/comments` : undefined}
+                          onDeleteComment={deleteComment}
                         />
                       </div>
 
@@ -767,6 +783,10 @@ export function RecipeViewerModal({
                                 comments={comments}
                                 loading={commentsLoading}
                                 error={commentError}
+                                commentType="RECIPE_COMMENT"
+                                currentUserId={currentUserId}
+                                deleteApiBase={recipe ? `/api/recipes/${recipe.id}/comments` : undefined}
+                                onDeleteComment={deleteComment}
                               />
                             </div>
 
@@ -830,6 +850,16 @@ export function RecipeViewerModal({
                               >
                                 <Share2 className="w-5 h-5" />
                               </button>
+                              {currentUserId && activeUser.id !== currentUserId && (
+                                <button
+                                  onClick={() => setReportOpen(true)}
+                                  aria-label="Report recipe"
+                                  className="w-9 h-9 rounded-full flex items-center justify-center hover:opacity-70"
+                                  style={{ color: 'var(--cr-text-muted)' }}
+                                >
+                                  <Flag className="w-4.5 h-4.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -876,6 +906,15 @@ export function RecipeViewerModal({
         contentType="recipe"
         contentId={recipe?.id}
       />
+      {recipe && (
+        <ReportModal
+          isOpen={reportOpen}
+          onClose={() => setReportOpen(false)}
+          targetType="RECIPE"
+          targetId={recipe.id}
+          onReported={onClose}
+        />
+      )}
     </>
   )
 }

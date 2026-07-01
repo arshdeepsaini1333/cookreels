@@ -106,6 +106,24 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum ReportType {
+  USER
+  RECIPE
+  REEL
+  RECIPE_COMMENT
+  REEL_COMMENT
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE_CONTENT
+  HARASSMENT
+  HATE_SPEECH
+  MISINFORMATION
+  VIOLENCE
+  OTHER
+}
+
 
 // ─── User ───────
 
@@ -145,6 +163,9 @@ model User {
   blockComments    Boolean   @default(false)
   privateAccount   Boolean   @default(false)
 
+  isBanned         Boolean   @default(false)
+  bannedAt         DateTime?
+
   recipes          Recipe[]
   reels            Reel[]
   recipeComments   RecipeComment[]
@@ -173,6 +194,9 @@ model User {
 
   campaigns        Campaign[]
   payments         Payment[]
+
+  reportsMade      Report[]  @relation("ReportsMade")
+  reportsReceived  Report[]  @relation("ReportsReceived")
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -280,6 +304,8 @@ model Recipe {
 
   isPublished  Boolean     @default(true)
   isTrending   Boolean     @default(false)
+  isBanned     Boolean     @default(false)
+  bannedAt     DateTime?
 
   comments     RecipeComment[]
   likes        RecipeLike[]
@@ -290,6 +316,7 @@ model Recipe {
   notifications Notification[]
   activities   Activity[]
   sharedInMessages Message[]   @relation("RecipeSharedMessages")
+  reports      Report[]
 
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @default(now())
@@ -325,6 +352,8 @@ model Reel {
 
   isPublished  Boolean  @default(true)
   isTrending   Boolean  @default(false)
+  isBanned     Boolean  @default(false)
+  bannedAt     DateTime?
 
   comments     ReelComment[]
   likes        ReelLike[]
@@ -335,6 +364,7 @@ model Reel {
   activities   Activity[]
   campaigns    Campaign[]
   sharedInMessages Message[]   @relation("ReelSharedMessages")
+  reports      Report[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now())
@@ -437,6 +467,10 @@ model RecipeComment {
 
   content   String   @db.Text
   likeCount Int      @default(0)
+  isBanned  Boolean  @default(false)
+  bannedAt  DateTime?
+
+  reports   Report[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -459,6 +493,10 @@ model ReelComment {
 
   content   String   @db.Text
   likeCount Int      @default(0)
+  isBanned  Boolean  @default(false)
+  bannedAt  DateTime?
+
+  reports   Report[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -745,6 +783,40 @@ model Payment {
   @@index([razorpayOrderId])
   @@map("payments")
 }
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+model Report {
+  id          String       @id @default(uuid())
+  reporterId  String
+  reporter    User         @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  type        ReportType
+  reason      ReportReason
+  description String?      @db.Text
+
+  targetUserId          String?
+  targetUser            User?          @relation("ReportsReceived", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetRecipeId        String?
+  targetRecipe          Recipe?        @relation(fields: [targetRecipeId], references: [id], onDelete: Cascade)
+  targetReelId          String?
+  targetReel            Reel?          @relation(fields: [targetReelId], references: [id], onDelete: Cascade)
+  targetRecipeCommentId String?
+  targetRecipeComment   RecipeComment? @relation(fields: [targetRecipeCommentId], references: [id], onDelete: Cascade)
+  targetReelCommentId   String?
+  targetReelComment     ReelComment?   @relation(fields: [targetReelCommentId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime     @default(now())
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([targetRecipeId])
+  @@index([targetReelId])
+  @@index([targetRecipeCommentId])
+  @@index([targetReelCommentId])
+  @@map("reports")
+}
+
 
 model CampaignLead {
   id          String     @id @default(uuid())

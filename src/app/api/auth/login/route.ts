@@ -82,7 +82,10 @@ export async function POST(req: Request) {
 
     await createSession(user.id, user.username)
 
-    return NextResponse.json({ message: 'Login successful' }, { status: 200 })
+    return NextResponse.json(
+      { message: 'Login successful', isBanned: user.isBanned },
+      { status: 200 },
+    )
   } catch (error) {
     console.error('[login]', error)
     return NextResponse.json({ message: 'Server error' }, { status: 500 })

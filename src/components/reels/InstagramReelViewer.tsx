@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronLeft, ChevronRight, Heart, MessageCircle, Bookmark, Share2,
-  Volume2, VolumeX, BadgeCheck, Play, X, Send,
+  Volume2, VolumeX, BadgeCheck, Play, X, Send, Flag, MoreHorizontal, Trash2, Loader2,
 } from 'lucide-react'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { GuestBanner } from '@/components/shared/GuestBanner'
+import { ReportModal } from '@/components/shared/ReportModal'
 
 // Horizontal slide-in/out, direction-aware (mirrors RecipeViewerModal's slideV)
 const slideV = {
@@ -76,10 +77,88 @@ const GRADIENTS = [
 
 interface Comment {
   id: string
+  userId?: string
   username: string
   userAvatar: string | null
   text: string
   createdAt: string
+}
+
+// ─── CommentSheetItem ─────────────────────────────────────────────────────────
+
+function CommentSheetItem({ comment: c, currentUserId, reelId, onDelete }: {
+  comment: Comment
+  currentUserId: string | null
+  reelId: string
+  onDelete?: (commentId: string) => void
+}) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const isOwn = !!currentUserId && c.userId === currentUserId
+
+  async function handleDelete() {
+    if (deleting) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/reels/${reelId}/comments/${c.id}`, { method: 'DELETE' })
+      if (res.ok) onDelete?.(c.id)
+    } catch {}
+    setDeleting(false)
+  }
+
+  return (
+    <div className="flex gap-2.5 group">
+      <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
+           style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
+        {c.userAvatar
+          ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center text-xs font-bold"
+                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
+              {c.username.slice(0,1).toUpperCase()}
+            </div>
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
+        <p className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
+      </div>
+      {currentUserId && (
+        <>
+          {isOwn ? (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="self-start mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Delete comment"
+              style={{ color: '#EF4444' }}
+            >
+              {deleting
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Trash2 className="w-3.5 h-3.5" />
+              }
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setReportOpen(true)}
+                className="self-start mt-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Report comment"
+                style={{ color: 'var(--cr-text-muted)' }}
+              >
+                <Flag className="w-3.5 h-3.5" />
+              </button>
+              <ReportModal
+                isOpen={reportOpen}
+                onClose={() => setReportOpen(false)}
+                targetType="REEL_COMMENT"
+                targetId={c.id}
+              />
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 // ─── CommentSheet ─────────────────────────────────────────────────────────────
@@ -189,22 +268,13 @@ function CommentSheet({
                 </p>
               ) : (
                 comments.map(c => (
-                  <div key={c.id} className="flex gap-2.5">
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
-                         style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-                      {c.userAvatar
-                        ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-xs font-bold"
-                               style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-                            {c.username.slice(0,1).toUpperCase()}
-                          </div>
-                      }
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
-                      <p className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
-                    </div>
-                  </div>
+                  <CommentSheetItem
+                    key={c.id}
+                    comment={c}
+                    currentUserId={currentUserId}
+                    reelId={reelId}
+                    onDelete={id => setComments(prev => prev.filter(x => x.id !== id))}
+                  />
                 ))
               )}
             </div>
@@ -274,11 +344,13 @@ interface SlotProps {
   onCommentOpen: () => void
   hideLikeCount?: boolean
   currentUserId: string | null
+  onReportedReel?: () => void
 }
 
 function MobileReelSlot({
   reel, index, isActive, creator, initialIsFollowing, isOwnReel,
   globalMuted, onMuteToggle, onCommentOpen, hideLikeCount, currentUserId,
+  onReportedReel,
 }: SlotProps) {
   const router      = useRouter()
   const videoRef    = useRef<HTMLVideoElement>(null)
@@ -289,7 +361,8 @@ function MobileReelSlot({
   const [following, setFollowing] = useState(initialIsFollowing)
   const [expanded,  setExpanded]  = useState(false)
   const [failed,    setFailed]    = useState(false)
-  const [shareOpen, setShareOpen] = useState(false)
+  const [shareOpen,  setShareOpen]  = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const gradient = GRADIENTS[index % GRADIENTS.length]
 
   // Fetch initial like and save state from the server
@@ -492,6 +565,16 @@ function MobileReelSlot({
           />
         </button>
 
+        {/* Report */}
+        {currentUserId && !isOwnReel && (
+          <button onClick={e => { e.stopPropagation(); setReportOpen(true) }} aria-label="Report reel">
+            <Flag
+              className="w-5 h-5 text-white/70"
+              style={{ filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.7))' }}
+            />
+          </button>
+        )}
+
         {/* Mute */}
         <button
           onClick={e => { e.stopPropagation(); onMuteToggle() }}
@@ -589,7 +672,91 @@ function MobileReelSlot({
       contentType="reel"
       contentId={reel.id}
     />
+    <ReportModal
+      isOpen={reportOpen}
+      onClose={() => setReportOpen(false)}
+      targetType="REEL"
+      targetId={reel.id}
+      onReported={onReportedReel}
+    />
     </>
+  )
+}
+
+// ─── DesktopCommentItem ───────────────────────────────────────────────────────
+
+function DesktopCommentItem({ comment: c, currentUserId, reelId, onDelete }: {
+  comment: Comment
+  currentUserId: string | null
+  reelId: string
+  onDelete?: (commentId: string) => void
+}) {
+  const [reportOpen, setReportOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const isOwn = !!currentUserId && c.userId === currentUserId
+
+  async function handleDelete() {
+    if (deleting) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/reels/${reelId}/comments/${c.id}`, { method: 'DELETE' })
+      if (res.ok) onDelete?.(c.id)
+    } catch {}
+    setDeleting(false)
+  }
+
+  return (
+    <div className="flex gap-2 group">
+      <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"
+           style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
+        {c.userAvatar
+          ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
+                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
+              {c.username.slice(0,1).toUpperCase()}
+            </div>
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
+        <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
+      </div>
+      {currentUserId && (
+        <>
+          {isOwn ? (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="self-start mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Delete comment"
+              style={{ color: '#EF4444' }}
+            >
+              {deleting
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Trash2 className="w-3 h-3" />
+              }
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setReportOpen(true)}
+                className="self-start mt-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                aria-label="Report comment"
+                style={{ color: 'var(--cr-text-muted)' }}
+              >
+                <Flag className="w-3 h-3" />
+              </button>
+              <ReportModal
+                isOpen={reportOpen}
+                onClose={() => setReportOpen(false)}
+                targetType="REEL_COMMENT"
+                targetId={c.id}
+              />
+            </>
+          )}
+        </>
+      )}
+    </div>
   )
 }
 
@@ -611,11 +778,13 @@ interface DesktopProps {
   hideLikeCount?: boolean
   blockComments?: boolean
   currentUserId: string | null
+  onReportedReel?: () => void
 }
 
 function DesktopReelViewer({
   reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
   hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId, showBanner,
+  onReportedReel,
 }: DesktopProps) {
   const router      = useRouter()
   const videoRef    = useRef<HTMLVideoElement>(null)
@@ -632,6 +801,7 @@ function DesktopReelViewer({
   const [comments,   setComments]   = useState<Comment[]>([])
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [shareOpen,  setShareOpen]  = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const gradient = GRADIENTS[reelIndex % GRADIENTS.length]
 
   // Fetch initial like/save state and comments when reel changes
@@ -972,22 +1142,13 @@ function DesktopReelViewer({
                 ) : (
                   <div className="space-y-3">
                     {comments.map(c => (
-                      <div key={c.id} className="flex gap-2">
-                        <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"
-                             style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-                          {c.userAvatar
-                            ? <img src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
-                            : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
-                                   style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-                                {c.username.slice(0,1).toUpperCase()}
-                              </div>
-                          }
-                        </div>
-                        <div>
-                          <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
-                          <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
-                        </div>
-                      </div>
+                      <DesktopCommentItem
+                        key={c.id}
+                        comment={c}
+                        currentUserId={currentUserId}
+                        reelId={reel.id}
+                        onDelete={id => setComments(prev => prev.filter(x => x.id !== id))}
+                      />
                     ))}
                   </div>
                 )}
@@ -1042,6 +1203,16 @@ function DesktopReelViewer({
                   >
                     <Share2 className="w-5 h-5" />
                   </button>
+                  {currentUserId && !isOwnReel && (
+                    <button
+                      onClick={() => setReportOpen(true)}
+                      aria-label="Report reel"
+                      className="w-9 h-9 rounded-full flex items-center justify-center hover:opacity-70"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      <Flag className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1107,6 +1278,13 @@ function DesktopReelViewer({
         currentUserId={currentUserId ?? undefined}
         contentType="reel"
         contentId={reel.id}
+      />
+      <ReportModal
+        isOpen={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="REEL"
+        targetId={reel.id}
+        onReported={onReportedReel}
       />
     </>
   )
@@ -1281,6 +1459,7 @@ export function InstagramReelViewer({
                   onCommentOpen={() => setCommentSheetOpen(true)}
                   hideLikeCount={hideLikeCount}
                   currentUserId={currentUserId}
+                  onReportedReel={goNext}
                 />
               </motion.div>
             </AnimatePresence>
@@ -1299,6 +1478,7 @@ export function InstagramReelViewer({
                 onCommentOpen={() => setCommentSheetOpen(true)}
                 hideLikeCount={hideLikeCount}
                 currentUserId={currentUserId}
+                onReportedReel={goNext}
               />
             ))
           )}
@@ -1343,6 +1523,7 @@ export function InstagramReelViewer({
               blockComments={blockComments}
               currentUserId={currentUserId}
               showBanner={showBanner}
+              onReportedReel={goNext}
             />
           </motion.div>
         </AnimatePresence>

@@ -204,8 +204,13 @@ export async function fetchReelsFeedCursor(
         ON f2."followerId"  = r."userId" AND f2."followingId" = ${userId}
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
-      WHERE r."isPublished" = true AND r."userId" != ${userId}
+      WHERE r."isPublished" = true AND r."isBanned" = false
+        AND r."userId" != ${userId} AND u."isBanned" = false
         AND (u."privateAccount" = false OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
+        AND NOT EXISTS (
+          SELECT 1 FROM reports rep
+          WHERE rep."reporterId" = ${userId} AND rep."targetReelId" = r.id
+        )
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed
@@ -274,7 +279,8 @@ export async function fetchReelById(
       LEFT JOIN follows f2 ON f2."followerId"  = r."userId" AND f2."followingId" = ${userId}
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
-      WHERE r."isPublished" = true AND r.id = ${reelId}
+      WHERE r."isPublished" = true AND r."isBanned" = false AND r.id = ${reelId}
+        AND u."isBanned" = false
         AND (u."privateAccount" = false OR r."userId" = ${userId} OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
       GROUP BY r.id, u.id
     )
@@ -339,8 +345,13 @@ export async function fetchReelsFeed(
         ON f2."followerId"  = r."userId" AND f2."followingId" = ${userId}
       LEFT JOIN reel_tags rt ON rt."reelId" = r.id
       LEFT JOIN tags t       ON t.id = rt."tagId"
-      WHERE r."isPublished" = true AND r."userId" != ${userId}
+      WHERE r."isPublished" = true AND r."isBanned" = false
+        AND r."userId" != ${userId} AND u."isBanned" = false
         AND (u."privateAccount" = false OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
+        AND NOT EXISTS (
+          SELECT 1 FROM reports rep
+          WHERE rep."reporterId" = ${userId} AND rep."targetReelId" = r.id
+        )
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed

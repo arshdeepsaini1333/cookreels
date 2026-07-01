@@ -5,6 +5,7 @@ import { useRecipeSSE } from './useRecipeSSE'
 
 export interface RecipeCommentItem {
   id: string
+  userId?: string
   username: string
   userAvatar: string | null
   text: string
@@ -90,5 +91,10 @@ export function useRecipeComments(recipeId: string, isActive = true) {
     }
   }, [recipeId, submitting])
 
-  return { comments, commentCount, loading, submitting, error, addComment, refetch: fetchComments }
+  const deleteComment = useCallback((commentId: string) => {
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    setCommentCount(prev => Math.max(0, prev - 1))
+  }, [])
+
+  return { comments, commentCount, loading, submitting, error, addComment, deleteComment, refetch: fetchComments }
 }

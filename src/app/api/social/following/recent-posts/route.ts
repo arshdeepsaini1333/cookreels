@@ -7,8 +7,10 @@ export async function GET() {
     const session = await getSession()
     if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
 
+    const uid = session.userId
+
     const followingWithActivity = await prisma.follow.findMany({
-      where: { followerId: session.userId },
+      where: { followerId: uid },
       select: {
         following: {
           select: {
@@ -18,11 +20,21 @@ export async function GET() {
             lastName: true,
             profileImage: true,
             reels: {
+              where: {
+                isPublished: true,
+                isBanned: false,
+                NOT: { reports: { some: { reporterId: uid } } },
+              },
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, title: true, createdAt: true },
             },
             recipes: {
+              where: {
+                isPublished: true,
+                isBanned: false,
+                NOT: { reports: { some: { reporterId: uid } } },
+              },
               orderBy: { createdAt: 'desc' },
               take: 1,
               select: { id: true, title: true, createdAt: true },

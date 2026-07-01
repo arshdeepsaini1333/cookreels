@@ -11,7 +11,9 @@ export async function GET() {
   const reels = await prisma.reel.findMany({
     where: {
       isPublished: true,
-      user: { privateAccount: false },
+      isBanned: false,
+      user: { privateAccount: false, isBanned: false },
+      NOT: { reports: { some: { reporterId: session.userId } } },
     },
     select: {
       id: true,

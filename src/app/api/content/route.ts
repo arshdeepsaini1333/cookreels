@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -34,6 +35,7 @@ function mapDifficulty(d: string | null): "Easy" | "Medium" | "Hard" {
 const CREATOR_EMOJIS = ["👨‍🍳", "👩‍🍳", "🧑‍🍳"];
 
 export async function GET(req: Request) {
+  const session = await getSession();
   const { searchParams } = new URL(req.url);
   const category = searchParams.get("category") || "all";
   const q        = searchParams.get("q") || "";
@@ -57,9 +59,23 @@ export async function GET(req: Request) {
         }
       : {};
 
-    const recipeWhere  = { ...catFilter, ...qFilter, isPublished: true, user: { privateAccount: false } };
+    const reportFilter = session
+      ? { NOT: { reports: { some: { reporterId: session.userId } } } }
+      : {};
+
+    const recipeWhere  = {
+      ...catFilter, ...qFilter, ...reportFilter,
+      isPublished: true,
+      isBanned: false,
+      user: { privateAccount: false, isBanned: false },
+    };
     const reelQFilter  = q ? { title: { contains: q, mode: "insensitive" as const } } : {};
-    const reelWhere    = { ...catFilter, ...reelQFilter, isPublished: true, user: { privateAccount: false } };
+    const reelWhere    = {
+      ...catFilter, ...reelQFilter, ...reportFilter,
+      isPublished: true,
+      isBanned: false,
+      user: { privateAccount: false, isBanned: false },
+    };
 
     const recipeLimit = type === "reel"   ? 0 : type === "recipe" ? limit : Math.ceil(limit * 0.67);
     const reelLimit   = type === "recipe" ? 0 : type === "reel"   ? limit : limit - recipeLimit;

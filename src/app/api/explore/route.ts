@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
 
   const uid = session.userId
   const tab = req.nextUrl.searchParams.get('tab')
-  // tab: 'all' | 'trending' | 'recent' | 'recipes' | 'reels' | null (week-based, unused now)
+
+  // Shared filter snippets
+  const recipeReportFilter = { NOT: { reports: { some: { reporterId: uid } } } }
+  const reelReportFilter   = { NOT: { reports: { some: { reporterId: uid } } } }
+  const baseUser = { privateAccount: false, isBanned: false }
 
   // ── Trending: most-liked within the past 15 days, shuffled, no pagination ──
   if (tab === 'trending') {
@@ -42,10 +46,12 @@ export async function GET(req: NextRequest) {
       prisma.recipe.findMany({
         where: {
           isPublished: true,
+          isBanned: false,
           createdAt: { gte: since },
+          ...recipeReportFilter,
           OR: [
             { userId: uid },
-            { user: { privateAccount: false } },
+            { user: baseUser },
             { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
           ],
         },
@@ -68,10 +74,12 @@ export async function GET(req: NextRequest) {
       prisma.reel.findMany({
         where: {
           isPublished: true,
+          isBanned: false,
           createdAt: { gte: since },
+          ...reelReportFilter,
           OR: [
             { userId: uid },
-            { user: { privateAccount: false } },
+            { user: baseUser },
             { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
           ],
         },
@@ -108,10 +116,12 @@ export async function GET(req: NextRequest) {
       prisma.recipe.findMany({
         where: {
           isPublished: true,
+          isBanned: false,
           createdAt: { gte: since },
+          ...recipeReportFilter,
           OR: [
             { userId: uid },
-            { user: { privateAccount: false } },
+            { user: baseUser },
             { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
           ],
         },
@@ -133,10 +143,12 @@ export async function GET(req: NextRequest) {
       prisma.reel.findMany({
         where: {
           isPublished: true,
+          isBanned: false,
           createdAt: { gte: since },
+          ...reelReportFilter,
           OR: [
             { userId: uid },
-            { user: { privateAccount: false } },
+            { user: baseUser },
             { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
           ],
         },
@@ -179,9 +191,11 @@ export async function GET(req: NextRequest) {
         ? prisma.recipe.findMany({
             where: {
               isPublished: true,
+              isBanned: false,
+              ...recipeReportFilter,
               OR: [
                 { userId: uid },
-                { user: { privateAccount: false } },
+                { user: baseUser },
                 { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
               ],
             },
@@ -206,9 +220,11 @@ export async function GET(req: NextRequest) {
         ? prisma.reel.findMany({
             where: {
               isPublished: true,
+              isBanned: false,
+              ...reelReportFilter,
               OR: [
                 { userId: uid },
-                { user: { privateAccount: false } },
+                { user: baseUser },
                 { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
               ],
             },
@@ -234,18 +250,15 @@ export async function GET(req: NextRequest) {
       (tab !== 'reels'   && recipes.length === recipeTake) ||
       (tab !== 'recipes' && reels.length   === reelTake)
 
-    const outRecipes = shuffle(recipes)
-    const outReels   = shuffle(reels)
-
     return NextResponse.json({
-      recipes: outRecipes.map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
-      reels:   outReels.map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      recipes: shuffle(recipes).map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      reels:   shuffle(reels).map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
       hasMore,
       page,
     }, CACHE)
   }
 
-  // ── Legacy week-based fallback (kept for safety) ────────────────────────────
+  // ── Legacy week-based fallback ───────────────────────────────────────────────
   const week = Math.max(0, parseInt(req.nextUrl.searchParams.get('week') ?? '0', 10))
   const now  = new Date()
   const end  = new Date(now)
@@ -259,10 +272,12 @@ export async function GET(req: NextRequest) {
     prisma.recipe.findMany({
       where: {
         isPublished: true,
+        isBanned: false,
         createdAt: { gte: start, lt: end },
+        ...recipeReportFilter,
         OR: [
           { userId: uid },
-          { user: { privateAccount: false } },
+          { user: baseUser },
           { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
         ],
       },
@@ -277,10 +292,12 @@ export async function GET(req: NextRequest) {
     prisma.reel.findMany({
       where: {
         isPublished: true,
+        isBanned: false,
         createdAt: { gte: start, lt: end },
+        ...reelReportFilter,
         OR: [
           { userId: uid },
-          { user: { privateAccount: false } },
+          { user: baseUser },
           { user: { followers: { some: { followerId: uid, status: 'ACCEPTED' } } } },
         ],
       },
@@ -293,7 +310,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     }),
     prisma.recipe.count({ where: { isPublished: true, createdAt: { gte: olderStart, lt: start } } }),
-    prisma.reel.count({ where: { isPublished: true, createdAt: { gte: olderStart, lt: start } } }),
+    prisma.reel.count({ where:   { isPublished: true, createdAt: { gte: olderStart, lt: start } } }),
   ])
 
   return NextResponse.json({

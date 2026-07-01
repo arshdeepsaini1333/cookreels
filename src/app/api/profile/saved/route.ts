@@ -23,6 +23,8 @@ export async function GET() {
             likeCount:  true,
             difficulty: true,
             isPublished: true,
+            isBanned:   true,
+            reports: { where: { reporterId: userId }, select: { id: true }, take: 1 },
           },
         },
       },
@@ -41,6 +43,8 @@ export async function GET() {
             duration:     true,
             viewCount:    true,
             isPublished:  true,
+            isBanned:     true,
+            reports: { where: { reporterId: userId }, select: { id: true }, take: 1 },
           },
         },
       },
@@ -49,7 +53,7 @@ export async function GET() {
 
   return NextResponse.json({
     recipes: savedRecipes
-      .filter(s => s.recipe.isPublished)
+      .filter(s => s.recipe.isPublished && !s.recipe.isBanned && s.recipe.reports.length === 0)
       .map(s => ({
         id:         s.recipe.id,
         title:      s.recipe.title,
@@ -60,7 +64,7 @@ export async function GET() {
         difficulty: s.recipe.difficulty as string | null,
       })),
     reels: savedReels
-      .filter(s => s.reel.isPublished)
+      .filter(s => s.reel.isPublished && !s.reel.isBanned && s.reel.reports.length === 0)
       .map(s => ({
         id:           s.reel.id,
         title:        s.reel.title,

@@ -9,7 +9,12 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const recipes = await prisma.recipe.findMany({
-    where: { isPublished: true, user: { privateAccount: false } },
+    where: {
+      isPublished: true,
+      isBanned: false,
+      user: { privateAccount: false, isBanned: false },
+      NOT: { reports: { some: { reporterId: session.userId } } },
+    },
     orderBy: { createdAt: 'desc' },
     take: 20,
     select: {

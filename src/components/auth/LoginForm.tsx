@@ -232,7 +232,8 @@ export default function LoginForm() {
       })
 
       if (res.ok) {
-        router.push(nextUrl)
+        const data = await res.json().catch(() => ({})) as { isBanned?: boolean }
+        router.push(data.isBanned ? '/banned' : nextUrl)
         return
       }
 

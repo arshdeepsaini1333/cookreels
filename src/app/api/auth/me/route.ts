@@ -14,6 +14,7 @@ export async function GET() {
       lastName: true,
       username: true,
       profileImage: true,
+      isBanned: true,
     },
   })
 
