@@ -16,7 +16,10 @@
       "Read(//d//**)",
       "Bash(npx tsc *)",
       "Bash(npx next *)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o response.html -w \"%{http_code}\\\\n\" http://localhost:3000/user/arshdeep)",
+      "Bash(grep -o \"Follow</\\\\|Message</\\\\|min-h-screen\" response.html)"
     ]
   }
 }

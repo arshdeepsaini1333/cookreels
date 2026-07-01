@@ -15,6 +15,7 @@ import type { ProfileRecipe, ProfileReel, ProfileStats, ProfileUser } from './Pr
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
 import { ReportModal } from '@/components/shared/ReportModal'
+import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -370,6 +371,10 @@ export function PublicProfilePage({
   const router = useRouter()
   const { theme } = useTheme()
 
+  const isLoggedOut = !currentUserId
+  const rawUsername = user.username.replace(/^@/, '')
+  const [showLoginPrompt, setShowLoginPrompt] = useState(isLoggedOut)
+
   const [activeTab,    setActiveTab]    = useState<PublicTab>('Recipes')
   const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted'>(initialFollowStatus)
   const [isFollowedBy] = useState(initialIsFollowedBy)
@@ -399,7 +404,7 @@ export function PublicProfilePage({
 
   const handleFollow = useCallback(async () => {
     if (!currentUserId) {
-      router.push('/auth/login')
+      router.push(`/auth/login?next=${encodeURIComponent(`/user/${rawUsername}`)}`)
       return
     }
     if (followPending) return
@@ -440,7 +445,7 @@ export function PublicProfilePage({
     }
 
     setFollowPending(false)
-  }, [currentUserId, followPending, followStatus, router, user.id])
+  }, [currentUserId, followPending, followStatus, router, user.id, rawUsername])
 
   // ── Load more recipes ────────────────────────────────────────────────────────
 
@@ -528,8 +533,8 @@ export function PublicProfilePage({
     }
   }, [user.name])
 
-  return (
-    <DashboardLayout username={currentUserName}>
+  const profileContent = (
+    <>
       <div className="max-w-4xl mx-auto">
 
         {/* ── COVER + AVATAR ─────────────────────────────── */}
@@ -937,7 +942,30 @@ export function PublicProfilePage({
         targetType="USER"
         targetId={user.id}
       />
+    </>
+  )
 
+  if (isLoggedOut) {
+    return (
+      <>
+        <div className="min-h-screen overflow-y-auto dark:bg-[#1E1E1F]" style={{ background: 'var(--cr-bg-main)' }}>
+          <div className="px-4 sm:px-6 pt-6 pb-10">
+            {profileContent}
+          </div>
+        </div>
+        <LoginPromptModal
+          isOpen={showLoginPrompt}
+          onClose={() => setShowLoginPrompt(false)}
+          redirectTo={`/user/${rawUsername}`}
+          userName={user.name}
+        />
+      </>
+    )
+  }
+
+  return (
+    <DashboardLayout username={currentUserName}>
+      {profileContent}
     </DashboardLayout>
   )
 }
