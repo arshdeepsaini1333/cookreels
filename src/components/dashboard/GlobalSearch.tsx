@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, X, Loader2, ChevronLeft, Clapperboard } from 'lucide-react'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { ProtectedImg } from '@/components/shared/ProtectedMedia'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 import { useTheme } from '@/context/ThemeContext'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -145,8 +147,7 @@ function RecipeRow({ recipe, isDark, onSelect }: { recipe: SearchRecipe; isDark:
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
     >
       {recipe.coverImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={recipe.coverImage} alt={recipe.title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+        <ProtectedImg src={recipe.coverImage} alt={recipe.title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
       ) : (
         <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
           🍽️
@@ -164,39 +165,6 @@ function RecipeRow({ recipe, isDark, onSelect }: { recipe: SearchRecipe; isDark:
   )
 }
 
-function ReelThumb({ url, title, isDark }: { url: string | null; title: string; isDark: boolean }) {
-  const [ok, setOk] = useState<boolean | null>(url ? null : false)
-
-  const placeholder = (
-    <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
-      <Clapperboard size={18} style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-    </div>
-  )
-
-  if (ok === true) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={url!} alt={title} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
-    )
-  }
-  if (ok === null) {
-    return (
-      <div className="relative w-9 h-9 flex-shrink-0">
-        {placeholder}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={url!}
-          alt={title}
-          className="absolute inset-0 w-full h-full rounded-lg object-cover opacity-0"
-          onLoad={e => { (e.currentTarget as HTMLImageElement).classList.remove('opacity-0'); setOk(true) }}
-          onError={() => setOk(false)}
-        />
-      </div>
-    )
-  }
-  return placeholder
-}
-
 function ReelRow({ reel, isDark, onSelect }: { reel: SearchReel; isDark: boolean; onSelect: () => void }) {
   return (
     <button
@@ -205,7 +173,9 @@ function ReelRow({ reel, isDark, onSelect }: { reel: SearchReel; isDark: boolean
       onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = isDark ? 'rgba(52,52,56,0.60)' : '#FFF3BF' }}
       onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
     >
-      <ReelThumb url={reel.thumbnailUrl} title={reel.title} isDark={isDark} />
+      <div className="relative w-9 h-9 rounded-lg overflow-hidden flex-shrink-0">
+        <ReelThumbnail videoUrl={reel.videoUrl} thumbnailUrl={reel.thumbnailUrl} />
+      </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
           {reel.title}
@@ -239,12 +209,23 @@ function RecentRow({
       <button onClick={onSelect} className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 text-left">
         {entry.type === 'user' ? (
           <UserAvatar src={image} name={title} size="md" />
+        ) : entry.type === 'reel' ? (
+          <div className="relative w-9 h-9 flex-shrink-0">
+            <div className="absolute inset-0 rounded-lg overflow-hidden">
+              <ReelThumbnail videoUrl={entry.data.videoUrl} thumbnailUrl={entry.data.thumbnailUrl} />
+            </div>
+            <span
+              className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
+              style={{ background: isDark ? '#1E1E1F' : '#FFFFFF', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}
+            >
+              <Clapperboard size={9} style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }} />
+            </span>
+          </div>
         ) : image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={title} className={`w-9 h-9 ${rounded} object-cover flex-shrink-0`} />
+          <ProtectedImg src={image} alt={title} className={`w-9 h-9 ${rounded} object-cover flex-shrink-0`} />
         ) : (
           <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 text-base" style={{ background: isDark ? '#343438' : '#E8E8E8' }}>
-            {entry.type === 'recipe' ? '🍽️' : '🎬'}
+            🍽️
           </div>
         )}
         <div className="flex-1 min-w-0">

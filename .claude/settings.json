@@ -81,7 +81,18 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/messages?conv=8ff6a931-6fe6-45f9-ae97-6edeb30935f6\" -H \"Cookie: cr_session=eyJ1c2VySWQiOiJjNmQ1MjY0NS0yODkyLTRkZDktYTQ3Zi05MmQ0MTNjMjA3Y2EiLCJ1c2VybmFtZSI6ImRldnRlc3RfZW1vamlfMjc5NzEzIiwiZXhwaXJlc0F0IjoxNzgzNTQxMDgyOTk2fQ.bF8_MjZ93vOQFuI-h3HQaH2JmfM3gpjp8Iax7kkssvs\")",
       "Bash(node verify_emoji2.js \"eyJ1c2VySWQiOiJjNmQ1MjY0NS0yODkyLTRkZDktYTQ3Zi05MmQ0MTNjMjA3Y2EiLCJ1c2VybmFtZSI6ImRldnRlc3RfZW1vamlfMjc5NzEzIiwiZXhwaXJlc0F0IjoxNzgzNTQxMDgyOTk2fQ.bF8_MjZ93vOQFuI-h3HQaH2JmfM3gpjp8Iax7kkssvs\" \"8ff6a931-6fe6-45f9-ae97-6edeb30935f6\")",
       "Bash(node verify_emoji_search.js \"eyJ1c2VySWQiOiJjNmQ1MjY0NS0yODkyLTRkZDktYTQ3Zi05MmQ0MTNjMjA3Y2EiLCJ1c2VybmFtZSI6ImRldnRlc3RfZW1vamlfMjc5NzEzIiwiZXhwaXJlc0F0IjoxNzgzNTQxMDgyOTk2fQ.bF8_MjZ93vOQFuI-h3HQaH2JmfM3gpjp8Iax7kkssvs\" \"8ff6a931-6fe6-45f9-ae97-6edeb30935f6\")",
-      "Bash(node verify_gap.js \"eyJ1c2VySWQiOiI3NmJkNzlmNy0yN2E0LTRkZjktYmZjOS05NmEyNGM1YzBhNTEiLCJ1c2VybmFtZSI6ImRldnRlc3RfZW1vamlfMDU3OTMwIiwiZXhwaXJlc0F0IjoxNzgzNTQxODY1NzM3fQ.AMe4dytaau-iqoi70LVaOrsKzV1rZZQkAKRQXXKPwHA\" \"f318837d-a03c-4a6e-aeca-566463919fea\")"
+      "Bash(node verify_gap.js \"eyJ1c2VySWQiOiI3NmJkNzlmNy0yN2E0LTRkZjktYmZjOS05NmEyNGM1YzBhNTEiLCJ1c2VybmFtZSI6ImRldnRlc3RfZW1vamlfMDU3OTMwIiwiZXhwaXJlc0F0IjoxNzgzNTQxODY1NzM3fQ.AMe4dytaau-iqoi70LVaOrsKzV1rZZQkAKRQXXKPwHA\" \"f318837d-a03c-4a6e-aeca-566463919fea\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/media/reels/test-nonexistent-key.jpg\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/api/search?q=chicken\")",
+      "Bash(node scripts-temp-check-thumb.js)",
+      "Bash(curl -s \"http://localhost:3000/api/reels/trending\")",
+      "Bash(curl -s \"http://localhost:3000/api/explore\")",
+      "Bash(node -e \"try{require.resolve\\('pg'\\); console.log\\('pg found'\\)}catch\\(e\\){console.log\\('no pg'\\)}\" --prefix d:/cookreels-main)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://cookreels.s3.ap-southeast-2.amazonaws.com/reels/cookreels18.jpg\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/media/reels/cookreels18.jpg\")",
+      "Bash(curl -sI \"http://localhost:3000/media/reels/cookreels18.jpg\")",
+      "Bash(ffmpeg -version)",
+      "Bash(rm -f d:/cookreels-main/scripts-temp-check-thumb.js)"
     ]
   }
 }
