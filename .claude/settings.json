@@ -19,7 +19,9 @@
       "Bash(netstat -ano)",
       "Bash(npm run *)",
       "Bash(curl -s -o response.html -w \"%{http_code}\\\\n\" http://localhost:3000/user/arshdeep)",
-      "Bash(grep -o \"Follow</\\\\|Message</\\\\|min-h-screen\" response.html)"
+      "Bash(grep -o \"Follow</\\\\|Message</\\\\|min-h-screen\" response.html)",
+      "Bash(powershell -Command \"Stop-Process -Id 19568 -Force\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/recipe/47f1dbdf-1628-49ba-bff3-ce73b8f01d89)"
     ]
   }
 }
