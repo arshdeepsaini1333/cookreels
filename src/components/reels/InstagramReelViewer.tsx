@@ -18,6 +18,14 @@ const slideV = {
   exit:   (d: number) => ({ x: d >= 0 ? '-100%' : '100%' }),
 }
 
+// Vertical slide-in/out, direction-aware — used on mobile so ctx-mode navigation
+// feels like scrolling a reel feed instead of swiping a horizontal carousel.
+const slideVVertical = {
+  enter:  (d: number) => ({ y: d >= 0 ? '100%' : '-100%' }),
+  center: { y: 0 },
+  exit:   (d: number) => ({ y: d >= 0 ? '-100%' : '100%' }),
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ViewerReel {
@@ -1495,11 +1503,12 @@ export function InstagramReelViewer({
             mobileSwipeY.current = e.touches[0].clientY
           } : undefined}
           onTouchEnd={inCtxMode ? (e) => {
-            if (mobileSwipeX.current === null) return
-            const dx = mobileSwipeX.current - e.changedTouches[0].clientX
-            const dy = Math.abs((mobileSwipeY.current ?? 0) - e.changedTouches[0].clientY)
-            if (Math.abs(dx) > 60 && Math.abs(dx) > dy) {
-              if (dx > 0) goNext()
+            if (mobileSwipeY.current === null) return
+            // Vertical swipe: up → next reel, down → previous (mirrors a reel feed's scroll direction).
+            const dy = mobileSwipeY.current - e.changedTouches[0].clientY
+            const dx = Math.abs((mobileSwipeX.current ?? 0) - e.changedTouches[0].clientX)
+            if (Math.abs(dy) > 60 && Math.abs(dy) > dx) {
+              if (dy > 0) goNext()
               else goPrev()
             }
             mobileSwipeX.current = mobileSwipeY.current = null
@@ -1510,7 +1519,7 @@ export function InstagramReelViewer({
               <motion.div
                 key={currentReel.id}
                 custom={direction}
-                variants={slideV}
+                variants={slideVVertical}
                 initial="enter"
                 animate="center"
                 exit="exit"

@@ -3,22 +3,26 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, User, FileText, ChefHat, Loader2, AlertCircle, Camera } from 'lucide-react'
+import { X, User, AtSign, FileText, ChefHat, Loader2, AlertCircle, Check, Camera } from 'lucide-react'
 import { ImageCropModal, validateImageFile } from './ImageCropModal'
 
 interface EditProfileModalProps {
   open: boolean
   userId: string
   initialName: string
+  initialUsername: string
   initialBio: string | null
   initialLevel: string
   initialCoverUrl?: string | null
   initialAvatarUrl?: string | null
   onClose: () => void
-  onSave: (updated: { name: string; bio: string | null; level: string }) => void
+  onSave: (updated: { name: string; username: string; usernameChanged: boolean; bio: string | null; level: string }) => void
   onCoverUpdate?: (url: string) => void
   onAvatarUpdate?: (url: string) => void
 }
+
+const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
 
 const LEVELS = [
   { emoji: '🏠', label: 'Home Chef'          },
@@ -34,6 +38,7 @@ export function EditProfileModal({
   open,
   userId,
   initialName,
+  initialUsername,
   initialBio,
   initialLevel,
   initialCoverUrl,
@@ -45,6 +50,8 @@ export function EditProfileModal({
 }: EditProfileModalProps) {
   const [mounted, setMounted] = useState(false)
   const [name,    setName]    = useState(initialName)
+  const [username, setUsername] = useState(initialUsername)
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle')
   const [bio,     setBio]     = useState(initialBio ?? '')
   const [level,   setLevel]   = useState(initialLevel)
   const [saving,  setSaving]  = useState(false)
@@ -63,6 +70,8 @@ export function EditProfileModal({
   useEffect(() => {
     if (open) {
       setName(initialName)
+      setUsername(initialUsername)
+      setUsernameStatus('idle')
       setBio(initialBio ?? '')
       setLevel(initialLevel)
       setCoverUrl(initialCoverUrl ?? null)
@@ -71,14 +80,36 @@ export function EditProfileModal({
       setImgError(null)
       setSaving(false)
     }
-  }, [open, initialName, initialBio, initialLevel, initialCoverUrl, initialAvatarUrl])
+  }, [open, initialName, initialUsername, initialBio, initialLevel, initialCoverUrl, initialAvatarUrl])
+
+  const usernameChanged = username.trim().toLowerCase() !== initialUsername.trim().toLowerCase()
+
+  // Debounced live availability check — mirrors the format rule used at signup.
+  useEffect(() => {
+    if (!open || !usernameChanged) { setUsernameStatus('idle'); return }
+
+    const cleaned = username.trim().toLowerCase()
+    if (!USERNAME_RE.test(cleaned)) { setUsernameStatus('invalid'); return }
+
+    setUsernameStatus('checking')
+    const t = setTimeout(() => {
+      fetch(`/api/profile/update?username=${encodeURIComponent(cleaned)}`)
+        .then(r => r.json())
+        .then(d => setUsernameStatus(d.available ? 'available' : 'taken'))
+        .catch(() => setUsernameStatus('idle'))
+    }, 450)
+    return () => clearTimeout(t)
+  }, [open, username, usernameChanged])
 
   const hasChanges =
     name.trim() !== initialName.trim() ||
+    usernameChanged ||
     (bio.trim() || null) !== (initialBio?.trim() || null) ||
     level !== initialLevel
 
-  const canSave = hasChanges && !saving && name.trim().length > 0
+  const usernameOk = !usernameChanged || usernameStatus === 'available'
+
+  const canSave = hasChanges && !saving && name.trim().length > 0 && usernameOk
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'cover') => {
     const file = e.target.files?.[0]
@@ -96,9 +127,10 @@ export function EditProfileModal({
     setSaving(true)
 
     const body: Record<string, string> = {}
-    if (name.trim()  !== initialName.trim())                      body.name  = name.trim()
-    if ((bio.trim() || null) !== (initialBio?.trim() || null))    body.bio   = bio.trim()
-    if (level !== initialLevel)                                    body.level = level
+    if (name.trim()  !== initialName.trim())                      body.name     = name.trim()
+    if (usernameChanged)                                           body.username = username.trim().toLowerCase()
+    if ((bio.trim() || null) !== (initialBio?.trim() || null))    body.bio      = bio.trim()
+    if (level !== initialLevel)                                    body.level    = level
 
     try {
       const res  = await fetch('/api/profile/update', {
@@ -115,9 +147,11 @@ export function EditProfileModal({
       }
 
       onSave({
-        name:  data.name  ?? name.trim(),
-        bio:   'bio' in data ? data.bio : (bio.trim() || null),
-        level: data.level ?? level,
+        name:            data.name     ?? name.trim(),
+        username:        data.username ?? username.trim().toLowerCase(),
+        usernameChanged,
+        bio:             'bio' in data ? data.bio : (bio.trim() || null),
+        level:           data.level ?? level,
       })
       onClose()
     } catch {
@@ -312,6 +346,66 @@ export function EditProfileModal({
                         borderColor: 'var(--cr-border)',
                       }}
                     />
+                  </div>
+
+                  {/* Username */}
+                  <div>
+                    <label
+                      className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      <AtSign className="w-3.5 h-3.5" /> Username
+                    </label>
+                    <div className="relative">
+                      <span
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium pointer-events-none"
+                        style={{ color: 'var(--cr-text-muted)' }}
+                      >
+                        @
+                      </span>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={e => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                        placeholder="username"
+                        maxLength={20}
+                        className="w-full pl-8 pr-9 py-3 rounded-xl text-sm font-medium outline-none transition-all border"
+                        style={{
+                          background:  'var(--cr-bg-surface)',
+                          color:       'var(--cr-text-1)',
+                          borderColor:
+                            usernameStatus === 'taken' || usernameStatus === 'invalid'
+                              ? '#ef4444'
+                              : usernameStatus === 'available'
+                                ? '#22c55e'
+                                : 'var(--cr-border)',
+                        }}
+                      />
+                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2">
+                        {usernameStatus === 'checking' && (
+                          <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--cr-text-muted)' }} />
+                        )}
+                        {usernameStatus === 'available' && <Check className="w-4 h-4" style={{ color: '#22c55e' }} />}
+                        {(usernameStatus === 'taken' || usernameStatus === 'invalid') && (
+                          <AlertCircle className="w-4 h-4" style={{ color: '#ef4444' }} />
+                        )}
+                      </span>
+                    </div>
+                    {usernameStatus === 'invalid' && (
+                      <p className="mt-1.5 text-xs font-medium" style={{ color: '#ef4444' }}>
+                        3–20 characters: letters, numbers, or underscore
+                      </p>
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <p className="mt-1.5 text-xs font-medium" style={{ color: '#ef4444' }}>
+                        This username is already taken
+                      </p>
+                    )}
+                    {usernameStatus === 'available' && (
+                      <p className="mt-1.5 text-xs font-medium" style={{ color: '#22c55e' }}>
+                        Username is available
+                      </p>
+                    )}
                   </div>
 
                   {/* Bio */}

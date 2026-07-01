@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -193,6 +194,12 @@ export function AddContentModal({
   const router = useRouter()
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
 
+  // Portal to document.body — mounting inline would nest this modal inside
+  // DashboardLayout's `relative z-10` content wrapper, which traps its z-index
+  // inside that local stacking context and lets the bottom nav paint over it.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const showToast = (msg: string, ok: boolean) => {
     setToast({ msg, ok })
     setTimeout(() => {
@@ -333,7 +340,9 @@ export function AddContentModal({
   }
   const labelCls = 'text-xs font-semibold mb-1.5 block'
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -341,23 +350,29 @@ export function AddContentModal({
             key="add-backdrop"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.22 }}
-            onClick={handleClose}
             className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm"
           />
-          <motion.div
-            key="add-modal"
-            initial={{ opacity: 0, y: 40, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            className="fixed left-1/2 -translate-x-1/2 z-[90] w-[calc(100%-2rem)] max-w-lg rounded-2xl overflow-hidden flex flex-col"
-            style={{
-              top: 'max(5rem, calc(50% - min(45vh, 320px)))',
-              maxHeight: 'calc(100svh - 5.5rem)',
-              background: 'var(--cr-bg-card)',
-              boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
-            }}
+
+          {/* Centering wrapper — flex-centers the card within the viewport so it can
+               never extend past the screen edge (the old top/maxHeight calc formulas
+               didn't always add up to <=100dvh, letting the card overflow the bottom). */}
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+            onClick={handleClose}
           >
+            <motion.div
+              key="add-modal"
+              initial={{ opacity: 0, y: 40, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-lg max-h-[85dvh] rounded-2xl overflow-hidden flex flex-col"
+              style={{
+                background: 'var(--cr-bg-card)',
+                boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+              }}
+            >
             {/* Header */}
             <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-4 border-b" style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>
               <h2 className="text-lg font-bold" style={{ color: 'var(--cr-text-1)', fontFamily: 'var(--font-heading)' }}>
@@ -372,7 +387,7 @@ export function AddContentModal({
             </div>
 
             {/* Scrollable body */}
-            <div className="overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {/* Type selector */}
               <div className="flex gap-2 px-5 pt-4">
                 {(['recipe', 'reel'] as ContentType[]).map(t => (
@@ -540,7 +555,8 @@ export function AddContentModal({
                 </motion.button>
               </form>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
 
           {/* Toast */}
           <AnimatePresence>
@@ -566,6 +582,7 @@ export function AddContentModal({
           </AnimatePresence>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

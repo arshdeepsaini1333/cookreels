@@ -1,14 +1,13 @@
 'use client'
 
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import {
   Home, Compass, Film, Users, MessageCircle,
-  LayoutGrid, Search, X,
-  ArrowLeft, Megaphone,
+  LayoutGrid, Megaphone,
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { useTheme } from '@/context/ThemeContext'
 import { UserAvatar } from '@/components/shared/UserAvatar'
@@ -30,9 +29,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({ username = 'Chef' }: SidebarProps) {
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
-  const [searchValue, setSearchValue] = useState('')
-  const mobileInputRef = useRef<HTMLInputElement>(null)
   const pathname = usePathname()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -99,106 +95,6 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile search button (replaces hamburger) */}
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl backdrop-blur-xl shadow-lg"
-        style={{
-          background: isDark ? 'rgba(43,43,45,0.95)' : 'rgba(247,241,217,0.95)',
-          border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-          color: isDark ? '#A1A1AA' : '#666666',
-        }}
-        onClick={() => { setMobileSearchOpen(true); setTimeout(() => mobileInputRef.current?.focus(), 80) }}
-        aria-label="Search"
-      >
-        <Search size={18} />
-      </motion.button>
-
-      {/* Mobile search overlay */}
-      <AnimatePresence>
-        {mobileSearchOpen && (
-          <>
-            <motion.div
-              key="search-backdrop"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="lg:hidden fixed inset-0 z-40"
-              style={{ background: isDark ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.35)', backdropFilter: 'blur(4px)' }}
-              onClick={() => setMobileSearchOpen(false)}
-            />
-            <motion.div
-              key="search-panel"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ type: 'spring', stiffness: 340, damping: 32 }}
-              className="lg:hidden fixed left-0 right-0 top-0 z-50 px-4 pt-4 pb-5 shadow-2xl"
-              style={{
-                background: isDark ? 'rgba(30,30,31,0.98)' : 'rgba(245,245,245,0.98)',
-                borderBottom: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => { setMobileSearchOpen(false); setSearchValue('') }}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
-                  style={{
-                    background: isDark ? 'rgba(43,43,45,0.90)' : 'rgba(255,255,255,0.90)',
-                    border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                    color: isDark ? '#A1A1AA' : '#666666',
-                  }}
-                >
-                  <ArrowLeft size={16} strokeWidth={2} />
-                </button>
-
-                <div
-                  className="flex-1 flex items-center rounded-2xl px-3.5 py-2.5"
-                  style={{
-                    background: isDark ? 'rgba(43,43,45,0.80)' : 'rgba(255,255,255,0.90)',
-                    border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                  }}
-                >
-                  <Search size={15} className="flex-shrink-0 mr-2.5" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-                  <input
-                    ref={mobileInputRef}
-                    type="text"
-                    value={searchValue}
-                    onChange={e => setSearchValue(e.target.value)}
-                    placeholder="Search recipes, creators, reels…"
-                    className="flex-1 bg-transparent text-sm outline-none"
-                    style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}
-                  />
-                  {searchValue && (
-                    <button onClick={() => setSearchValue('')} className="flex-shrink-0 ml-1">
-                      <X size={14} style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {!searchValue && (
-                <div className="mt-4 space-y-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest px-1 mb-2" style={{ color: isDark ? '#52525B' : '#9CA3AF' }}>Trending</p>
-                  {['Butter Chicken', 'Avocado Toast', 'Masala Dosa', 'Pasta Carbonara', 'Smash Burger'].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => { setSearchValue(s); setMobileSearchOpen(false) }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-colors"
-                      style={{ color: isDark ? '#A1A1AA' : '#666666' }}
-                      onTouchStart={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.50)' : 'rgba(245,197,24,0.06)')}
-                      onTouchEnd={e => (e.currentTarget.style.background = 'transparent')}
-                    >
-                      <Search size={13} style={{ color: 'var(--cr-accent)' }} />
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
       {/* Sidebar panel — desktop only */}
       <aside className="hidden lg:flex lg:relative z-40 h-full w-64 xl:w-72 flex-shrink-0 flex-col">
         {/* Glass panel */}

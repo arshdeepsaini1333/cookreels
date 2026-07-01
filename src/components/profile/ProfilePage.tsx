@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
@@ -455,6 +456,13 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
   const [loaded, setLoaded] = useState(false)
   const [showBlockedUsers, setShowBlockedUsers] = useState(false)
 
+  // Portal to document.body — mounting inline nests this drawer inside DashboardLayout's
+  // `relative z-10` content wrapper, which traps its z-index inside that local stacking
+  // context and lets the sticky global header (z-20) paint over the drawer's own header,
+  // hiding its title and close button.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   useEffect(() => {
     if (!open || loaded) return
     fetch('/api/profile/settings')
@@ -475,7 +483,9 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
     }).catch(() => {})
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <>
     <AnimatePresence>
       {open && (
@@ -589,7 +599,8 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
     </AnimatePresence>
 
     <BlockedUsersModal isOpen={showBlockedUsers} onClose={() => setShowBlockedUsers(false)} />
-    </>
+    </>,
+    document.body
   )
 }
 
@@ -630,7 +641,10 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
 
   // ── Editable profile info ────────────────────────────────────────────────────
   const [profileName,     setProfileName]     = useState(user.name)
-  const [profileUsername, setProfileUsername] = useState(user.username)
+  // user.username arrives "@"-prefixed for display (see /user/[username]/page.tsx), but every
+  // consumer here (render, share URL, EditProfileModal, SocialListModal) wants the raw handle —
+  // normalize once so it's never double-prefixed.
+  const [profileUsername, setProfileUsername] = useState(user.username.replace(/^@/, ''))
   const [profileBio,      setProfileBio]      = useState(user.bio)
   const [profileLevel,    setProfileLevel]    = useState(user.level)
 
@@ -1113,16 +1127,29 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
         open={showEditProfile}
         userId={user.id}
         initialName={profileName}
+        initialUsername={profileUsername}
         initialBio={profileBio}
         initialLevel={profileLevel}
         initialCoverUrl={coverUrl}
         initialAvatarUrl={avatarUrl}
         onClose={() => setShowEditProfile(false)}
-        onSave={({ name, bio, level }) => {
+        onSave={({ name, username, usernameChanged, bio, level }) => {
           setProfileName(name)
+          setProfileUsername(username)
           setProfileBio(bio)
           setProfileLevel(level)
-          showToast('Profile updated!', true)
+
+          if (usernameChanged) {
+            // This page is served at /user/[username] (looked up by that exact URL param) —
+            // a plain reload would re-request the OLD username's URL, which no longer resolves
+            // to any user after the rename and would 404. Navigate to the new username's URL
+            // instead; the full navigation also re-fetches everywhere (header, sidebar,
+            // notifications, etc.) using the session cookie's just-reissued username claim.
+            showToast('Username updated! Redirecting…', true)
+            setTimeout(() => { window.location.href = `/user/${username}` }, 900)
+          } else {
+            showToast('Profile updated!', true)
+          }
         }}
         onCoverUpdate={(url) => {
           setCoverUrl(url)

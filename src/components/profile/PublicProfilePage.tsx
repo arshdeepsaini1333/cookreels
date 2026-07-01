@@ -7,7 +7,7 @@ import {
   Share2, MessageCircle,
   UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play,
   Clock, Film, Eye, BadgeCheck,
-  Tag, ChevronRight, Lock, Flag, Ban, ShieldOff,
+  Tag, ChevronRight, Lock, Flag, Ban, ShieldOff, MoreVertical,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
@@ -535,6 +535,21 @@ export function PublicProfilePage({
   const [messagePending, setMessagePending] = useState(false)
   const [reportOpen,     setReportOpen]     = useState(false)
 
+  // ── Mobile "more actions" menu (collapses Share/Block/Report so the action row doesn't overcrowd) ──
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const moreMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!moreMenuOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [moreMenuOpen])
+
   const handleMessage = useCallback(async () => {
     if (messagePending) return
     setMessagePending(true)
@@ -760,8 +775,9 @@ export function PublicProfilePage({
             </span>
           </div>
 
-          {/* Mobile action buttons */}
-          <div className="flex sm:hidden gap-2 mt-4">
+          {/* Mobile action buttons — Follow/Message stay full-width; Share/Block/Report
+               collapse into a single "more" menu so the row doesn't overcrowd on narrow screens. */}
+          <div className="flex sm:hidden items-center gap-2 mt-4">
             {isBlocked ? (
               <motion.button
                 onClick={() => setBlockModalOpen(true)}
@@ -802,40 +818,63 @@ export function PublicProfilePage({
                 </motion.button>
               </>
             )}
-            <motion.button
-              onClick={handleShare}
-              whileTap={{ scale: 0.97 }}
-              className="w-11 h-11 rounded-full flex items-center justify-center border"
-              style={{ borderColor: shareCopied ? 'var(--cr-accent)' : 'var(--cr-border)', background: shareCopied ? 'var(--cr-accent-soft)' : 'var(--cr-bg-card)' }}
-              title={shareCopied ? 'Link copied!' : 'Share profile'}
-            >
-              {shareCopied
-                ? <span className="text-[10px] font-bold" style={{ color: 'var(--cr-accent)' }}>✓</span>
-                : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
-              }
-            </motion.button>
-            {currentUserId && !isBlocked && (
+
+            <div className="relative flex-shrink-0" ref={moreMenuRef}>
               <motion.button
-                onClick={() => setBlockModalOpen(true)}
-                whileTap={{ scale: 0.97 }}
+                onClick={() => setMoreMenuOpen(o => !o)}
+                whileTap={{ scale: 0.94 }}
                 className="w-11 h-11 rounded-full flex items-center justify-center border"
-                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
-                title="Block user"
+                style={{
+                  borderColor: moreMenuOpen ? 'var(--cr-accent)' : 'var(--cr-border)',
+                  background: moreMenuOpen ? 'var(--cr-accent-soft)' : 'var(--cr-bg-card)',
+                }}
+                aria-label="More actions"
               >
-                <ShieldOff className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                <MoreVertical className="w-4 h-4" style={{ color: moreMenuOpen ? 'var(--cr-accent)' : 'var(--cr-text-2)' }} />
               </motion.button>
-            )}
-            {currentUserId && (
-              <motion.button
-                onClick={() => setReportOpen(true)}
-                whileTap={{ scale: 0.97 }}
-                className="w-11 h-11 rounded-full flex items-center justify-center border"
-                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
-                title="Report user"
-              >
-                <Flag className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
-              </motion.button>
-            )}
+
+              <AnimatePresence>
+                {moreMenuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.94, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.94, y: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 w-48 rounded-2xl overflow-hidden shadow-2xl z-30"
+                    style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)' }}
+                  >
+                    <button
+                      onClick={() => { setMoreMenuOpen(false); handleShare() }}
+                      className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left"
+                      style={{ color: 'var(--cr-text-1)' }}
+                    >
+                      <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                      {shareCopied ? 'Link copied!' : 'Share profile'}
+                    </button>
+                    {currentUserId && !isBlocked && (
+                      <button
+                        onClick={() => { setMoreMenuOpen(false); setBlockModalOpen(true) }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left border-t"
+                        style={{ color: 'var(--cr-text-1)', borderColor: 'var(--cr-border)' }}
+                      >
+                        <ShieldOff className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                        Block user
+                      </button>
+                    )}
+                    {currentUserId && (
+                      <button
+                        onClick={() => { setMoreMenuOpen(false); setReportOpen(true) }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-left border-t"
+                        style={{ color: '#EF4444', borderColor: 'var(--cr-border)' }}
+                      >
+                        <Flag className="w-4 h-4" />
+                        Report user
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </motion.div>
 

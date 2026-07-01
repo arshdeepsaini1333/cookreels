@@ -137,25 +137,27 @@ export function Header({
           <GlobalSearch variant="desktop" currentUserAvatar={avatarUrl} currentUserName={username} />
         </div>
 
-        {/* Mobile: spacer to push actions right */}
-        <div className="sm:hidden flex-1 ml-8" />
+        {/* Mobile: Search button — leftmost, in place of the old spacer */}
+        <motion.button
+          whileHover={{ scale: 1.06 }}
+          whileTap={{ scale: 0.92 }}
+          aria-label="Search"
+          onClick={() => setMobileSearchOpen(true)}
+          className="sm:hidden relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200"
+          style={{
+            background: isDark ? 'rgba(245,197,24,0.12)' : 'rgba(245,197,24,0.10)',
+            border: '1px solid rgba(245,197,24,0.35)',
+            color: '#F5C518',
+          }}
+        >
+          <Search size={16} strokeWidth={2.1} />
+        </motion.button>
+
+        {/* Mobile: spacer to push remaining actions right */}
+        <div className="sm:hidden flex-1" />
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-
-          {/* Mobile: Search button */}
-          <button
-            aria-label="Search"
-            onClick={() => setMobileSearchOpen(true)}
-            className="sm:hidden relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200"
-            style={{
-              background: isDark ? 'rgba(43,43,45,0.90)' : 'rgba(255,255,255,0.90)',
-              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-              color: isDark ? '#A1A1AA' : '#666666',
-            }}
-          >
-            <Search size={16} strokeWidth={1.9} />
-          </button>
 
           {/* Mobile: Friends link */}
           <Link

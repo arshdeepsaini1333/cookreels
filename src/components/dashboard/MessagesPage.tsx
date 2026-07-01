@@ -8,8 +8,10 @@ import {
   MessageCircle, Smile, ImageIcon, Check, CheckCheck,
   ChefHat, X, Loader2, Trash2, Ban, Play, Clock, Lock,
 } from 'lucide-react'
+import LibEmojiPicker, { Theme as EmojiTheme, EmojiStyle, type EmojiClickData } from 'emoji-picker-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { useTheme } from '@/context/ThemeContext'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -93,14 +95,6 @@ interface CtxMenu {
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 const POLL_INTERVAL = 3000
-
-const EMOJIS = [
-  '😊','😂','❤️','👍','🔥','✨','🎉','😍','🥰','👏',
-  '😄','🙏','💯','😭','🤣','😅','🥹','🫶','💪','🤩',
-  '🍕','🍔','🌮','🍜','🍣','🥗','🍳','🥘','🍰','🎂',
-  '🍩','🍪','🍫','☕','🧁','🥐','🫕','🥙','🌯','🥚',
-  '🧀','🥩','🥦','🧅','🧄','🫑','🥕','🍅','🥑','🍓',
-]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -743,16 +737,26 @@ function HeaderMenu({
 
 // ── EmojiPicker ────────────────────────────────────────────────────────────────
 
-function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+function EmojiPicker({ onSelect, onClose, triggerRef }: {
+  onSelect: (emoji: string) => void
+  onClose: () => void
+  triggerRef: React.RefObject<HTMLButtonElement | null>
+}) {
   const ref = useRef<HTMLDivElement>(null)
+  const { theme } = useTheme()
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+      const target = e.target as Node
+      // Exclude the toggle button itself — otherwise its mousedown-triggered close
+      // races with its own onClick's toggle, and clicking it again can't close the picker.
+      if (ref.current && !ref.current.contains(target) && !triggerRef.current?.contains(target)) {
+        onClose()
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+  }, [onClose, triggerRef])
 
   return (
     <motion.div
@@ -761,17 +765,17 @@ function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void;
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: 8, scale: 0.95 }}
       transition={{ duration: 0.15, ease: EASE }}
-      className="absolute bottom-full left-0 mb-2 p-2 rounded-2xl shadow-xl z-50"
-      style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)', width: '264px' }}
+      className="absolute bottom-full left-0 mb-2 z-50"
     >
-      <div className="grid grid-cols-10 gap-0.5">
-        {EMOJIS.map(emoji => (
-          <button key={emoji} onClick={() => onSelect(emoji)}
-            className="w-6 h-6 flex items-center justify-center text-base rounded-lg hover:bg-[rgba(245,197,24,0.15)] transition-colors">
-            {emoji}
-          </button>
-        ))}
-      </div>
+      <LibEmojiPicker
+        onEmojiClick={(data: EmojiClickData) => onSelect(data.emoji)}
+        theme={theme === 'dark' ? EmojiTheme.DARK : EmojiTheme.LIGHT}
+        emojiStyle={EmojiStyle.NATIVE}
+        autoFocusSearch={false}
+        previewConfig={{ showPreview: false }}
+        width={300}
+        height={350}
+      />
     </motion.div>
   )
 }
@@ -846,6 +850,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   const inputRef      = useRef<HTMLTextAreaElement>(null)
   const pollingRef    = useRef<ReturnType<typeof setInterval> | null>(null)
   const fileInputRef  = useRef<HTMLInputElement>(null)
+  const emojiBtnRef   = useRef<HTMLButtonElement>(null)
   const hasAutoOpened = useRef(false)
   const activeConvRef = useRef<string | null>(null)
   const isNearBottom  = useRef(true)
@@ -1101,10 +1106,24 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   }
 
   const handleEmojiSelect = useCallback((emoji: string) => {
-    setInputValue(prev => prev + emoji)
-    setShowEmoji(false)
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }, [])
+    const el = inputRef.current
+    const start = el?.selectionStart ?? inputValue.length
+    const end   = el?.selectionEnd   ?? inputValue.length
+    const caret = start + emoji.length
+
+    setInputValue(prev => prev.slice(0, start) + emoji + prev.slice(end))
+    // Picker stays open — lets you pick several emoji in a row without reopening it.
+    // It's still closed explicitly via the outside-click handler or the toggle button.
+
+    // Re-focus and place the caret right after the inserted emoji — without this the
+    // browser drops it back to the start of the text once the textarea regains focus.
+    setTimeout(() => {
+      const node = inputRef.current
+      if (!node) return
+      node.focus()
+      node.setSelectionRange(caret, caret)
+    }, 0)
+  }, [inputValue])
 
   const openContextMenu = useCallback((messageId: string, isMine: boolean, x: number, y: number) => {
     setContextMenu({ messageId, isMine, x, y })
@@ -1240,7 +1259,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
     </AnimatePresence>
 
     <div
-      className="flex overflow-hidden -mx-4 -mt-6 -mb-20 lg:mx-0 lg:mt-0 lg:mb-0 lg:rounded-2xl h-[calc(100dvh-4rem-60px)] lg:h-[calc(100svh-8.5rem)]"
+      className="flex overflow-hidden overscroll-contain -mx-4 -mt-6 -mb-20 lg:mx-0 lg:mt-0 lg:mb-0 lg:rounded-2xl h-[calc(100svh-4rem-60px)] lg:h-[calc(100svh-8.5rem)]"
       style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
     >
       {/* ── Left Sidebar ──────────────────────────────────────────────────── */}
@@ -1270,7 +1289,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2 space-y-0.5 msg-scroll">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-2 space-y-0.5 msg-scroll">
           {loadingConvs ? (
             Array.from({ length: 7 }).map((_, i) => <ConvSkeleton key={i} />)
           ) : filtered.length === 0 ? (
@@ -1396,7 +1415,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
               {/* ── Messages Area ────────────────────────────────────────── */}
               <div
                 ref={msgAreaRef}
-                className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-1 min-h-0 msg-scroll"
+                className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 flex flex-col gap-1 min-h-0 msg-scroll"
                 style={{ background: 'var(--cr-bg-surface)' }}
                 onClick={() => { setContextMenu(null); setShowHeaderMenu(false) }}
                 onScroll={() => {
@@ -1519,13 +1538,13 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
                   <div className="relative">
                     <AnimatePresence>
                       {showEmoji && (
-                        <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} />
+                        <EmojiPicker onSelect={handleEmojiSelect} onClose={() => setShowEmoji(false)} triggerRef={emojiBtnRef} />
                       )}
                     </AnimatePresence>
 
                     <div className="flex items-end gap-2 rounded-2xl px-3 py-2"
                       style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-                      <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowEmoji(v => !v)}
+                      <motion.button ref={emojiBtnRef} whileTap={{ scale: 0.88 }} onClick={() => setShowEmoji(v => !v)}
                         title="Emoji" className="p-1 shrink-0 mb-0.5 transition-colors"
                         style={{ color: showEmoji ? '#F5C518' : 'var(--cr-text-muted)' }}>
                         <Smile className="w-5 h-5" />

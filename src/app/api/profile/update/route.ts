@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/lib/session'
+import { getSession, createSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(req: Request) {
@@ -70,6 +70,12 @@ export async function PATCH(req: Request) {
     data,
     select: { firstName: true, lastName: true, username: true, bio: true, level: true },
   })
+
+  // The session cookie carries a signed `username` claim (used by DashboardLayout,
+  // notification sender fields, etc.) — re-sign it so it doesn't go stale after a rename.
+  if (data.username) {
+    await createSession(session.userId, updated.username)
+  }
 
   return NextResponse.json({
     name:     `${updated.firstName} ${updated.lastName}`.trim(),
