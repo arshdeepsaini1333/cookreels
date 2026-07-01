@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { blockedUserFilter } from '@/lib/blocks'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' }
 
@@ -9,7 +10,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const users = await prisma.user.findMany({
-    where: { isActive: true },
+    where: { isActive: true, NOT: blockedUserFilter(session.userId) },
     select: {
       id: true,
       username: true,

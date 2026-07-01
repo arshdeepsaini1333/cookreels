@@ -8,13 +8,14 @@ import {
   UserPlus, UserCheck, ChefHat, Flame, Heart, Play,
   Bookmark, Clock, Film, Eye, BadgeCheck,
   Lock, X, Edit3, Plus, ChevronRight,
-  Key, EyeOff,
+  Key, EyeOff, ShieldOff,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
 import { AddContentModal } from '@/components/shared/AddContentModal'
 import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
+import { BlockedUsersModal } from '@/components/profile/BlockedUsersModal'
 import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCropModal'
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
@@ -452,6 +453,7 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
   const { theme, toggleTheme } = useTheme()
   const [privacy, setPrivacy] = useState({ hideLikeCount: false, blockComments: false, privateAccount: false })
   const [loaded, setLoaded] = useState(false)
+  const [showBlockedUsers, setShowBlockedUsers] = useState(false)
 
   useEffect(() => {
     if (!open || loaded) return
@@ -474,6 +476,7 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
   }
 
   return (
+    <>
     <AnimatePresence>
       {open && (
         <>
@@ -550,6 +553,21 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
                 </div>
               </div>
 
+              {/* Safety */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Safety</p>
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--cr-bg-surface)' }}>
+                  <button
+                    onClick={() => setShowBlockedUsers(true)}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-left"
+                  >
+                    <span style={{ color: 'var(--cr-accent)' }}><ShieldOff className="w-4 h-4" /></span>
+                    <span className="text-sm font-medium flex-1" style={{ color: 'var(--cr-text-1)' }}>Blocked Users</span>
+                    <ChevronRight className="w-4 h-4" style={{ color: 'var(--cr-text-muted)' }} />
+                  </button>
+                </div>
+              </div>
+
               {/* Appearance */}
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Appearance</p>
@@ -569,6 +587,9 @@ function SettingsDrawer({ open, onClose, onEditProfile, onChangePassword, onSetP
         </>
       )}
     </AnimatePresence>
+
+    <BlockedUsersModal isOpen={showBlockedUsers} onClose={() => setShowBlockedUsers(false)} />
+    </>
   )
 }
 

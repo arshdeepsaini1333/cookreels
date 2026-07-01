@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { getBlockRelation } from '@/lib/blocks'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -54,7 +55,11 @@ export async function GET(_req: Request, { params }: Params) {
       })
       isFollowing = !!accepted
     }
-    const canView = !reel.user.privateAccount || isOwner || isFollowing
+    let canView = !reel.user.privateAccount || isOwner || isFollowing
+    if (!isOwner) {
+      const { blockedByViewer, blockedViewer } = await getBlockRelation(session?.userId, reel.user.id)
+      if (blockedByViewer || blockedViewer) canView = false
+    }
     if (!canView) {
       return NextResponse.json(
         { message: 'This account is private', privateAccount: true },

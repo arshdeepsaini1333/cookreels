@@ -56,6 +56,7 @@ interface Conversation {
   lastMessageAt: string | null
   status: 'OPEN' | 'PENDING' | 'DECLINED'
   requestedById: string | null
+  isBlocked: boolean
 }
 
 interface MsgSender {
@@ -817,6 +818,8 @@ interface Props {
 }
 
 export function MessagesPage({ currentUserId, currentUsername, openConvId }: Props) {
+  const router = useRouter()
+
   // ── State ──────────────────────────────────────────────────────────────────
   const [conversations,    setConversations]    = useState<Conversation[]>([])
   const [activeConv,       setActiveConv]       = useState<Conversation | null>(null)
@@ -1028,7 +1031,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   const sendMessage = useCallback(async () => {
     const hasText  = Boolean(inputValue.trim())
     const hasImage = Boolean(imageFile)
-    if ((!hasText && !hasImage) || !activeConv?.id || isSending) return
+    if ((!hasText && !hasImage) || !activeConv?.id || isSending || activeConv?.isBlocked) return
 
     const content = inputValue.trim()
     setInputValue('')
@@ -1207,7 +1210,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
   const requestConvs = filtered.filter(c => c.status === 'PENDING' && c.requestedById !== currentUserId)
 
   const groups  = groupByDate(messages)
-  const canSend = (Boolean(inputValue.trim()) || Boolean(imageFile)) && !isSending && !isUploadingImage
+  const canSend = (Boolean(inputValue.trim()) || Boolean(imageFile)) && !isSending && !isUploadingImage && !activeConv?.isBlocked
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1349,16 +1352,23 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
                   <ArrowLeft className="w-4 h-4" style={{ color: 'var(--cr-text-1)' }} />
                 </motion.button>
 
-                <Avatar name={activeConv.user.name} avatar={activeConv.user.avatar} isOnline={activeConv.user.isOnline} size="md" />
+                <button
+                  type="button"
+                  onClick={() => { if (!activeConv.isBlocked) router.push(`/user/${activeConv.user.username}`) }}
+                  disabled={activeConv.isBlocked}
+                  className={`flex items-center gap-3 flex-1 min-w-0 text-left ${activeConv.isBlocked ? 'cursor-default' : 'cursor-pointer'}`}
+                >
+                  <Avatar name={activeConv.user.name} avatar={activeConv.user.avatar} isOnline={activeConv.user.isOnline} size="md" />
 
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate" style={{ color: 'var(--cr-text-1)' }}>
-                    {activeConv.user.name}
-                  </p>
-                  <p className="text-[11px]" style={{ color: 'var(--cr-text-muted)' }}>
-                    @{activeConv.user.username}
-                  </p>
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate" style={{ color: 'var(--cr-text-1)' }}>
+                      {activeConv.user.name}
+                    </p>
+                    <p className="text-[11px]" style={{ color: 'var(--cr-text-muted)' }}>
+                      @{activeConv.user.username}
+                    </p>
+                  </div>
+                </button>
 
                 {/* Three dots with dropdown */}
                 <div className="relative">
@@ -1438,7 +1448,16 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
               </div>
 
               {/* ── Composer / Request UI ─────────────────────────────────── */}
-              {activeConv.status === 'PENDING' && activeConv.requestedById !== currentUserId ? (
+              {activeConv.isBlocked ? (
+                /* Either party has blocked the other — messaging is disabled */
+                <div className="px-4 py-4 border-t shrink-0 flex flex-col items-center gap-2 text-center"
+                  style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>
+                  <Ban className="w-5 h-5" style={{ color: 'var(--cr-text-muted)' }} />
+                  <p className="text-sm font-medium" style={{ color: 'var(--cr-text-muted)' }}>
+                    You can&apos;t send messages to this conversation
+                  </p>
+                </div>
+              ) : activeConv.status === 'PENDING' && activeConv.requestedById !== currentUserId ? (
                 /* Recipient: Accept / Decline */
                 <div className="px-4 py-4 border-t shrink-0 flex flex-col items-center gap-3"
                   style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}>

@@ -21,7 +21,23 @@
       "Bash(curl -s -o response.html -w \"%{http_code}\\\\n\" http://localhost:3000/user/arshdeep)",
       "Bash(grep -o \"Follow</\\\\|Message</\\\\|min-h-screen\" response.html)",
       "Bash(powershell -Command \"Stop-Process -Id 19568 -Force\")",
-      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/recipe/47f1dbdf-1628-49ba-bff3-ce73b8f01d89)"
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/recipe/47f1dbdf-1628-49ba-bff3-ce73b8f01d89)",
+      "Bash(find \"src/app/api/users\" -type f)",
+      "Bash(find \"src/app/api/social\" -type f)",
+      "Bash(npx prisma *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -X POST http://localhost:3000/api/social/block -H \"Content-Type: application/json\" -d '{\"targetUserId\":\"test\"}' -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(node -e ' *)",
+      "Bash(find src/app -iname \"*search*\" -type d)",
+      "Bash(find src/app -iname \"*search*\")",
+      "Bash(npx tsx -e ' *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/api/search?q=sa\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/api/search?q=ar\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/api/messages/conversations\")",
+      "Bash(powershell -Command \"Stop-Process -Id 24432 -Force\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" \"http://localhost:3000/api/social/blocked\")",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }

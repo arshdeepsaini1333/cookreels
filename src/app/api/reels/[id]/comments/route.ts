@@ -4,11 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { sseBus } from '@/lib/sse'
 import { createNotification } from '@/lib/notifications'
 import { NotificationType } from '@/generated/prisma'
+import { getBlockedUserIds } from '@/lib/blocks'
 
 type Params = { params: Promise<{ id: string }> }
 
 export async function GET(_req: Request, { params }: Params) {
   const { id } = await params
+  const session = await getSession()
 
   const reel = await prisma.reel.findUnique({
     where: { id },
@@ -17,8 +19,15 @@ export async function GET(_req: Request, { params }: Params) {
 
   if (!reel) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const blockedIds = session ? await getBlockedUserIds(session.userId) : []
+
   const comments = await prisma.reelComment.findMany({
-    where: { reelId: id, parentId: null, isBanned: false },
+    where: {
+      reelId: id,
+      parentId: null,
+      isBanned: false,
+      ...(blockedIds.length > 0 ? { userId: { notIn: blockedIds } } : {}),
+    },
     orderBy: { createdAt: 'asc' },
     select: {
       id: true,

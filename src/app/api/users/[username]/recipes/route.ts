@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { getBlockRelation } from '@/lib/blocks'
 
 type Params = { params: Promise<{ username: string }> }
 
@@ -29,6 +30,10 @@ export async function GET(req: Request, { params }: Params) {
         select: { id: true },
       })
       canView = !!accepted
+    }
+    if (!isOwner) {
+      const { blockedByViewer, blockedViewer } = await getBlockRelation(session?.userId, user.id)
+      if (blockedByViewer || blockedViewer) canView = false
     }
     if (!canView) {
       return NextResponse.json(

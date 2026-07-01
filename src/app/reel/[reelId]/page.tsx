@@ -87,12 +87,20 @@ export default async function ReelPage({ params }: Props) {
 
   if (allReels.length === 0) notFound()
 
-  const isFollowing = session
-    ? !!(await prisma.follow.findFirst({
-        where:  { followerId: session.userId, followingId: reel.userId },
-        select: { id: true },
-      }))
-    : false
+  const [isFollowing, currentUser] = await Promise.all([
+    session
+      ? prisma.follow.findFirst({
+          where:  { followerId: session.userId, followingId: reel.userId },
+          select: { id: true },
+        }).then(Boolean)
+      : Promise.resolve(false),
+    session
+      ? prisma.user.findUnique({
+          where:  { id: session.userId },
+          select: { firstName: true, lastName: true, profileImage: true },
+        })
+      : Promise.resolve(null),
+  ])
 
   return (
     <InstagramReelViewer
@@ -109,6 +117,8 @@ export default async function ReelPage({ params }: Props) {
       hideLikeCount={reel.user.hideLikeCount}
       blockComments={reel.user.blockComments}
       currentUserId={session?.userId ?? null}
+      currentUserAvatar={currentUser?.profileImage ?? null}
+      currentUserName={currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : undefined}
       initialIsFollowing={isFollowing}
       isOwnReel={session?.userId === reel.userId}
     />

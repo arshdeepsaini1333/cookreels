@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { MessageStatus } from '@/generated/prisma'
+import { getBlockedUserIds, getBlockRelation } from '@/lib/blocks'
+
+const BLOCKED_PLACEHOLDER = 'cookreel_user'
 
 // GET /api/messages/conversations — mutual friends + existing conversations
 export async function GET() {
@@ -11,7 +14,7 @@ export async function GET() {
   const { userId } = session
 
   try {
-    const [friends, conversations] = await Promise.all([
+    const [friends, conversations, blockedIdList] = await Promise.all([
       // Mutual follows: users who I follow AND who follow me back
       prisma.user.findMany({
         where: {
@@ -53,22 +56,29 @@ export async function GET() {
           },
         },
       }),
+      getBlockedUserIds(userId),
     ])
+
+    const blockedIds = new Set(blockedIdList)
 
     // Shape conversation data — include status and requestedById
     const convData = conversations.map(conv => {
-      const other = conv.user1Id === userId ? conv.user2 : conv.user1
-      const last  = conv.messages[0] ?? null
+      const other     = conv.user1Id === userId ? conv.user2 : conv.user1
+      const last      = conv.messages[0] ?? null
+      const isBlocked = blockedIds.has(other.id)
       return {
         id:   conv.id,
         status:        conv.status,
         requestedById: conv.requestedById,
+        isBlocked,
         user: {
           id:       other.id,
-          name:     `${other.firstName} ${other.lastName}`,
-          username: other.username,
-          avatar:   other.profileImage,
-          isOnline: other.isOnline,
+          // Either direction of block hides the real identity, Instagram-style —
+          // the thread stays visible for history, but the person becomes anonymous.
+          name:     isBlocked ? BLOCKED_PLACEHOLDER : `${other.firstName} ${other.lastName}`,
+          username: isBlocked ? BLOCKED_PLACEHOLDER : other.username,
+          avatar:   isBlocked ? null : other.profileImage,
+          isOnline: isBlocked ? false : other.isOnline,
         },
         lastMessage: last
           ? {
@@ -86,14 +96,17 @@ export async function GET() {
       }
     })
 
-    // Friends who don't have any conversation yet — show at the bottom
+    // Friends who don't have any conversation yet — show at the bottom.
+    // (Blocking already tears down the follow relationship, so a blocked user
+    // shouldn't appear here — the filter is just a defensive safety net.)
     const convFriendIds = new Set(convData.map(c => c.user.id))
     const freshFriends  = friends
-      .filter(f => !convFriendIds.has(f.id))
+      .filter(f => !convFriendIds.has(f.id) && !blockedIds.has(f.id))
       .map(f => ({
         id:            null as string | null,
         status:        'OPEN' as const,
         requestedById: null as string | null,
+        isBlocked:     false,
         user: {
           id:       f.id,
           name:     `${f.firstName} ${f.lastName}`,
@@ -121,6 +134,11 @@ export async function POST(req: NextRequest) {
   const { userId: targetUserId } = await req.json()
   if (!targetUserId || targetUserId === session.userId) {
     return NextResponse.json({ error: 'Invalid target user' }, { status: 400 })
+  }
+
+  const { blockedByViewer, blockedViewer } = await getBlockRelation(session.userId, targetUserId)
+  if (blockedByViewer || blockedViewer) {
+    return NextResponse.json({ error: 'You cannot message this user' }, { status: 403 })
   }
 
   const [user1Id, user2Id] = [session.userId, targetUserId].sort()

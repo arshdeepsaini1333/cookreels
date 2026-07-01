@@ -46,6 +46,8 @@ export interface InstagramReelViewerProps {
   allReels: ViewerReel[]
   creator: ViewerCreator
   currentUserId: string | null
+  currentUserAvatar?: string | null
+  currentUserName?: string
   initialIsFollowing: boolean
   isOwnReel: boolean
   hideLikeCount?: boolean
@@ -164,13 +166,15 @@ function CommentSheetItem({ comment: c, currentUserId, reelId, onDelete }: {
 // ─── CommentSheet ─────────────────────────────────────────────────────────────
 
 function CommentSheet({
-  open, onClose, blockComments, reelId, currentUserId,
+  open, onClose, blockComments, reelId, currentUserId, currentUserAvatar, currentUserName,
 }: {
   open: boolean
   onClose: () => void
   blockComments?: boolean
   reelId: string
   currentUserId: string | null
+  currentUserAvatar?: string | null
+  currentUserName?: string
 }) {
   const [comments,   setComments]   = useState<Comment[]>([])
   const [loading,    setLoading]    = useState(false)
@@ -292,8 +296,20 @@ function CommentSheet({
                     Sign in to comment
                   </p>
                 ) : (
+                  <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
+                    {currentUserAvatar
+                      ? <img src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
+                      : <div
+                          className="w-full h-full flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                        >
+                          {(currentUserName ?? '?').slice(0, 1).toUpperCase()}
+                        </div>
+                    }
+                  </div>
                   <div
-                    className="flex items-center gap-2.5 rounded-full px-4 py-2.5"
+                    className="flex-1 flex items-center gap-2.5 rounded-full px-4 py-2.5"
                     style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
                   >
                     <input
@@ -319,6 +335,7 @@ function CommentSheet({
                         </motion.button>
                       )}
                     </AnimatePresence>
+                  </div>
                   </div>
                 )}
               </div>
@@ -361,9 +378,22 @@ function MobileReelSlot({
   const [following, setFollowing] = useState(initialIsFollowing)
   const [expanded,  setExpanded]  = useState(false)
   const [failed,    setFailed]    = useState(false)
+  const [videoLoading, setVideoLoading] = useState(true)
+  const [posterOk,  setPosterOk]  = useState(true)
   const [shareOpen,  setShareOpen]  = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const gradient = GRADIENTS[index % GRADIENTS.length]
+
+  // Preload the thumbnail so a broken URL never reaches the <video poster>
+  // (a failed poster load otherwise renders the browser's broken-image icon).
+  useEffect(() => {
+    if (!reel.thumbnailUrl) { setPosterOk(false); return }
+    setPosterOk(true)
+    const img = new window.Image()
+    img.onload = () => setPosterOk(true)
+    img.onerror = () => setPosterOk(false)
+    img.src = reel.thumbnailUrl
+  }, [reel.thumbnailUrl])
 
   // Fetch initial like and save state from the server
   useEffect(() => {
@@ -463,13 +493,23 @@ function MobileReelSlot({
           src={reel.videoUrl}
           loop
           playsInline
-          poster={reel.thumbnailUrl ?? undefined}
+          poster={posterOk ? reel.thumbnailUrl ?? undefined : undefined}
           preload={isActive ? 'auto' : 'metadata'}
           className="absolute inset-0 w-full h-full object-cover"
           onPlay={() => setPaused(false)}
           onPause={() => setPaused(true)}
+          onLoadedData={() => setVideoLoading(false)}
+          onPlaying={() => setVideoLoading(false)}
+          onWaiting={() => setVideoLoading(true)}
           onError={() => setFailed(true)}
         />
+      )}
+
+      {/* Loading spinner — shown instead of a broken-image icon while the video/poster loads */}
+      {!failed && videoLoading && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+          <Loader2 className="w-8 h-8 text-white animate-spin" style={{ opacity: 0.85 }} />
+        </div>
       )}
 
       {/* Top gradient overlay */}
@@ -767,6 +807,8 @@ interface DesktopProps {
   reelIndex: number
   totalReels: number
   creator: ViewerCreator
+  currentUserAvatar?: string | null
+  currentUserName?: string
   initialIsFollowing: boolean
   isOwnReel: boolean
   hasPrev: boolean
@@ -782,7 +824,8 @@ interface DesktopProps {
 }
 
 function DesktopReelViewer({
-  reel, reelIndex, totalReels, creator, initialIsFollowing, isOwnReel,
+  reel, reelIndex, totalReels, creator, currentUserAvatar, currentUserName,
+  initialIsFollowing, isOwnReel,
   hasPrev, hasNext, onPrev, onNext, onBack, hideLikeCount, blockComments, currentUserId, showBanner,
   onReportedReel,
 }: DesktopProps) {
@@ -796,6 +839,8 @@ function DesktopReelViewer({
   const [saved,      setSaved]      = useState(false)
   const [following,  setFollowing]  = useState(initialIsFollowing)
   const [failed,     setFailed]     = useState(false)
+  const [videoLoading, setVideoLoading] = useState(true)
+  const [posterOk,   setPosterOk]   = useState(true)
   const [comment,    setComment]    = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [comments,   setComments]   = useState<Comment[]>([])
@@ -803,6 +848,17 @@ function DesktopReelViewer({
   const [shareOpen,  setShareOpen]  = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const gradient = GRADIENTS[reelIndex % GRADIENTS.length]
+
+  // Preload the thumbnail so a broken URL never reaches the <video poster>
+  // (a failed poster load otherwise renders the browser's broken-image icon).
+  useEffect(() => {
+    if (!reel.thumbnailUrl) { setPosterOk(false); return }
+    setPosterOk(true)
+    const img = new window.Image()
+    img.onload = () => setPosterOk(true)
+    img.onerror = () => setPosterOk(false)
+    img.src = reel.thumbnailUrl
+  }, [reel.thumbnailUrl])
 
   // Fetch initial like/save state and comments when reel changes
   useEffect(() => {
@@ -837,6 +893,7 @@ function DesktopReelViewer({
     v.muted = muted
     setPaused(false)
     setFailed(false)
+    setVideoLoading(true)
     setLikeCount(reel.likeCount)
     setLiked(false)
     setSaved(false)
@@ -972,12 +1029,22 @@ function DesktopReelViewer({
                 src={reel.videoUrl}
                 loop
                 playsInline
-                poster={reel.thumbnailUrl ?? undefined}
+                poster={posterOk ? reel.thumbnailUrl ?? undefined : undefined}
                 className="absolute inset-0 w-full h-full object-cover"
                 onPlay={() => setPaused(false)}
                 onPause={() => setPaused(true)}
+                onLoadedData={() => setVideoLoading(false)}
+                onPlaying={() => setVideoLoading(false)}
+                onWaiting={() => setVideoLoading(true)}
                 onError={() => setFailed(true)}
               />
+            )}
+
+            {/* Loading spinner — shown instead of a broken-image icon while the video/poster loads */}
+            {!failed && videoLoading && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 5 }}>
+                <Loader2 className="w-8 h-8 text-white animate-spin" style={{ opacity: 0.85 }} />
+              </div>
             )}
 
             {/* Gradient overlays */}
@@ -1228,12 +1295,14 @@ function DesktopReelViewer({
               ) : (
                 <div className="flex items-center gap-2.5 px-4 pb-4">
                   <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                    {creator.avatar
-                      ? <img src={creator.avatar} alt="" className="w-full h-full object-cover" />
+                    {currentUserAvatar
+                      ? <img src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
                       : <div
-                          className="w-full h-full"
-                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)' }}
-                        />
+                          className="w-full h-full flex items-center justify-center text-[10px] font-bold"
+                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                        >
+                          {(currentUserName ?? '?').slice(0, 1).toUpperCase()}
+                        </div>
                     }
                   </div>
                   <div
@@ -1294,6 +1363,7 @@ function DesktopReelViewer({
 
 export function InstagramReelViewer({
   initialReelId, allReels, creator, currentUserId,
+  currentUserAvatar, currentUserName,
   initialIsFollowing, isOwnReel, hideLikeCount = false, blockComments = false,
   ctxPrev, ctxNext, ctxHasPrev, ctxHasNext,
 }: InstagramReelViewerProps) {
@@ -1491,6 +1561,8 @@ export function InstagramReelViewer({
           blockComments={blockComments}
           reelId={currentReel.id}
           currentUserId={currentUserId}
+          currentUserAvatar={currentUserAvatar}
+          currentUserName={currentUserName}
         />
       </div>
 
@@ -1512,6 +1584,8 @@ export function InstagramReelViewer({
               reelIndex={activeIndex}
               totalReels={allReels.length}
               creator={creator}
+              currentUserAvatar={currentUserAvatar}
+              currentUserName={currentUserName}
               initialIsFollowing={initialIsFollowing}
               isOwnReel={isOwnReel}
               hasPrev={hasPrev}

@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { sseBus } from '@/lib/sse'
 import { createNotification } from '@/lib/notifications'
 import { MessageType, NotificationType } from '@/generated/prisma'
+import { getBlockRelation } from '@/lib/blocks'
 
 // POST /api/messages/send — send a text, image, reel-share, or recipe-share message
 export async function POST(req: NextRequest) {
@@ -65,6 +66,11 @@ export async function POST(req: NextRequest) {
 
   const isUser1     = conv.user1Id === session.userId
   const recipientId = isUser1 ? conv.user2Id : conv.user1Id
+
+  const { blockedByViewer, blockedViewer } = await getBlockRelation(session.userId, recipientId)
+  if (blockedByViewer || blockedViewer) {
+    return NextResponse.json({ error: 'You cannot message this user' }, { status: 403 })
+  }
 
   // Determine the effective message type for IMAGE messages
   const effectiveType: MessageType =

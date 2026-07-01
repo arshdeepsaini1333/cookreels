@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+import type { Prisma } from "@/generated/prisma";
+import { blockedAuthorFilter } from "@/lib/blocks";
 
 function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -59,19 +61,22 @@ export async function GET(req: Request) {
         }
       : {};
 
-    const reportFilter = session
-      ? { NOT: { reports: { some: { reporterId: session.userId } } } }
+    const recipeReportFilter = session
+      ? { NOT: [{ reports: { some: { reporterId: session.userId } } }, blockedAuthorFilter<Prisma.RecipeWhereInput>(session.userId)] }
+      : {};
+    const reelReportFilter = session
+      ? { NOT: [{ reports: { some: { reporterId: session.userId } } }, blockedAuthorFilter<Prisma.ReelWhereInput>(session.userId)] }
       : {};
 
     const recipeWhere  = {
-      ...catFilter, ...qFilter, ...reportFilter,
+      ...catFilter, ...qFilter, ...recipeReportFilter,
       isPublished: true,
       isBanned: false,
       user: { privateAccount: false, isBanned: false },
     };
     const reelQFilter  = q ? { title: { contains: q, mode: "insensitive" as const } } : {};
     const reelWhere    = {
-      ...catFilter, ...reelQFilter, ...reportFilter,
+      ...catFilter, ...reelQFilter, ...reelReportFilter,
       isPublished: true,
       isBanned: false,
       user: { privateAccount: false, isBanned: false },

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@/generated/prisma'
+import { blockedAuthorFilter } from '@/lib/blocks'
 
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' }
 
@@ -13,7 +15,10 @@ export async function GET() {
       isPublished: true,
       isBanned: false,
       user: { privateAccount: false, isBanned: false },
-      NOT: { reports: { some: { reporterId: session.userId } } },
+      NOT: [
+        { reports: { some: { reporterId: session.userId } } },
+        blockedAuthorFilter<Prisma.RecipeWhereInput>(session.userId),
+      ],
     },
     orderBy: { createdAt: 'desc' },
     take: 20,

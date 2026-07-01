@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@/generated/prisma'
+import { blockedAuthorFilter } from '@/lib/blocks'
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -33,8 +35,8 @@ export async function GET(req: NextRequest) {
   const tab = req.nextUrl.searchParams.get('tab')
 
   // Shared filter snippets
-  const recipeReportFilter = { NOT: { reports: { some: { reporterId: uid } } } }
-  const reelReportFilter   = { NOT: { reports: { some: { reporterId: uid } } } }
+  const recipeReportFilter = { NOT: [{ reports: { some: { reporterId: uid } } }, blockedAuthorFilter<Prisma.RecipeWhereInput>(uid)] }
+  const reelReportFilter   = { NOT: [{ reports: { some: { reporterId: uid } } }, blockedAuthorFilter<Prisma.ReelWhereInput>(uid)] }
   const baseUser = { privateAccount: false, isBanned: false }
 
   // ── Trending: most-liked within the past 15 days, shuffled, no pagination ──

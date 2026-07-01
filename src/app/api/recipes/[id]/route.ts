@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { getBlockRelation, getBlockedUserIds } from '@/lib/blocks'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -8,6 +9,7 @@ export async function GET(_req: Request, { params }: Params) {
   try {
     const { id } = await params
     const session = await getSession()
+    const blockedCommenterIds = session ? await getBlockedUserIds(session.userId) : []
 
     const recipe = await prisma.recipe.findUnique({
       where: { id },
@@ -39,7 +41,10 @@ export async function GET(_req: Request, { params }: Params) {
           },
         },
         comments: {
-          where:   { parentId: null },
+          where: {
+            parentId: null,
+            ...(blockedCommenterIds.length > 0 ? { userId: { notIn: blockedCommenterIds } } : {}),
+          },
           orderBy: { createdAt: 'asc' },
           select: {
             id:        true,
@@ -67,6 +72,10 @@ export async function GET(_req: Request, { params }: Params) {
         select: { id: true },
       })
       canView = !!accepted
+    }
+    if (!isOwner) {
+      const { blockedByViewer, blockedViewer } = await getBlockRelation(session?.userId, recipe.user.id)
+      if (blockedByViewer || blockedViewer) canView = false
     }
     if (!canView) {
       return NextResponse.json(

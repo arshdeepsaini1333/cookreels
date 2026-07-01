@@ -7,7 +7,7 @@ import {
   Share2, MessageCircle,
   UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play,
   Clock, Film, Eye, BadgeCheck,
-  Tag, ChevronRight, Lock, Flag,
+  Tag, ChevronRight, Lock, Flag, Ban, ShieldOff,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
@@ -16,6 +16,7 @@ import { SocialListModal } from '@/components/profile/SocialListModal'
 import type { SocialListType } from '@/components/profile/SocialListModal'
 import { ReportModal } from '@/components/shared/ReportModal'
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
+import { BlockConfirmModal } from '@/components/shared/BlockConfirmModal'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -31,6 +32,7 @@ export interface PublicProfilePageProps {
   initialFollowStatus:  'none' | 'pending' | 'accepted'
   initialIsFollowedBy:  boolean
   isPrivate:            boolean
+  initialIsBlockedByViewer: boolean
 }
 
 // ─── Animation presets 
@@ -367,6 +369,7 @@ export function PublicProfilePage({
   initialFollowStatus,
   initialIsFollowedBy,
   isPrivate,
+  initialIsBlockedByViewer,
 }: PublicProfilePageProps) {
   const router = useRouter()
   const { theme } = useTheme()
@@ -398,7 +401,12 @@ export function PublicProfilePage({
 
   const [taggedLoaded,     setTaggedLoaded]      = useState(false)
 
+  const [isBlocked,      setIsBlocked]      = useState(initialIsBlockedByViewer)
+  const [blockModalOpen, setBlockModalOpen] = useState(false)
+
   const isFriend = isFollowing && isFollowedBy
+  // Blocking hides content the same way a private, un-followed account would.
+  const isGated = isBlocked || (isPrivate && followStatus !== 'accepted')
 
   // ── Follow / Unfollow / Request / Withdraw
 
@@ -446,6 +454,31 @@ export function PublicProfilePage({
 
     setFollowPending(false)
   }, [currentUserId, followPending, followStatus, router, user.id, rawUsername])
+
+  // ── Block / Unblock ──────────────────────────────────────────────────────────
+
+  const handleToggleBlock = useCallback(async () => {
+    if (!isBlocked) {
+      const res = await fetch('/api/social/block', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ targetUserId: user.id }),
+      })
+      if (!res.ok) return
+      setIsBlocked(true)
+      // Blocking severs the follow relationship server-side — mirror it locally.
+      if (followStatus === 'accepted') setFollowersCount(c => c - 1)
+      setFollowStatus('none')
+    } else {
+      const res = await fetch('/api/social/block', {
+        method:  'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ targetUserId: user.id }),
+      })
+      if (!res.ok) return
+      setIsBlocked(false)
+    }
+  }, [isBlocked, user.id, followStatus])
 
   // ── Load more recipes ────────────────────────────────────────────────────────
 
@@ -592,34 +625,49 @@ export function PublicProfilePage({
 
             {/* Desktop action buttons */}
             <div className="hidden sm:flex items-center gap-2 pb-3">
-              <motion.button
-                onClick={handleFollow}
-                disabled={followPending}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow-md transition-all disabled:opacity-70"
-                style={followBtnStyle}
-              >
-                {followPending
-                  ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                  : <FollowIcon className="w-3.5 h-3.5" />
-                }
-                {followBtnLabel}
-              </motion.button>
-              <motion.button
-                onClick={handleMessage}
-                disabled={messagePending}
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.97 }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors disabled:opacity-60"
-                style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
-              >
-                {messagePending
-                  ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                  : <MessageCircle className="w-3.5 h-3.5" />
-                }
-                Message
-              </motion.button>
+              {isBlocked ? (
+                <motion.button
+                  onClick={() => setBlockModalOpen(true)}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all"
+                  style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid #EF4444', color: '#EF4444' }}
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  Blocked
+                </motion.button>
+              ) : (
+                <>
+                  <motion.button
+                    onClick={handleFollow}
+                    disabled={followPending}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow-md transition-all disabled:opacity-70"
+                    style={followBtnStyle}
+                  >
+                    {followPending
+                      ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      : <FollowIcon className="w-3.5 h-3.5" />
+                    }
+                    {followBtnLabel}
+                  </motion.button>
+                  <motion.button
+                    onClick={handleMessage}
+                    disabled={messagePending}
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold border transition-colors disabled:opacity-60"
+                    style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
+                  >
+                    {messagePending
+                      ? <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      : <MessageCircle className="w-3.5 h-3.5" />
+                    }
+                    Message
+                  </motion.button>
+                </>
+              )}
               <motion.button
                 onClick={handleShare}
                 whileHover={{ scale: 1.04 }}
@@ -633,6 +681,18 @@ export function PublicProfilePage({
                   : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
                 }
               </motion.button>
+              {currentUserId && !isBlocked && (
+                <motion.button
+                  onClick={() => setBlockModalOpen(true)}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center border transition-all"
+                  style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+                  title="Block user"
+                >
+                  <ShieldOff className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+                </motion.button>
+              )}
               {currentUserId && (
                 <motion.button
                   onClick={() => setReportOpen(true)}
@@ -702,32 +762,46 @@ export function PublicProfilePage({
 
           {/* Mobile action buttons */}
           <div className="flex sm:hidden gap-2 mt-4">
-            <motion.button
-              onClick={handleFollow}
-              disabled={followPending}
-              whileTap={{ scale: 0.97 }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold transition-all disabled:opacity-70"
-              style={followBtnStyle}
-            >
-              {followPending
-                ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                : <FollowIcon className="w-4 h-4" />
-              }
-              {followBtnLabel}
-            </motion.button>
-            <motion.button
-              onClick={handleMessage}
-              disabled={messagePending}
-              whileTap={{ scale: 0.97 }}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold border disabled:opacity-60"
-              style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
-            >
-              {messagePending
-                ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                : <MessageCircle className="w-4 h-4" />
-              }
-              Message
-            </motion.button>
+            {isBlocked ? (
+              <motion.button
+                onClick={() => setBlockModalOpen(true)}
+                whileTap={{ scale: 0.97 }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold transition-all"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid #EF4444', color: '#EF4444' }}
+              >
+                <Ban className="w-4 h-4" />
+                Blocked
+              </motion.button>
+            ) : (
+              <>
+                <motion.button
+                  onClick={handleFollow}
+                  disabled={followPending}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold transition-all disabled:opacity-70"
+                  style={followBtnStyle}
+                >
+                  {followPending
+                    ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    : <FollowIcon className="w-4 h-4" />
+                  }
+                  {followBtnLabel}
+                </motion.button>
+                <motion.button
+                  onClick={handleMessage}
+                  disabled={messagePending}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-sm font-semibold border disabled:opacity-60"
+                  style={{ borderColor: 'var(--cr-border)', color: 'var(--cr-text-1)', background: 'var(--cr-bg-card)' }}
+                >
+                  {messagePending
+                    ? <span className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    : <MessageCircle className="w-4 h-4" />
+                  }
+                  Message
+                </motion.button>
+              </>
+            )}
             <motion.button
               onClick={handleShare}
               whileTap={{ scale: 0.97 }}
@@ -740,6 +814,17 @@ export function PublicProfilePage({
                 : <Share2 className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
               }
             </motion.button>
+            {currentUserId && !isBlocked && (
+              <motion.button
+                onClick={() => setBlockModalOpen(true)}
+                whileTap={{ scale: 0.97 }}
+                className="w-11 h-11 rounded-full flex items-center justify-center border"
+                style={{ borderColor: 'var(--cr-border)', background: 'var(--cr-bg-card)' }}
+                title="Block user"
+              >
+                <ShieldOff className="w-4 h-4" style={{ color: 'var(--cr-text-2)' }} />
+              </motion.button>
+            )}
             {currentUserId && (
               <motion.button
                 onClick={() => setReportOpen(true)}
@@ -786,8 +871,8 @@ export function PublicProfilePage({
           ))}
         </motion.div>
 
-        {/* ── PRIVATE ACCOUNT GATE ────────────────────────── */}
-        {isPrivate && followStatus !== 'accepted' && (
+        {/* ── PRIVATE / BLOCKED ACCOUNT GATE ────────────────── */}
+        {isGated && (
           <motion.div
             className="flex flex-col items-center py-16 px-4 mt-6"
             initial={{ opacity: 0, y: 16 }}
@@ -798,21 +883,37 @@ export function PublicProfilePage({
               className="w-20 h-20 rounded-full flex items-center justify-center mb-5"
               style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
             >
-              <Lock className="w-9 h-9" style={{ color: 'var(--cr-text-muted)' }} />
+              {isBlocked
+                ? <Ban className="w-9 h-9" style={{ color: '#EF4444' }} />
+                : <Lock className="w-9 h-9" style={{ color: 'var(--cr-text-muted)' }} />
+              }
             </div>
             <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--cr-text-1)', fontFamily: 'var(--font-heading)' }}>
-              This account is private
+              {isBlocked ? 'You blocked this account' : 'This account is private'}
             </h2>
             <p className="text-sm text-center max-w-xs leading-relaxed" style={{ color: 'var(--cr-text-muted)' }}>
-              {followStatus === 'pending'
-                ? "Your follow request is pending. Once approved, you'll be able to see their recipes and reels."
-                : 'Follow this account to see their recipes and reels.'}
+              {isBlocked
+                ? 'Unblock to see their recipes and reels again.'
+                : followStatus === 'pending'
+                  ? "Your follow request is pending. Once approved, you'll be able to see their recipes and reels."
+                  : 'Follow this account to see their recipes and reels.'}
             </p>
+            {isBlocked && (
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setBlockModalOpen(true)}
+                className="mt-5 flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold shadow-md"
+                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+              >
+                Unblock
+              </motion.button>
+            )}
           </motion.div>
         )}
 
         {/* ── STICKY TAB NAVIGATION ────────────────────────── */}
-        {(!isPrivate || followStatus === 'accepted') && <div
+        {!isGated && <div
           className="sticky top-0 z-20 mt-6 border-b"
           style={{ background: 'var(--cr-bg-surface)', borderColor: 'var(--cr-border)' }}
         >
@@ -842,7 +943,7 @@ export function PublicProfilePage({
         </div>}
 
         {/* ── TAB CONTENT ──────────────────────────────────── */}
-        {(!isPrivate || followStatus === 'accepted') && <div className="mt-5 px-4 pb-8">
+        {!isGated && <div className="mt-5 px-4 pb-8">
           <AnimatePresence mode="wait">
 
             {/* RECIPES */}
@@ -941,6 +1042,15 @@ export function PublicProfilePage({
         onClose={() => setReportOpen(false)}
         targetType="USER"
         targetId={user.id}
+      />
+
+      {/* Block / unblock confirm modal */}
+      <BlockConfirmModal
+        isOpen={blockModalOpen}
+        onClose={() => setBlockModalOpen(false)}
+        onConfirm={handleToggleBlock}
+        userName={user.name}
+        action={isBlocked ? 'unblock' : 'block'}
       />
     </>
   )

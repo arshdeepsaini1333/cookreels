@@ -211,6 +211,11 @@ export async function fetchReelsFeedCursor(
           SELECT 1 FROM reports rep
           WHERE rep."reporterId" = ${userId} AND rep."targetReelId" = r.id
         )
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b."blockerId" = ${userId} AND b."blockedId" = r."userId")
+             OR (b."blockerId" = r."userId" AND b."blockedId" = ${userId})
+        )
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed
@@ -282,6 +287,11 @@ export async function fetchReelById(
       WHERE r."isPublished" = true AND r."isBanned" = false AND r.id = ${reelId}
         AND u."isBanned" = false
         AND (u."privateAccount" = false OR r."userId" = ${userId} OR (f1."followingId" IS NOT NULL AND f1.status = 'ACCEPTED'))
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b."blockerId" = ${userId} AND b."blockedId" = r."userId")
+             OR (b."blockerId" = r."userId" AND b."blockedId" = ${userId})
+        )
       GROUP BY r.id, u.id
     )
     SELECT * FROM feed
@@ -351,6 +361,11 @@ export async function fetchReelsFeed(
         AND NOT EXISTS (
           SELECT 1 FROM reports rep
           WHERE rep."reporterId" = ${userId} AND rep."targetReelId" = r.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM blocks b
+          WHERE (b."blockerId" = ${userId} AND b."blockedId" = r."userId")
+             OR (b."blockerId" = r."userId" AND b."blockedId" = ${userId})
         )
       GROUP BY r.id, u.id
     )

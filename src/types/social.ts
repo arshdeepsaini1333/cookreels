@@ -31,3 +31,20 @@ export interface PaginatedUsers {
   page: number
   totalPages: number
 }
+
+export interface BlockedUser {
+  id: string
+  firstName: string
+  lastName: string
+  username: string
+  profileImage: string | null
+  isVerified: boolean
+  blockedAt: string
+}
+
+export interface PaginatedBlockedUsers {
+  users: BlockedUser[]
+  total: number
+  page: number
+  totalPages: number
+}

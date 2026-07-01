@@ -3,8 +3,10 @@ import { cache } from 'react'
 import type { Metadata } from 'next'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
+import { getBlockRelation } from '@/lib/blocks'
 import { PublicProfilePage } from '@/components/profile/PublicProfilePage'
 import { ProfilePage } from '@/components/profile/ProfilePage'
+import { BlockedProfileNotice } from '@/components/profile/BlockedProfileNotice'
 
 type Props = {
   params: Promise<{ username: string }>
@@ -112,6 +114,14 @@ export default async function Page({ params }: Props) {
   const [user, session] = await Promise.all([fetchUser(username), getSession()])
 
   if (!user) notFound()
+
+  const blockRelation = await getBlockRelation(session?.userId, user.id)
+
+  // Profile owner has blocked the viewer — treat the link as unreachable,
+  // Instagram-style, without revealing that a block is the reason.
+  if (blockRelation.blockedViewer) {
+    return <BlockedProfileNotice />
+  }
 
   // ── Own profile ────────────────────────────────────────────────────────────
   if (session?.userId === user.id) {
@@ -300,8 +310,9 @@ export default async function Page({ params }: Props) {
     : fwdRecord.status === 'PENDING' ? 'pending' : 'accepted'
   const isFollowedBy = !!revRecord
 
-  // Hide content from private accounts unless viewer is an accepted follower or the owner
-  const canSeeContent = !user.privateAccount || followStatus === 'accepted'
+  // Hide content from private accounts unless viewer is an accepted follower or the owner.
+  // Also hide content once the viewer has blocked this account — they've chosen not to see it.
+  const canSeeContent = (!user.privateAccount || followStatus === 'accepted') && !blockRelation.blockedByViewer
 
   return (
     <PublicProfilePage
@@ -350,6 +361,7 @@ export default async function Page({ params }: Props) {
       initialFollowStatus={followStatus}
       initialIsFollowedBy={isFollowedBy}
       isPrivate={user.privateAccount}
+      initialIsBlockedByViewer={blockRelation.blockedByViewer}
     />
   )
 }
