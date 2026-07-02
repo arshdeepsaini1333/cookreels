@@ -22,7 +22,7 @@ export async function GET() {
           followers: { some: { followerId: userId } },
           following: { some: { followingId: userId } },
         },
-        select: { id: true, firstName: true, lastName: true, username: true, profileImage: true, isOnline: true },
+        select: { id: true, firstName: true, lastName: true, username: true, profileImage: true },
       }),
       // Existing DM threads — exclude hidden and declined
       prisma.conversation.findMany({
@@ -35,8 +35,8 @@ export async function GET() {
         },
         orderBy: { lastMessageAt: 'desc' },
         include: {
-          user1: { select: { id: true, firstName: true, lastName: true, username: true, profileImage: true, isOnline: true } },
-          user2: { select: { id: true, firstName: true, lastName: true, username: true, profileImage: true, isOnline: true } },
+          user1: { select: { id: true, firstName: true, lastName: true, username: true, profileImage: true } },
+          user2: { select: { id: true, firstName: true, lastName: true, username: true, profileImage: true } },
           messages: {
             orderBy: { createdAt: 'desc' },
             take:    1,
@@ -78,7 +78,6 @@ export async function GET() {
           name:     isBlocked ? BLOCKED_PLACEHOLDER : `${other.firstName} ${other.lastName}`,
           username: isBlocked ? BLOCKED_PLACEHOLDER : other.username,
           avatar:   isBlocked ? null : other.profileImage,
-          isOnline: isBlocked ? false : other.isOnline,
         },
         lastMessage: last
           ? {
@@ -112,7 +111,6 @@ export async function GET() {
           name:     `${f.firstName} ${f.lastName}`,
           username: f.username,
           avatar:   f.profileImage,
-          isOnline: f.isOnline,
         },
         lastMessage:   null,
         unreadCount:   0,

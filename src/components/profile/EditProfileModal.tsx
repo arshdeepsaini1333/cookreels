@@ -61,6 +61,8 @@ export function EditProfileModal({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl ?? null)
   const [cropModal, setCropModal] = useState<{ type: 'avatar' | 'cover'; file: File } | null>(null)
   const [imgError,  setImgError]  = useState<string | null>(null)
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false)
+  useEffect(() => { setAvatarLoadFailed(false) }, [avatarUrl])
 
   const coverInputRef  = useRef<HTMLInputElement>(null)
   const avatarInputRef = useRef<HTMLInputElement>(null)
@@ -264,8 +266,8 @@ export function EditProfileModal({
                           className="w-full h-full rounded-full overflow-hidden"
                           style={{ border: '2.5px solid var(--cr-bg-card)' }}
                         >
-                          {avatarUrl ? (
-                            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                          {avatarUrl && !avatarLoadFailed ? (
+                            <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={() => setAvatarLoadFailed(true)} />
                           ) : (
                             <div
                               className="w-full h-full flex items-center justify-center text-lg font-bold"

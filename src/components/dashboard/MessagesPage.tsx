@@ -21,7 +21,6 @@ interface ConvUser {
   name: string
   username: string
   avatar: string | null
-  isOnline: boolean
 }
 
 interface LastMessage {
@@ -143,19 +142,20 @@ function initials(name: string | null | undefined) {
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg'
 
 function Avatar({
-  name, avatar, isOnline, size = 'md',
+  name, avatar, size = 'md',
 }: {
-  name: string; avatar: string | null; isOnline?: boolean; size?: AvatarSize
+  name: string; avatar: string | null; size?: AvatarSize
 }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [avatar])
   const ring = { xs: 'w-6 h-6', sm: 'w-8 h-8', md: 'w-10 h-10', lg: 'w-13 h-13' }[size]
-  const dot  = { xs: 'w-1.5 h-1.5 bottom-0 right-0', sm: 'w-2 h-2 bottom-0 right-0', md: 'w-2.5 h-2.5 bottom-0 right-0', lg: 'w-3 h-3 bottom-0.5 right-0.5' }[size]
   const text = { xs: 'text-[9px]', sm: 'text-[10px]', md: 'text-xs', lg: 'text-sm' }[size]
 
   return (
     <div className="relative shrink-0">
       <div className={`${ring} rounded-full overflow-hidden ring-2 ring-[#F5C518]/25`}>
-        {avatar && !/googleusercontent\.com/i.test(avatar) ? (
-          <ProtectedImg src={avatar} alt={name} className="w-full h-full object-cover" />
+        {avatar && !failed && !/googleusercontent\.com/i.test(avatar) ? (
+          <ProtectedImg src={avatar} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
         ) : (
           <div className={`w-full h-full flex items-center justify-center font-bold ${text}`}
             style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
@@ -163,10 +163,6 @@ function Avatar({
           </div>
         )}
       </div>
-      {isOnline !== undefined && (
-        <span className={`absolute ${dot} rounded-full ring-2 ring-[var(--cr-bg-card)]`}
-          style={{ background: isOnline ? '#22c55e' : 'var(--cr-border)' }} />
-      )}
     </div>
   )
 }
@@ -221,7 +217,7 @@ function ConversationItem({
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-left transition-colors"
       style={{ background: isActive ? 'rgba(245,197,24,0.10)' : 'transparent', borderLeft: `3px solid ${isActive ? '#F5C518' : 'transparent'}` }}
     >
-      <Avatar name={conv.user.name} avatar={conv.user.avatar} isOnline={conv.user.isOnline} size="md" />
+      <Avatar name={conv.user.name} avatar={conv.user.avatar} size="md" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-1">
           <span className="text-sm truncate"
@@ -499,6 +495,7 @@ function MessageBubble({
 }) {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const touchPos       = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [avatarFailed, setAvatarFailed] = useState(false)
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const t = e.touches[0]
@@ -554,8 +551,8 @@ function MessageBubble({
       <div className="w-6 shrink-0 self-end mb-1">
         {!isMine && showAvatar && (
           <div className="w-6 h-6 rounded-full overflow-hidden ring-1 ring-[#F5C518]/20">
-            {message.sender.profileImage && !/googleusercontent\.com/i.test(message.sender.profileImage) ? (
-              <ProtectedImg src={message.sender.profileImage} alt="" className="w-full h-full object-cover" />
+            {message.sender.profileImage && !avatarFailed && !/googleusercontent\.com/i.test(message.sender.profileImage) ? (
+              <ProtectedImg src={message.sender.profileImage} alt="" className="w-full h-full object-cover" onError={() => setAvatarFailed(true)} />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[8px] font-bold"
                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
@@ -1378,7 +1375,7 @@ export function MessagesPage({ currentUserId, currentUsername, openConvId }: Pro
                   disabled={activeConv.isBlocked}
                   className={`flex items-center gap-3 flex-1 min-w-0 text-left ${activeConv.isBlocked ? 'cursor-default' : 'cursor-pointer'}`}
                 >
-                  <Avatar name={activeConv.user.name} avatar={activeConv.user.avatar} isOnline={activeConv.user.isOnline} size="md" />
+                  <Avatar name={activeConv.user.name} avatar={activeConv.user.avatar} size="md" />
 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold truncate" style={{ color: 'var(--cr-text-1)' }}>

@@ -9,10 +9,11 @@ import { useTheme } from '@/context/ThemeContext'
 import {
   Megaphone, Rocket, BarChart2, Users, MapPin, TrendingUp, Globe,
   Eye, MousePointer, DollarSign, Target, Zap, ChevronRight,
-  Plus, Play, PenLine, Pause, Trash2, MoreHorizontal,
+  Plus, Play, PenLine, Pause, Trash2, MoreHorizontal, Smartphone,
   CheckCircle2, Clock, XCircle, FileText, Film,
   ArrowRight, Sparkles,
 } from 'lucide-react'
+import CampaignPreviewModal from './CampaignPreviewModal'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ const TABS: { id: CampaignTab; label: string }[] = [
 
 // ─── Campaign Row ─────────────────────────────────────────────────────────────
 
-function CampaignRow({ campaign, isDark, onRefresh }: { campaign: Campaign; isDark: boolean; onRefresh: () => void }) {
+function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Campaign; isDark: boolean; onRefresh: () => void; onPreview: (id: string) => void }) {
   const [menuOpen, setMenuOpen]     = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [acting, setActing]         = useState(false)
@@ -227,7 +228,8 @@ function CampaignRow({ campaign, isDark, onRefresh }: { campaign: Campaign; isDa
   }
 
   const menuItems = [
-    { icon: Eye,     label: 'View', href: `/boost/create?id=${campaign.id}` },
+    { icon: Eye,        label: 'View',    href: `/boost/create?id=${campaign.id}` },
+    { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(campaign.id) } },
     ...(campaign.status === 'draft' ? [{ icon: PenLine, label: 'Edit', href: `/boost/create?id=${campaign.id}&edit=true` }] : []),
     ...(campaign.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),
     ...(campaign.status === 'paused' ? [{ icon: Play,  label: 'Resume', onClick: () => doStatusAction('resume') }] : []),
@@ -474,6 +476,7 @@ export function BoostCenter({ username }: { username: string }) {
   const [loading, setLoading]       = useState(true)
   const [activeTab, setActiveTab]   = useState<CampaignTab>('all')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [previewId, setPreviewId]   = useState<string | null>(null)
 
   const refresh = useCallback(() => setRefreshKey(k => k + 1), [])
 
@@ -825,7 +828,7 @@ export function BoostCenter({ username }: { username: string }) {
           ) : filteredCampaigns.length > 0 ? (
             <div className="space-y-1.5">
               {filteredCampaigns.map(c => (
-                <CampaignRow key={c.id} campaign={c} isDark={isDark} onRefresh={refresh} />
+                <CampaignRow key={c.id} campaign={c} isDark={isDark} onRefresh={refresh} onPreview={setPreviewId} />
               ))}
             </div>
           ) : (
@@ -992,6 +995,8 @@ export function BoostCenter({ username }: { username: string }) {
 
       {/* ── Why Advertise on CookReels (premium comparison section) ──────── */}
       <WhyAdvertiseCookReels />
+
+      <CampaignPreviewModal campaignId={previewId} onClose={() => setPreviewId(null)} />
     </div>
   )
 }

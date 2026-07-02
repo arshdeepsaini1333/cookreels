@@ -35,7 +35,7 @@ export async function GET(req: Request) {
         select: {
           id: true, firstName: true, lastName: true, username: true,
           profileImage: true, bio: true, cuisineSpecialty: true,
-          level: true, isVerified: true, isOnline: true,
+          level: true, isVerified: true,
           // Do I follow them?
           followers: { where: { followerId: userId }, select: { id: true } },
           // Do they follow me?
@@ -57,7 +57,7 @@ export async function GET(req: Request) {
           id: u.id, firstName: u.firstName, lastName: u.lastName,
           username: u.username, profileImage: u.profileImage, bio: u.bio,
           cuisineSpecialty: u.cuisineSpecialty, level: u.level,
-          isVerified: u.isVerified, isOnline: u.isOnline,
+          isVerified: u.isVerified,
           followersCount: u._count.followers, followingCount: u._count.following,
           isFollowing, isFollowedBy, isFriend: isFollowing && isFollowedBy,
         }

@@ -286,13 +286,16 @@ function GlassBtn({
 // ─── Comment Avatar ───────────────────────────────────────────────────────────
 
 function CommentAvatar({ src, username }: { src: string | null; username: string }) {
-  if (src) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  if (src && !failed) {
     return (
       <ProtectedImg
         src={src}
         alt={username}
         className="w-9 h-9 rounded-full object-cover flex-shrink-0"
         loading="lazy"
+        onError={() => setFailed(true)}
       />
     )
   }
@@ -517,6 +520,7 @@ const ReelCard = memo(function ReelCard({
   const [videoFailed, setVideoFailed] = useState(false)
   const [shareOpen, setShareOpen]     = useState(false)
   const [paused, setPaused]           = useState(false)
+  const [avatarFailed, setAvatarFailed] = useState(false)
   const videoRef      = useRef<HTMLVideoElement>(null)
   const wasActiveRef  = useRef(false)
   const tapRef        = useRef({ count: 0, timer: null as ReturnType<typeof setTimeout> | null })
@@ -752,11 +756,12 @@ const ReelCard = memo(function ReelCard({
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-1.5">
-          {reel.creator.profileImage && !/googleusercontent\.com/i.test(reel.creator.profileImage) ? (
+          {reel.creator.profileImage && !avatarFailed && !/googleusercontent\.com/i.test(reel.creator.profileImage) ? (
             <ProtectedImg
               src={reel.creator.profileImage}
               alt={reel.creator.username}
               className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-2 ring-white/20 shadow-lg"
+              onError={() => setAvatarFailed(true)}
             />
           ) : (
             <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient(reel.creator.username)} flex-shrink-0 flex items-center justify-center ring-2 ring-white/20 shadow-lg`}>

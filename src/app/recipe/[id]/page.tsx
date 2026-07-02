@@ -130,7 +130,6 @@ export default async function RecipePage({ params }: Props) {
     username:         recipe.user.username,
     bio:              recipe.user.bio,
     verified:         recipe.user.isVerified,
-    isOnline:         false,
     topChef:          false,
     level:            'Chef',
     avatar:           recipe.user.profileImage,

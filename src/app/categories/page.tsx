@@ -14,7 +14,7 @@ export default async function CategoriesRoute() {
 
   return (
     <DashboardLayout username={session.username}>
-      <CategoriesPage username={session.username} />
+      <CategoriesPage username={session.username} userId={session.userId} />
     </DashboardLayout>
   )
 }

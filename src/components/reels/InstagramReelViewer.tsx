@@ -10,7 +10,9 @@ import {
 import { ShareModal } from '@/components/shared/ShareModal'
 import { GuestBanner } from '@/components/shared/GuestBanner'
 import { ReportModal } from '@/components/shared/ReportModal'
-import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
+import { UserAvatar } from '@/components/shared/UserAvatar'
 
 // Horizontal slide-in/out, direction-aware (mirrors RecipeViewerModal's slideV)
 const slideV = {
@@ -66,6 +68,8 @@ export interface InstagramReelViewerProps {
   ctxNext?: () => void
   ctxHasPrev?: boolean
   ctxHasNext?: boolean
+  /** Called when the viewer should close. Defaults to router.back(). */
+  onClose?: () => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -119,16 +123,12 @@ function CommentSheetItem({ comment: c, currentUserId, reelId, onDelete }: {
 
   return (
     <div className="flex gap-2.5 group">
-      <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0"
-           style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-        {c.userAvatar
-          ? <ProtectedImg src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
-          : <div className="w-full h-full flex items-center justify-center text-xs font-bold"
-                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-              {c.username.slice(0,1).toUpperCase()}
-            </div>
-        }
-      </div>
+      <UserAvatar
+        src={c.userAvatar}
+        name={c.username}
+        size="w-8 h-8 text-xs"
+        style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+      />
       <div className="flex-1 min-w-0">
         <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
         <p className="text-sm mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
@@ -306,17 +306,7 @@ function CommentSheet({
                   </p>
                 ) : (
                   <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                    {currentUserAvatar
-                      ? <ProtectedImg src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
-                      : <div
-                          className="w-full h-full flex items-center justify-center text-[10px] font-bold"
-                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                        >
-                          {(currentUserName ?? '?').slice(0, 1).toUpperCase()}
-                        </div>
-                    }
-                  </div>
+                  <UserAvatar src={currentUserAvatar} name={currentUserName} size="w-7 h-7 text-[10px]" />
                   <div
                     className="flex-1 flex items-center gap-2.5 rounded-full px-4 py-2.5"
                     style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
@@ -391,6 +381,7 @@ function MobileReelSlot({
   const [posterOk,  setPosterOk]  = useState(true)
   const [shareOpen,  setShareOpen]  = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false)
   const gradient = GRADIENTS[index % GRADIENTS.length]
 
   // Preload the thumbnail so a broken URL never reaches the <video poster>
@@ -653,17 +644,7 @@ function MobileReelSlot({
             className="flex items-center gap-2.5 min-w-0 cursor-pointer"
             onClick={e => { e.stopPropagation(); router.push(`/user/${creator.username.replace(/^@/, '')}`) }}
           >
-            <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-white/40 flex-shrink-0">
-              {creator.avatar
-                ? <ProtectedImg src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
-                : <div
-                    className="w-full h-full flex items-center justify-center font-bold text-sm"
-                    style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                  >
-                    {creator.name.slice(0, 1).toUpperCase()}
-                  </div>
-              }
-            </div>
+            <UserAvatar src={creator.avatar} name={creator.name} size="w-10 h-10 text-sm ring-2 ring-white/40" />
 
             <div className="flex items-center gap-1.5 min-w-0">
               <span
@@ -684,7 +665,7 @@ function MobileReelSlot({
           {!isOwnReel && (
             <motion.button
               whileTap={{ scale: 0.93 }}
-              onClick={() => setFollowing(f => !f)}
+              onClick={() => { currentUserId ? setFollowing(f => !f) : setLoginPromptOpen(true) }}
               className="ml-auto px-3.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 transition-all"
               style={following
                 ? { border: '1.5px solid rgba(255,255,255,0.65)', color: 'white', background: 'transparent' }
@@ -728,6 +709,13 @@ function MobileReelSlot({
       targetId={reel.id}
       onReported={onReportedReel}
     />
+    <LoginPromptModal
+      isOpen={loginPromptOpen}
+      onClose={() => setLoginPromptOpen(false)}
+      redirectTo={`/reel/${reel.id}`}
+      title="Login to follow"
+      message={`Sign in to follow ${creator.username} and see more from them.`}
+    />
     </>
   )
 }
@@ -756,16 +744,12 @@ function DesktopCommentItem({ comment: c, currentUserId, reelId, onDelete }: {
 
   return (
     <div className="flex gap-2 group">
-      <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0"
-           style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}>
-        {c.userAvatar
-          ? <ProtectedImg src={c.userAvatar} alt={c.username} className="w-full h-full object-cover" />
-          : <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
-                 style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
-              {c.username.slice(0,1).toUpperCase()}
-            </div>
-        }
-      </div>
+      <UserAvatar
+        src={c.userAvatar}
+        name={c.username}
+        size="w-7 h-7 text-[10px]"
+        style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
+      />
       <div className="flex-1 min-w-0">
         <span className="text-xs font-bold" style={{ color: 'var(--cr-text-1)' }}>@{c.username}</span>
         <p className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--cr-text-2)' }}>{c.text}</p>
@@ -856,6 +840,7 @@ function DesktopReelViewer({
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [shareOpen,  setShareOpen]  = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false)
   const gradient = GRADIENTS[reelIndex % GRADIENTS.length]
 
   // Preload the thumbnail so a broken URL never reaches the <video poster>
@@ -1009,13 +994,14 @@ function DesktopReelViewer({
       {/* Centered card — click outside to close */}
       <div
         className="absolute inset-0 flex items-center justify-center p-4 lg:p-6"
+        style={showBanner ? { top: 'calc(60px + env(safe-area-inset-top, 0px))' } : undefined}
         onClick={onBack}
       >
         <div
           className="flex rounded-3xl overflow-hidden w-full"
           style={{
             maxWidth: '880px',
-            height: 'min(86vh, 680px)',
+            height: 'min(86dvh, 680px)',
             background: 'var(--cr-bg-card)',
             boxShadow: '0 8px 40px rgba(0,0,0,0.18), 0 0 0 1px rgba(245,197,24,0.06)',
           }}
@@ -1103,18 +1089,12 @@ function DesktopReelViewer({
                 className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                 onClick={() => router.push(`/user/${creator.username.replace(/^@/, '')}`)}
               >
-                <div className="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0"
-                     style={{ '--tw-ring-color': 'var(--cr-accent)' } as React.CSSProperties}>
-                  {creator.avatar
-                    ? <ProtectedImg src={creator.avatar} alt={creator.name} className="w-full h-full object-cover" />
-                    : <div
-                        className="w-full h-full flex items-center justify-center font-bold text-sm"
-                        style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                      >
-                        {creator.name.slice(0, 1).toUpperCase()}
-                      </div>
-                  }
-                </div>
+                <UserAvatar
+                  src={creator.avatar}
+                  name={creator.name}
+                  size="w-10 h-10 text-sm ring-2"
+                  style={{ '--tw-ring-color': 'var(--cr-accent)' } as React.CSSProperties}
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -1140,7 +1120,7 @@ function DesktopReelViewer({
               {!isOwnReel && (
                 <motion.button
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => setFollowing(f => !f)}
+                  onClick={() => { currentUserId ? setFollowing(f => !f) : setLoginPromptOpen(true) }}
                   className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex-shrink-0"
                   style={following
                     ? { border: '1px solid var(--cr-border)', color: 'var(--cr-text-1)', background: 'transparent' }
@@ -1303,17 +1283,7 @@ function DesktopReelViewer({
                 </p>
               ) : (
                 <div className="flex items-center gap-2.5 px-4 pb-4">
-                  <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0">
-                    {currentUserAvatar
-                      ? <ProtectedImg src={currentUserAvatar} alt="" className="w-full h-full object-cover" />
-                      : <div
-                          className="w-full h-full flex items-center justify-center text-[10px] font-bold"
-                          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
-                        >
-                          {(currentUserName ?? '?').slice(0, 1).toUpperCase()}
-                        </div>
-                    }
-                  </div>
+                  <UserAvatar src={currentUserAvatar} name={currentUserName} size="w-7 h-7 text-[10px]" />
                   <div
                     className="flex-1 flex items-center gap-2 rounded-full px-3.5 py-2"
                     style={{ background: 'var(--cr-bg-surface)', border: '1px solid var(--cr-border)' }}
@@ -1364,6 +1334,13 @@ function DesktopReelViewer({
         targetId={reel.id}
         onReported={onReportedReel}
       />
+      <LoginPromptModal
+        isOpen={loginPromptOpen}
+        onClose={() => setLoginPromptOpen(false)}
+        redirectTo={`/reel/${reel.id}`}
+        title="Login to follow"
+        message={`Sign in to follow ${creator.username} and see more from them.`}
+      />
     </>
   )
 }
@@ -1374,9 +1351,10 @@ export function InstagramReelViewer({
   initialReelId, allReels, creator, currentUserId,
   currentUserAvatar, currentUserName,
   initialIsFollowing, isOwnReel, hideLikeCount = false, blockComments = false,
-  ctxPrev, ctxNext, ctxHasPrev, ctxHasNext,
+  ctxPrev, ctxNext, ctxHasPrev, ctxHasNext, onClose,
 }: InstagramReelViewerProps) {
   const router = useRouter()
+  const handleClose = onClose ?? (() => router.back())
   const initialIndex = Math.max(0, allReels.findIndex(r => r.id === initialReelId))
 
   const [activeIndex,       setActiveIndex]       = useState(initialIndex)
@@ -1476,7 +1454,7 @@ export function InstagramReelViewer({
       >
         {/* Sticky back button — always above the video */}
         <button
-          onClick={() => router.back()}
+          onClick={handleClose}
           aria-label="Go back"
           className="fixed w-10 h-10 rounded-full bg-black/50 backdrop-blur-md flex items-center justify-center"
           style={{
@@ -1544,22 +1522,34 @@ export function InstagramReelViewer({
               </motion.div>
             </AnimatePresence>
           ) : (
+            // Virtualised: only the active slot and its immediate neighbours get a real
+            // <video> element. Mounting every reel unconditionally (as this used to)
+            // fired off a network request per reel — up to 60 concurrent video loads —
+            // which starved the active video's connection and made it slow or never play.
             allReels.map((reel, i) => (
-              <MobileReelSlot
-                key={reel.id}
-                reel={reel}
-                index={i}
-                isActive={i === activeIndex}
-                creator={creator}
-                initialIsFollowing={initialIsFollowing}
-                isOwnReel={isOwnReel}
-                globalMuted={globalMuted}
-                onMuteToggle={() => setGlobalMuted(m => !m)}
-                onCommentOpen={() => setCommentSheetOpen(true)}
-                hideLikeCount={hideLikeCount}
-                currentUserId={currentUserId}
-                onReportedReel={goNext}
-              />
+              Math.abs(i - activeIndex) <= 1 ? (
+                <MobileReelSlot
+                  key={reel.id}
+                  reel={reel}
+                  index={i}
+                  isActive={i === activeIndex}
+                  creator={creator}
+                  initialIsFollowing={initialIsFollowing}
+                  isOwnReel={isOwnReel}
+                  globalMuted={globalMuted}
+                  onMuteToggle={() => setGlobalMuted(m => !m)}
+                  onCommentOpen={() => setCommentSheetOpen(true)}
+                  hideLikeCount={hideLikeCount}
+                  currentUserId={currentUserId}
+                  onReportedReel={goNext}
+                />
+              ) : (
+                <div
+                  key={reel.id}
+                  className="flex-shrink-0 bg-black"
+                  style={{ width: '100vw', height: '100dvh', scrollSnapAlign: 'start' }}
+                />
+              )
             ))
           )}
         </div>
@@ -1602,7 +1592,7 @@ export function InstagramReelViewer({
               hasNext={hasNext}
               onPrev={goPrev}
               onNext={goNext}
-              onBack={() => router.back()}
+              onBack={handleClose}
               hideLikeCount={hideLikeCount}
               blockComments={blockComments}
               currentUserId={currentUserId}

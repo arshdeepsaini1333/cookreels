@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@/generated/prisma'
-import type { Audience, AudienceLocation } from '@/types/campaign'
+import { serializeAudience } from '@/lib/serializeAudience'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -24,29 +24,6 @@ const UpdateAudienceSchema = z.object({
   os:         z.enum(['all', 'android', 'ios', 'windows', 'macos', 'linux']).optional(),
 })
 
-type AudienceRow = {
-  id: string; name: string; gender: string; ageMin: number; ageMax: number
-  locations: Prisma.JsonValue; interests: string[]; behaviours: string[]
-  deviceType: string; os: string; createdAt: Date; updatedAt: Date
-}
-
-function serialize(a: AudienceRow): Audience {
-  return {
-    id:         a.id,
-    name:       a.name,
-    gender:     a.gender as Audience['gender'],
-    ageMin:     a.ageMin,
-    ageMax:     a.ageMax,
-    locations:  (a.locations as AudienceLocation[] | null) ?? [],
-    interests:  a.interests,
-    behaviours: a.behaviours,
-    deviceType: a.deviceType as Audience['deviceType'],
-    os:         a.os as Audience['os'],
-    createdAt:  a.createdAt.toISOString(),
-    updatedAt:  a.updatedAt.toISOString(),
-  }
-}
-
 // ─── GET /api/audiences/[id] ───────────────────────────────────────────────────
 
 export async function GET(_req: Request, { params }: Params) {
@@ -58,7 +35,7 @@ export async function GET(_req: Request, { params }: Params) {
   try {
     const audience = await prisma.audience.findFirst({ where: { id, userId: session.userId } })
     if (!audience) return NextResponse.json({ error: 'Audience not found' }, { status: 404 })
-    return NextResponse.json(serialize(audience))
+    return NextResponse.json(serializeAudience(audience))
   } catch (error) {
     console.error('[GET /api/audiences/[id]]', error)
     return NextResponse.json({ error: 'Failed to fetch audience' }, { status: 500 })
@@ -106,7 +83,7 @@ export async function PATCH(req: Request, { params }: Params) {
 
   try {
     const audience = await prisma.audience.update({ where: { id }, data: updateData })
-    return NextResponse.json(serialize(audience))
+    return NextResponse.json(serializeAudience(audience))
   } catch (error) {
     console.error('[PATCH /api/audiences/[id]]', error)
     return NextResponse.json({ error: 'Failed to update audience' }, { status: 500 })

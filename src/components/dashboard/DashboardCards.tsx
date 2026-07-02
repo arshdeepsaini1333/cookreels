@@ -1251,7 +1251,7 @@ function RecommendedSection({
       initial="hidden"
       animate={inView ? 'visible' : 'hidden'}
     >
-      <SectionTitle label="Recommended For You" sub="Curated picks based on your taste" />
+      <SectionTitle label="Recommended For You" sub="Curated picks based on your taste" href="/explore" />
 
       {loading && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -1508,6 +1508,32 @@ function timeAgo(iso: string): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
+function FriendActivityAvatar({ profileImage, displayName, isDark }: { profileImage: string | null; displayName: string; isDark: boolean }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [profileImage])
+  const showImg = profileImage && !failed && !/googleusercontent\.com/i.test(profileImage)
+  return showImg ? (
+    <ProtectedImg
+      src={profileImage}
+      alt={displayName}
+      className="w-full h-full rounded-full object-cover"
+      style={{ border: `2px solid ${isDark ? '#2B2B2D' : '#FFFFFF'}` }}
+      onError={() => setFailed(true)}
+    />
+  ) : (
+    <div
+      className="w-full h-full rounded-full flex items-center justify-center text-sm font-bold"
+      style={{
+        background: isDark ? '#3A3A3E' : '#F5F5F5',
+        border: `2px solid ${isDark ? '#2B2B2D' : '#FFFFFF'}`,
+        color: isDark ? '#F5F5F5' : '#1A1A1A',
+      }}
+    >
+      {displayName[0]?.toUpperCase()}
+    </div>
+  )
+}
+
 function RecentFriends() {
   const { theme } = useTheme()
   const router = useRouter()
@@ -1598,25 +1624,7 @@ function RecentFriends() {
                 className="w-10 h-10 rounded-full p-[2px]"
                 style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800, #FF6B35)' }}
               >
-                {friend.profileImage && !/googleusercontent\.com/i.test(friend.profileImage) ? (
-                  <ProtectedImg
-                    src={friend.profileImage}
-                    alt={friend.displayName}
-                    className="w-full h-full rounded-full object-cover"
-                    style={{ border: `2px solid ${isDark ? '#2B2B2D' : '#FFFFFF'}` }}
-                  />
-                ) : (
-                  <div
-                    className="w-full h-full rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{
-                      background: isDark ? '#3A3A3E' : '#F5F5F5',
-                      border: `2px solid ${isDark ? '#2B2B2D' : '#FFFFFF'}`,
-                      color: isDark ? '#F5F5F5' : '#1A1A1A',
-                    }}
-                  >
-                    {friend.displayName[0]?.toUpperCase()}
-                  </div>
-                )}
+                <FriendActivityAvatar profileImage={friend.profileImage} displayName={friend.displayName} isDark={isDark} />
               </div>
               {/* New-post dot */}
               <span

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '@/context/ThemeContext'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { AddContentModal } from '@/components/shared/AddContentModal'
 
 /* ─── Types ───── */
 
@@ -973,14 +974,14 @@ function DiscoverySidebar() {
 
 /* ─── Floating Action Button ─────────────────────────────────── */
 
-function FloatingFAB() {
+function FloatingFAB({ onAction }: { onAction: (type: 'reel' | 'recipe') => void }) {
   const { theme } = useTheme()
   const dark = theme === 'dark'
   const [open, setOpen] = useState(false)
 
   const actions = [
-    { icon: Camera,   label: 'Upload Reel' },
-    { icon: Utensils, label: 'Add Recipe'  },
+    { icon: Camera,   label: 'Upload Reel', type: 'reel'   as const },
+    { icon: Utensils, label: 'Add Recipe',  type: 'recipe' as const },
   ]
 
   return (
@@ -993,6 +994,7 @@ function FloatingFAB() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.82 }}
             transition={{ delay: i * 0.07, type: 'spring', stiffness: 300, damping: 22 }}
+            onClick={() => { setOpen(false); onAction(action.type) }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg whitespace-nowrap"
             style={{
               background: dark ? 'linear-gradient(135deg, #F5C518, #FFB800)' : 'linear-gradient(135deg, #F5C518, #FFD84D)',
@@ -1024,13 +1026,15 @@ function FloatingFAB() {
 
 /* ─── Page Export ────────────────────────────────────────────── */
 
-export function CategoriesPage({ username }: { username?: string }) {
+export function CategoriesPage({ username, userId }: { username?: string; userId?: string }) {
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [contentType, setContentType] = useState<ContentType>('all')
   const [categories, setCategories] = useState<DbCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addModalType, setAddModalType] = useState<'reel' | 'recipe'>('recipe')
 
   useEffect(() => {
     fetch('/api/categories')
@@ -1108,7 +1112,16 @@ export function CategoriesPage({ username }: { username?: string }) {
         </div>
       </div>
 
-      <FloatingFAB />
+      <FloatingFAB onAction={(type) => { setAddModalType(type); setShowAddModal(true) }} />
+
+      {userId && (
+        <AddContentModal
+          open={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          userId={userId}
+          initialType={addModalType}
+        />
+      )}
     </div>
   )
 }

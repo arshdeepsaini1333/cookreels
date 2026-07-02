@@ -12,9 +12,11 @@ export default async function Page({
   searchParams: Promise<{ reelId?: string }>
 }) {
   const session = await getSession()
-  if (!session) redirect('/auth/login')
-
   const { reelId } = await searchParams
+
+  if (!session) {
+    redirect(reelId ? `/reel/${reelId}` : '/auth/login')
+  }
 
   let initialReels: FeedReel[] = []
   let initialHasMore = true

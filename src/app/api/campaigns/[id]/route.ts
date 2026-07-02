@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@/generated/prisma'
 import type { AudienceData, AudienceLocation } from '@/types/campaign'
+import { serializeAudience } from '@/lib/serializeAudience'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -16,8 +17,11 @@ const UpdateCampaignSchema = z.object({
   durationDays: z.number().int().positive().optional(),
   dailyBudget:  z.number().positive().optional(),
   totalBudget:  z.number().positive().optional(),
+  impressions:  z.number().int().positive().optional(),
   startDate:    z.string().nullable().optional(),
   endDate:      z.string().nullable().optional(),
+  bannerUrl:    z.string().nullable().optional(),
+  adVideoUrl:   z.string().nullable().optional(),
 })
 
 // ─── GET /api/campaigns/[id] ─────────────────────────────────────────────────
@@ -39,17 +43,24 @@ export async function GET(_req: Request, { params }: Params) {
         totalBudget: true,
         dailyBudget: true,
         durationDays:true,
+        impressions: true,
         startDate:   true,
         endDate:     true,
         reelId:      true,
         paymentId:   true,
         audienceData:true,
+        bannerUrl:   true,
+        adVideoUrl:  true,
         locations:   true,
         ageMin:      true,
         ageMax:      true,
         gender:      true,
         audiences: {
-          select: { id: true, name: true },
+          select: {
+            id: true, name: true, gender: true, ageMin: true, ageMax: true,
+            locations: true, interests: true, behaviours: true, deviceType: true, os: true,
+            createdAt: true, updatedAt: true,
+          },
           take: 1,
         },
         createdAt:   true,
@@ -103,17 +114,21 @@ export async function GET(_req: Request, { params }: Params) {
       totalBudget:  Number(campaign.totalBudget),
       dailyBudget:  Number(campaign.dailyBudget),
       durationDays: campaign.durationDays,
+      // Fallback for campaigns created before the dedicated column existed.
+      impressions:  campaign.impressions || (campaign.audienceData as AudienceData).impressions || 0,
       startDate:    campaign.startDate?.toISOString() ?? null,
       endDate:      campaign.endDate?.toISOString()   ?? null,
       reelId:       campaign.reelId,
       reelThumbnail,
       platform:     (campaign.audienceData as AudienceData).platform ?? 'cookreels',
       audienceData: campaign.audienceData,
+      bannerUrl:    campaign.bannerUrl,
+      adVideoUrl:   campaign.adVideoUrl,
       locations:    campaign.locations,
       ageMin:       campaign.ageMin,
       ageMax:       campaign.ageMax,
       gender:       campaign.gender,
-      audience:     campaign.audiences[0] ?? null,
+      audience:     campaign.audiences[0] ? serializeAudience(campaign.audiences[0]) : null,
       analytics: campaign.analytics ? {
         impressions:     campaign.analytics.impressions,
         views:           campaign.analytics.views,
@@ -190,8 +205,11 @@ export async function PATCH(req: Request, { params }: Params) {
   if (data.durationDays !== undefined) updateData.durationDays = data.durationDays
   if (data.dailyBudget  !== undefined) updateData.dailyBudget  = data.dailyBudget
   if (data.totalBudget  !== undefined) updateData.totalBudget  = data.totalBudget
+  if (data.impressions  !== undefined) updateData.impressions  = data.impressions
   if (data.startDate    !== undefined) updateData.startDate    = data.startDate ? new Date(data.startDate) : null
   if (data.endDate      !== undefined) updateData.endDate      = data.endDate   ? new Date(data.endDate)   : null
+  if (data.bannerUrl    !== undefined) updateData.bannerUrl    = data.bannerUrl
+  if (data.adVideoUrl   !== undefined) updateData.adVideoUrl   = data.adVideoUrl
 
   if (data.audienceId !== undefined) {
     const audience = await prisma.audience.findFirst({

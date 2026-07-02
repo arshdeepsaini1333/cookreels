@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@/generated/prisma'
-import type { Audience, AudienceLocation } from '@/types/campaign'
+import { serializeAudience } from '@/lib/serializeAudience'
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -24,29 +24,6 @@ const AudienceSchema = z.object({
   os:         z.enum(['all', 'android', 'ios', 'windows', 'macos', 'linux']).optional().default('all'),
 })
 
-type AudienceRow = {
-  id: string; name: string; gender: string; ageMin: number; ageMax: number
-  locations: Prisma.JsonValue; interests: string[]; behaviours: string[]
-  deviceType: string; os: string; createdAt: Date; updatedAt: Date
-}
-
-function serialize(a: AudienceRow): Audience {
-  return {
-    id:         a.id,
-    name:       a.name,
-    gender:     a.gender as Audience['gender'],
-    ageMin:     a.ageMin,
-    ageMax:     a.ageMax,
-    locations:  (a.locations as AudienceLocation[] | null) ?? [],
-    interests:  a.interests,
-    behaviours: a.behaviours,
-    deviceType: a.deviceType as Audience['deviceType'],
-    os:         a.os as Audience['os'],
-    createdAt:  a.createdAt.toISOString(),
-    updatedAt:  a.updatedAt.toISOString(),
-  }
-}
-
 // ─── GET /api/audiences ────────────────────────────────────────────────────────
 
 export async function GET(req: Request) {
@@ -64,7 +41,7 @@ export async function GET(req: Request) {
       },
       orderBy: { createdAt: 'desc' },
     })
-    return NextResponse.json({ audiences: audiences.map(serialize) })
+    return NextResponse.json({ audiences: audiences.map(serializeAudience) })
   } catch (error) {
     console.error('[GET /api/audiences]', error)
     return NextResponse.json({ error: 'Failed to fetch audiences' }, { status: 500 })
@@ -107,7 +84,7 @@ export async function POST(req: Request) {
         os:         data.os,
       },
     })
-    return NextResponse.json(serialize(audience), { status: 201 })
+    return NextResponse.json(serializeAudience(audience), { status: 201 })
   } catch (error) {
     console.error('[POST /api/audiences]', error)
     return NextResponse.json({ error: 'Failed to create audience' }, { status: 500 })

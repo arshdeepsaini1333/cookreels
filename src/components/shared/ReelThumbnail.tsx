@@ -7,14 +7,16 @@ interface ReelThumbnailProps {
   videoUrl: string
   thumbnailUrl?: string | null
   imgClassName?: string
+  playing?: boolean
 }
 
-export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThumbnailProps) {
+export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName, playing }: ReelThumbnailProps) {
   const [inView, setInView] = useState(false)
   const [imgState, setImgState] = useState<'loading' | 'loaded' | 'error'>(
     thumbnailUrl ? 'loading' : 'error',
   )
   const rootRef = useRef<HTMLDivElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     const el = rootRef.current
@@ -35,7 +37,19 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
   const onLoadedMetadata: React.ReactEventHandler<HTMLVideoElement> = (e) => {
     const vid = e.currentTarget
     vid.currentTime = Math.min(1, (vid.duration || 10) * 0.1)
+    if (playing) vid.play().catch(() => {})
   }
+
+  useEffect(() => {
+    const vid = videoRef.current
+    if (!vid || vid.readyState < 1) return
+    if (playing) {
+      vid.play().catch(() => {})
+    } else {
+      vid.pause()
+      vid.currentTime = Math.min(1, (vid.duration || 10) * 0.1)
+    }
+  }, [playing])
 
   return (
     <div ref={rootRef} className="absolute inset-0">
@@ -66,9 +80,11 @@ export function ReelThumbnail({ videoUrl, thumbnailUrl, imgClassName }: ReelThum
       {/* Video (lazy — only after entering viewport) */}
       {inView && (
         <ProtectedVideo
+          ref={videoRef}
           src={videoUrl}
           preload="metadata"
           muted
+          loop
           playsInline
           onLoadedMetadata={onLoadedMetadata}
           className={`absolute inset-0 w-full h-full object-cover ${imgClassName ?? ''}`}

@@ -86,8 +86,11 @@ export interface CreateCampaignBody {
   durationDays: number
   dailyBudget: number
   totalBudget: number
+  impressions: number
   startDate?: string
   endDate?: string
+  bannerUrl?: string | null
+  adVideoUrl?: string | null
 }
 
 export type UpdateCampaignBody = Partial<CreateCampaignBody>
@@ -112,6 +115,7 @@ export interface CampaignListItem {
   totalBudget: number
   dailyBudget: number
   durationDays: number
+  impressions: number
   startDate: string | null
   endDate: string | null
   reelId: string | null
@@ -138,7 +142,9 @@ export interface CampaignDetail extends CampaignListItem {
   ageMin: number | null
   ageMax: number | null
   gender: string | null
-  audience: Pick<Audience, 'id' | 'name'> | null
+  bannerUrl: string | null
+  adVideoUrl: string | null
+  audience: Audience | null
   payment: PaymentDetail | null
 }
 

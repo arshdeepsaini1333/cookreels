@@ -72,7 +72,20 @@
       "Bash(mkdir -p \"d:/cookreels-main/src/app/api/messages/conversations/[convId]\")",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(xargs grep -l \"SMTP_\\\\|EMAIL_\\\\|RESEND\")",
-      "Bash(xargs grep -l \"TrendingReels\")"
+      "Bash(xargs grep -l \"TrendingReels\")",
+      "Bash(curl -s \"http://localhost:3000/api/explore?type=reels&limit=1\")",
+      "Bash(curl -s \"http://localhost:3000/api/explore\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/reel/nonexistent-id-test)",
+      "Bash(curl -s -D - -o /tmp/reelpage.html http://localhost:3000/reel/673cacf7-b285-44f9-8dfb-9fb1e02cfb35)",
+      "Bash(rm -f /tmp/reelpage.html /tmp/dev.log; ps aux 2>/dev/null | grep -i \"next dev\" | grep -v grep)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/reel/673cacf7-b285-44f9-8dfb-9fb1e02cfb35)",
+      "Bash(curl -s -D - -o /tmp/recipepage.html http://localhost:3000/recipe/a61dd5ac-10d1-49f8-8889-440a7b47e484)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/recipe/a61dd5ac-10d1-49f8-8889-440a7b47e484)",
+      "Bash(curl -s -D - -o /dev/null \"http://localhost:3000/reels?reelId=673cacf7-b285-44f9-8dfb-9fb1e02cfb35\")",
+      "Bash(curl -s -D - -o /dev/null \"http://localhost:3000/reels\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/reel/673cacf7-b285-44f9-8dfb-9fb1e02cfb35\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/categories)"
     ],
     "additionalDirectories": [
       "e:\\Cookreels\\cookreels-main\\src\\app",
@@ -81,7 +94,8 @@
       "e:\\Cookreels\\cookreels-main\\src\\app\\api\\recipes",
       "e:\\Cookreels\\cookreels-main\\src\\app\\api\\messages\\[conversationId]",
       "e:\\Cookreels\\cookreels-main\\src\\app\\reel",
-      "d:\\cookreels-main\\src\\app\\api\\messages\\conversations"
+      "d:\\cookreels-main\\src\\app\\api\\messages\\conversations",
+      "\\tmp"
     ]
   }
 }

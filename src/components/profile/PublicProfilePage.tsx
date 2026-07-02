@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
   Share2, MessageCircle,
-  UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play,
-  Clock, Film, Eye, BadgeCheck,
-  Tag, ChevronRight, Lock, Flag, Ban, ShieldOff, MoreVertical,
+  UserPlus, UserCheck, Users, ChefHat, Flame, Heart, Play, Bookmark,
+  Clock, Film, BadgeCheck,
+  ChevronRight, Lock, Flag, Ban, ShieldOff, MoreVertical,
 } from 'lucide-react'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { useTheme } from '@/context/ThemeContext'
@@ -17,7 +17,8 @@ import type { SocialListType } from '@/components/profile/SocialListModal'
 import { ReportModal } from '@/components/shared/ReportModal'
 import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
 import { BlockConfirmModal } from '@/components/shared/BlockConfirmModal'
-import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { ProtectedImg } from '@/components/shared/ProtectedMedia'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 
 // ─── Public profile prop types ────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ function fmtDuration(seconds: number | null | undefined): string {
 
 // ─── Static display data 
 
-const PUB_TABS = ['Recipes', 'Reels', 'Tagged'] as const
+const PUB_TABS = ['Recipes', 'Reels'] as const
 type PublicTab = (typeof PUB_TABS)[number]
 
 const CARD_GRADIENTS = [
@@ -139,9 +140,62 @@ function AnimatedStat({ value, label }: { value: number; label: string }) {
 
 // ─── RecipeCard ───────────────────────────────────────────────────────────────
 
-function RecipeCard({ r, idx, onClick }: { r: ProfileRecipe; idx: number; onClick?: () => void }) {
+function RecipeCard({
+  r, idx, currentUserId, onRequireLogin, onClick,
+}: {
+  r: ProfileRecipe
+  idx: number
+  currentUserId: string | null
+  onRequireLogin: () => void
+  onClick?: () => void
+}) {
   const gradient = CARD_GRADIENTS[idx % CARD_GRADIENTS.length]
   const diffKey  = r.difficulty ?? ''
+
+  const [liked, setLiked]         = useState(false)
+  const [likeCount, setLikeCount] = useState(r.likeCount)
+  const [saved, setSaved]         = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/recipes/${r.id}/likes`)
+      .then(res => res.ok ? res.json() : null)
+      .then(d => { if (d) { setLiked(d.liked ?? false); setLikeCount(d.likeCount ?? r.likeCount) } })
+      .catch(() => {})
+    if (currentUserId) {
+      fetch(`/api/recipes/${r.id}/save`)
+        .then(res => res.ok ? res.json() : null)
+        .then(d => { if (d) setSaved(d.saved ?? false) })
+        .catch(() => {})
+    }
+  }, [r.id, currentUserId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentUserId) { onRequireLogin(); return }
+    const newLiked = !liked
+    setLiked(newLiked)
+    setLikeCount(c => newLiked ? c + 1 : Math.max(0, c - 1))
+    try {
+      const res = await fetch(`/api/recipes/${r.id}/like`, { method: newLiked ? 'POST' : 'DELETE' })
+      if (!res.ok && res.status !== 409) throw new Error()
+    } catch {
+      setLiked(!newLiked)
+      setLikeCount(c => newLiked ? Math.max(0, c - 1) : c + 1)
+    }
+  }
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!currentUserId) { onRequireLogin(); return }
+    const newSaved = !saved
+    setSaved(newSaved)
+    try {
+      const res = await fetch(`/api/recipes/${r.id}/save`, { method: newSaved ? 'POST' : 'DELETE' })
+      if (!res.ok) throw new Error()
+    } catch {
+      setSaved(!newSaved)
+    }
+  }
 
   return (
     <motion.div
@@ -164,17 +218,28 @@ function RecipeCard({ r, idx, onClick }: { r: ProfileRecipe; idx: number; onClic
           </div>
         )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 transition-all duration-300 flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100">
-          <button className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35">
-            <Heart className="w-4 h-4 text-white" />
+          <button
+            onClick={handleLike}
+            className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35"
+          >
+            <Heart className="w-4 h-4 transition-colors" style={{ color: liked ? '#F5C518' : 'white', fill: liked ? '#F5C518' : 'transparent' }} />
           </button>
-          <button className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35">
-            <Play className="w-4 h-4 text-white fill-white" />
+          <button
+            onClick={handleSave}
+            className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35"
+          >
+            <Bookmark className="w-4 h-4 transition-colors" style={{ color: saved ? '#F5C518' : 'white', fill: saved ? '#F5C518' : 'transparent' }} />
           </button>
         </div>
         {diffKey && (
           <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${DIFF_STYLE[diffKey] ?? ''}`}>
             {DIFF_LABEL[diffKey] ?? diffKey}
           </span>
+        )}
+        {saved && (
+          <div className="absolute top-2 right-2">
+            <Bookmark className="w-4 h-4" style={{ color: '#F5C518', fill: '#F5C518' }} />
+          </div>
         )}
       </div>
       <div className="p-3">
@@ -188,7 +253,7 @@ function RecipeCard({ r, idx, onClick }: { r: ProfileRecipe; idx: number; onClic
           </span>
           <span className="flex items-center gap-1" style={{ color: 'var(--cr-text-muted)' }}>
             <Heart className="w-3 h-3" />
-            <span className="text-xs">{fmt(r.likeCount)}</span>
+            <span className="text-xs">{fmt(likeCount)}</span>
           </span>
         </div>
       </div>
@@ -212,22 +277,15 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
       className="relative rounded-xl overflow-hidden cursor-pointer"
       style={{ aspectRatio: '9/16' }}
     >
-      {/* Video as cover — autoplay muted loop */}
-      <ProtectedVideo
-        src={r.videoUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster={r.thumbnailUrl ?? undefined}
-        className="absolute inset-0 w-full h-full object-cover"
-        onError={e => { (e.currentTarget as HTMLVideoElement).style.display = 'none' }}
-      />
-      {/* Gradient shown while video loads or if URL is missing */}
+      {/* Gradient shown behind cover while it loads or if URL is missing */}
       {!r.videoUrl && (
         <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
           <span className="text-3xl opacity-50">🎬</span>
         </div>
+      )}
+      {/* Thumbnail cover — plays the video only while hovered */}
+      {r.videoUrl && (
+        <ReelThumbnail videoUrl={r.videoUrl} thumbnailUrl={r.thumbnailUrl} playing={hovered} />
       )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
@@ -253,21 +311,12 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
             <p className="text-white text-[11px] font-semibold leading-tight line-clamp-1 mb-1">{r.title}</p>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-0.5 text-white/80 text-[10px]">
-                <Eye className="w-3 h-3" /> {fmt(r.viewCount)}
-              </span>
-              <span className="flex items-center gap-0.5 text-white/80 text-[10px]">
                 <Heart className="w-3 h-3" /> {fmt(r.likeCount)}
               </span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      {!hovered && (
-        <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
-          <Eye className="w-3 h-3 text-white/65" />
-          <span className="text-[10px] text-white/65">{fmt(r.viewCount)}</span>
-        </div>
-      )}
     </motion.div>
   )
 }
@@ -332,6 +381,14 @@ function AvatarFallback({ name }: { name: string }) {
   )
 }
 
+function ProfileAvatarImg({ src, name }: { src: string | null; name: string }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  return src && !failed
+    ? <ProtectedImg src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
+    : <AvatarFallback name={name} />
+}
+
 // ─── LoadMoreButton 
 
 function LoadMoreButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
@@ -378,6 +435,7 @@ export function PublicProfilePage({
   const isLoggedOut = !currentUserId
   const rawUsername = user.username.replace(/^@/, '')
   const [showLoginPrompt, setShowLoginPrompt] = useState(isLoggedOut)
+  const [actionLoginPromptOpen, setActionLoginPromptOpen] = useState(false)
 
   const [activeTab,    setActiveTab]    = useState<PublicTab>('Recipes')
   const [followStatus, setFollowStatus] = useState<'none' | 'pending' | 'accepted'>(initialFollowStatus)
@@ -400,7 +458,6 @@ export function PublicProfilePage({
   const [reelsLoading,     setReelsLoading]      = useState(false)
   const [hasMoreReels,     setHasMoreReels]      = useState(totalReels > initialReels.length)
 
-  const [taggedLoaded,     setTaggedLoaded]      = useState(false)
 
   const [isBlocked,      setIsBlocked]      = useState(initialIsBlockedByViewer)
   const [blockModalOpen, setBlockModalOpen] = useState(false)
@@ -624,18 +681,9 @@ export function PublicProfilePage({
                 style={{ background: 'linear-gradient(135deg, #F5C518, #FF9F1C, #F5C518)' }}
               >
                 <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid var(--cr-bg-card)' }}>
-                  {user.avatar
-                    ? <ProtectedImg src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                    : <AvatarFallback name={user.name} />
-                  }
+                  <ProfileAvatarImg src={user.avatar} name={user.name} />
                 </div>
               </div>
-              {user.isOnline && (
-                <div
-                  className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 bg-emerald-500 animate-green-pulse"
-                  style={{ borderColor: 'var(--cr-bg-card)' }}
-                />
-              )}
             </div>
 
             {/* Desktop action buttons */}
@@ -960,13 +1008,12 @@ export function PublicProfilePage({
             {PUB_TABS.map(tab => (
               <button
                 key={tab}
-                onClick={() => { setActiveTab(tab); if (tab === 'Tagged') setTaggedLoaded(true) }}
+                onClick={() => setActiveTab(tab)}
                 className="relative flex items-center gap-1.5 px-4 sm:px-6 py-3.5 text-sm font-semibold whitespace-nowrap transition-colors"
                 style={{ color: activeTab === tab ? 'var(--cr-accent)' : 'var(--cr-text-muted)' }}
               >
                 {tab === 'Recipes' && <ChefHat className="w-3.5 h-3.5" />}
                 {tab === 'Reels'   && <Film    className="w-3.5 h-3.5" />}
-                {tab === 'Tagged'  && <Tag     className="w-3.5 h-3.5" />}
                 {tab}
                 {activeTab === tab && (
                   <motion.div
@@ -1004,7 +1051,16 @@ export function PublicProfilePage({
                       animate="visible"
                       className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
                     >
-                      {recipes.map((r, i) => <RecipeCard key={r.id} r={r} idx={i} onClick={() => router.push(`/recipe/${r.id}`)} />)}
+                      {recipes.map((r, i) => (
+                        <RecipeCard
+                          key={r.id}
+                          r={r}
+                          idx={i}
+                          currentUserId={currentUserId}
+                          onRequireLogin={() => setActionLoginPromptOpen(true)}
+                          onClick={() => router.push(`/recipe/${r.id}`)}
+                        />
+                      ))}
                     </motion.div>
                     {hasMoreRecipes && (
                       <LoadMoreButton onClick={loadMoreRecipes} loading={recipesLoading} />
@@ -1043,23 +1099,6 @@ export function PublicProfilePage({
               </motion.div>
             )}
 
-            {/* TAGGED */}
-            {activeTab === 'Tagged' && (
-              <motion.div
-                key="tagged"
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.28 }}
-              >
-                <EmptyState
-                  emoji="🏷️"
-                  title="No tagged posts yet"
-                  sub="Posts where this chef is tagged will appear here"
-                />
-              </motion.div>
-            )}
-
           </AnimatePresence>
         </div>}
 
@@ -1090,6 +1129,15 @@ export function PublicProfilePage({
         onConfirm={handleToggleBlock}
         userName={user.name}
         action={isBlocked ? 'unblock' : 'block'}
+      />
+
+      {/* Login prompt for guests liking/saving a recipe */}
+      <LoginPromptModal
+        isOpen={actionLoginPromptOpen}
+        onClose={() => setActionLoginPromptOpen(false)}
+        redirectTo={`/user/${rawUsername}`}
+        title="Login required"
+        message="Sign in to like and save recipes."
       />
     </>
   )

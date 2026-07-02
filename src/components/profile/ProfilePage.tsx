@@ -7,7 +7,7 @@ import { motion, AnimatePresence, useInView } from 'framer-motion'
 import {
   Settings, Share2, Camera, MessageCircle,
   UserPlus, UserCheck, ChefHat, Flame, Heart, Play,
-  Bookmark, Clock, Film, Eye, BadgeCheck,
+  Bookmark, Clock, Film, BadgeCheck,
   Lock, X, Edit3, Plus, ChevronRight,
   Key, EyeOff, ShieldOff,
 } from 'lucide-react'
@@ -21,7 +21,8 @@ import { ImageCropModal, validateImageFile } from '@/components/profile/ImageCro
 import { EditProfileModal } from '@/components/profile/EditProfileModal'
 import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
 import { SetPasswordModal } from '@/components/profile/SetPasswordModal'
-import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { ProtectedImg } from '@/components/shared/ProtectedMedia'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 // ─── Prop Types (data from server / DB) 
 
 export interface ProfileUser {
@@ -30,7 +31,6 @@ export interface ProfileUser {
   username: string
   bio: string | null
   verified: boolean
-  isOnline: boolean
   topChef: boolean
   level: string
   avatar: string | null
@@ -213,12 +213,14 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 // ─── RecipeCard ───
 
 function RecipeCard({
-  r, idx, saved, onSave, onClick,
+  r, idx, saved, onSave, liked, onLike, onClick,
 }: {
   r: ProfileRecipe
   idx: number
   saved: boolean
   onSave: () => void
+  liked?: boolean
+  onLike?: () => void
   onClick?: () => void
 }) {
   const gradient = CARD_GRADIENTS[idx % CARD_GRADIENTS.length]
@@ -247,11 +249,11 @@ function RecipeCard({
         )}
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/45 transition-all duration-300 flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100">
-          <button className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35">
-            <Heart className="w-4 h-4 text-white" />
-          </button>
-          <button className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35">
-            <Play className="w-4 h-4 text-white fill-white" />
+          <button
+            onClick={(e) => { e.stopPropagation(); onLike?.() }}
+            className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/35"
+          >
+            <Heart className="w-4 h-4 transition-colors" style={{ color: liked ? '#F5C518' : 'white', fill: liked ? '#F5C518' : 'transparent' }} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onSave() }}
@@ -308,22 +310,15 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
       className="relative rounded-xl overflow-hidden cursor-pointer"
       style={{ aspectRatio: '9/16' }}
     >
-      {/* Video as cover — falls back to thumbnail then gradient */}
-      <ProtectedVideo
-        src={r.videoUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        poster={r.thumbnailUrl ?? undefined}
-        className="absolute inset-0 w-full h-full object-cover"
-        onError={e => { (e.currentTarget as HTMLVideoElement).style.display = 'none' }}
-      />
-      {/* Fallback gradient shown behind video while it loads */}
+      {/* Fallback gradient shown behind cover while it loads */}
       {!r.videoUrl && (
         <div className={`w-full h-full bg-gradient-to-br ${gradient} flex items-center justify-center`}>
           <span className="text-3xl opacity-50">🎬</span>
         </div>
+      )}
+      {/* Thumbnail cover — plays the video only while hovered */}
+      {r.videoUrl && (
+        <ReelThumbnail videoUrl={r.videoUrl} thumbnailUrl={r.thumbnailUrl} playing={hovered} />
       )}
 
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
@@ -352,21 +347,12 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
             <p className="text-white text-[11px] font-semibold leading-tight line-clamp-1 mb-1">{r.title}</p>
             <div className="flex items-center gap-2">
               <span className="flex items-center gap-0.5 text-white/80 text-[10px]">
-                <Eye className="w-3 h-3" /> {fmt(r.viewCount)}
-              </span>
-              <span className="flex items-center gap-0.5 text-white/80 text-[10px]">
                 <Heart className="w-3 h-3" /> {fmt(r.likeCount)}
               </span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-      {!hovered && (
-        <div className="absolute bottom-2 left-2 flex items-center gap-0.5">
-          <Eye className="w-3 h-3 text-white/65" />
-          <span className="text-[10px] text-white/65">{fmt(r.viewCount)}</span>
-        </div>
-      )}
     </motion.div>
   )
 }
@@ -447,6 +433,14 @@ function AvatarFallback({ name }: { name: string }) {
       {initials}
     </div>
   )
+}
+
+function ProfileAvatarImg({ src, name }: { src: string | null; name: string }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  return src && !failed
+    ? <ProtectedImg src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
+    : <AvatarFallback name={name} />
 }
 
 // ─── SettingsDrawer ───────────────────────────────────────────────────────────
@@ -625,6 +619,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
   const [showSetPassword,    setShowSetPassword]    = useState(false)
   const [showAddModal,    setShowAddModal]    = useState(false)
   const [savedSet,        setSavedSet]        = useState<Set<string>>(new Set())
+  const [likedSet,        setLikedSet]        = useState<Set<string>>(new Set())
   const [isFollowing,     setIsFollowing]     = useState(false)
   const [socialModal,     setSocialModal]     = useState<SocialListType | null>(null)
 
@@ -705,7 +700,11 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
     fetch('/api/profile/liked')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d) { setLikedRecipes(d.recipes); setLikedReels(d.reels) }
+        if (d) {
+          setLikedRecipes(d.recipes)
+          setLikedReels(d.reels)
+          setLikedSet(s => new Set([...s, ...(d.recipes as { id: string }[]).map(r => r.id)]))
+        }
         setLikedLoaded(true)
       })
       .catch(() => setLikedLoaded(true))
@@ -718,19 +717,53 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
     fetch('/api/profile/saved')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d) { setSavedRecipes(d.recipes); setSavedReels(d.reels) }
+        if (d) {
+          setSavedRecipes(d.recipes)
+          setSavedReels(d.reels)
+          setSavedSet(s => new Set([...s, ...(d.recipes as { id: string }[]).map(r => r.id)]))
+        }
         setSavedLoaded(true)
       })
       .catch(() => setSavedLoaded(true))
       .finally(() => setSavedLoading(false))
   }, [activeTab, savedLoaded, savedLoading])
 
-  const toggleSave = (id: string) => {
+  const toggleSave = async (id: string) => {
+    const wasSaved = savedSet.has(id)
     setSavedSet(s => {
       const next = new Set(s)
-      next.has(id) ? next.delete(id) : next.add(id)
+      wasSaved ? next.delete(id) : next.add(id)
       return next
     })
+    try {
+      const res = await fetch(`/api/recipes/${id}/save`, { method: wasSaved ? 'DELETE' : 'POST' })
+      if (!res.ok) throw new Error()
+    } catch {
+      setSavedSet(s => {
+        const next = new Set(s)
+        wasSaved ? next.add(id) : next.delete(id)
+        return next
+      })
+    }
+  }
+
+  const toggleLike = async (id: string) => {
+    const wasLiked = likedSet.has(id)
+    setLikedSet(s => {
+      const next = new Set(s)
+      wasLiked ? next.delete(id) : next.add(id)
+      return next
+    })
+    try {
+      const res = await fetch(`/api/recipes/${id}/like`, { method: wasLiked ? 'DELETE' : 'POST' })
+      if (!res.ok && res.status !== 409) throw new Error()
+    } catch {
+      setLikedSet(s => {
+        const next = new Set(s)
+        wasLiked ? next.add(id) : next.delete(id)
+        return next
+      })
+    }
   }
 
   const firstName = profileName.split(' ')[0]
@@ -797,16 +830,9 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 style={{ background: 'linear-gradient(135deg, #F5C518, #FF9F1C, #F5C518)' }}
               >
                 <div className="w-full h-full rounded-full overflow-hidden" style={{ border: '3px solid var(--cr-bg-card)' }}>
-                  {avatarUrl
-                    ? <ProtectedImg src={avatarUrl} alt={user.name} className="w-full h-full object-cover" />
-                    : <AvatarFallback name={user.name} />
-                  }
+                  <ProfileAvatarImg src={avatarUrl} name={user.name} />
                 </div>
               </div>
-              {/* Online dot */}
-              {user.isOnline && (
-                <div className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 bg-emerald-500 animate-green-pulse" style={{ borderColor: 'var(--cr-bg-card)' }} />
-              )}
               {/* Camera button — own profile */}
               {isOwnProfile && (
                 <button
@@ -1001,7 +1027,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 ) : (
                   <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                     {recipes.map((r, i) => (
-                      <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                      <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} liked={likedSet.has(r.id)} onLike={() => toggleLike(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
                     ))}
                   </motion.div>
                 )}
@@ -1039,7 +1065,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                         <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Recipes</p>
                         <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                           {savedRecipes.map((r, i) => (
-                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} liked={likedSet.has(r.id)} onLike={() => toggleLike(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
                           ))}
                         </motion.div>
                       </div>
@@ -1075,7 +1101,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                         <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--cr-text-muted)' }}>Recipes</p>
                         <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                           {likedRecipes.map((r, i) => (
-                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                            <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} liked={likedSet.has(r.id)} onLike={() => toggleLike(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
                           ))}
                         </motion.div>
                       </div>

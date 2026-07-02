@@ -23,6 +23,11 @@ const COUNTRIES   = ['India', 'United States', 'Canada', 'United Kingdom', 'Aust
 const TIMEZONES   = ['Asia/Kolkata', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Australia/Sydney', 'Asia/Singapore']
 const RADIUS_OPTS = ['100m', '250m', '500m', '1km', '5km', '10km']
 
+const AUD_GENDER_LABEL: Record<string, string> = { all: 'All Genders', male: 'Male', female: 'Female' }
+const AUD_DEVICE_LABEL: Record<string, string> = { all: 'All Devices', mobile: 'Mobile', desktop: 'Desktop', tablet: 'Tablet' }
+const AUD_OS_LABEL: Record<string, string> = { all: 'All OS', android: 'Android', ios: 'iOS', windows: 'Windows', macos: 'macOS', linux: 'Linux' }
+const AUD_LOCATION_TYPE_LABEL: Record<string, string> = { country: 'Country', state: 'State', city: 'City', district: 'District', pincode: 'Pincode' }
+
 // ─── Status config (Prisma enum — uppercase) ──────────────────────────────────
 
 const STATUS_CFG: Record<string, { label: string; color: string; bg: string; Icon: React.ElementType }> = {
@@ -103,8 +108,8 @@ function initForm(d: CampaignDetail): EditForm {
     adFormat:       ((ad.adFormat as string) ?? 'reel') as 'banner' | 'reel',
     ctaText:        (ad.ctaText as string) ?? '',
     destinationUrl: (ad.destinationUrl as string) ?? '',
-    bannerUrl:      (ad.bannerUrl as string) ?? '',
-    adVideoUrl:     (ad.adVideoUrl as string) ?? '',
+    bannerUrl:      d.bannerUrl  ?? (ad.bannerUrl as string)  ?? '',
+    adVideoUrl:     d.adVideoUrl ?? (ad.adVideoUrl as string) ?? '',
     locations:      (d.locations as string[]) ?? [],
     state:          (ad.state as string) ?? '',
     city:           (ad.city as string) ?? '',
@@ -114,7 +119,7 @@ function initForm(d: CampaignDetail): EditForm {
     languages:      (ad.languages as string[]) ?? [],
     interests:      (ad.interests as string[]) ?? [],
     geofences:      (ad.geofences as GeofenceZone[]) ?? [],
-    impressions:    (ad.impressions as number) ?? 10000,
+    impressions:    d.impressions || (ad.impressions as number) || 10000,
     budgetType:     ((ad.budgetType as string) ?? 'daily') as 'daily' | 'lifetime',
     dailyBudget:    d.dailyBudget,
     totalBudget:    d.totalBudget,
@@ -197,8 +202,11 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
       durationDays: form.durationDays,
       dailyBudget:  form.dailyBudget,
       totalBudget:  form.totalBudget,
+      impressions:  form.impressions,
       startDate:    form.startDate || null,
       endDate:      form.endDate   || null,
+      bannerUrl:    form.bannerUrl  || null,
+      adVideoUrl:   form.adVideoUrl || null,
       audienceData: {
         ...detail.audienceData,
         description:    form.description,
@@ -212,7 +220,6 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
         languages:      form.languages,
         interests:      form.interests,
         geofences:      form.geofences,
-        impressions:    form.impressions,
         budgetType:     form.budgetType,
         timezone:       form.timezone,
       },
@@ -251,7 +258,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
     if (file.size > 10 * 1024 * 1024)   { setMediaError('Image must be under 10 MB.'); return }
     setMediaError(''); setUploadingBanner(true)
     try {
-      const url = await uploadToS3(file, 'campaigns', `banner_${Date.now()}_${file.name}`)
+      const url = await uploadToS3(file, 'campaigns/banner', `banner_${Date.now()}_${file.name}`)
       upd('bannerUrl', url)
     } catch { setMediaError('Banner upload failed. Please try again.') }
     finally  { setUploadingBanner(false) }
@@ -262,7 +269,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
     if (file.size > 500 * 1024 * 1024)  { setMediaError('Video must be under 500 MB.'); return }
     setMediaError(''); setUploadingVideo(true)
     try {
-      const url = await uploadToS3(file, 'campaigns', `reel_${Date.now()}_${file.name}`)
+      const url = await uploadToS3(file, 'campaigns/video', `reel_${Date.now()}_${file.name}`)
       upd('adVideoUrl', url)
     } catch { setMediaError('Video upload failed. Please try again.') }
     finally  { setUploadingVideo(false) }
@@ -393,8 +400,8 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
             {/* ── VIEW MODE ── mirrors edit sections exactly, read-only ── */}
             {!loading && detail && !editing && (() => {
-              const bannerSrc = ad.bannerUrl  as string | undefined
-              const videoSrc  = ad.adVideoUrl as string | undefined
+              const bannerSrc = detail.bannerUrl  ?? (ad.bannerUrl  as string | undefined)
+              const videoSrc  = detail.adVideoUrl ?? (ad.adVideoUrl as string | undefined)
               const isBanner  = ad.adFormat === 'banner'
               const accentClr = isBanner ? '#4285F4' : '#F5C518'
               const accentBg  = isBanner ? 'rgba(66,133,244,0.10)' : 'rgba(245,197,24,0.10)'
@@ -449,6 +456,14 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                             {bannerSrc ? 'Uploaded Banner' : videoSrc ? 'Uploaded Video' : 'Linked Reel'}
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Ad Heading */}
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ad Heading</p>
+                      <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: inputBg, border: `1.5px solid ${border}`, color: ad.adHeading ? textPrimary : textMuted, fontStyle: ad.adHeading ? 'normal' : 'italic', opacity: ad.adHeading ? 1 : 0.6 }}>
+                        {(ad.adHeading as string) || 'Not set'}
                       </div>
                     </div>
 
@@ -515,11 +530,11 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Impressions</p>
                       <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: inputBg, border: `1.5px solid ${border}`, color: textPrimary }}>
-                        {ad.impressions ? fmtNum(ad.impressions as number) : '—'}
+                        {detail.impressions ? fmtNum(detail.impressions) : '—'}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                         {[10000, 50000, 100000, 500000].map(n => (
-                          <div key={n} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, textAlign: 'center', border: `1.5px solid ${(ad.impressions as number) === n ? 'rgba(245,197,24,0.45)' : border}`, background: (ad.impressions as number) === n ? 'rgba(245,197,24,0.10)' : inputBg, color: (ad.impressions as number) === n ? '#F5C518' : textMuted, userSelect: 'none' }}>
+                          <div key={n} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, textAlign: 'center', border: `1.5px solid ${detail.impressions === n ? 'rgba(245,197,24,0.45)' : border}`, background: detail.impressions === n ? 'rgba(245,197,24,0.10)' : inputBg, color: detail.impressions === n ? '#F5C518' : textMuted, userSelect: 'none' }}>
                             {n >= 100000 ? `${n / 100000}L` : `${n / 1000}K`}
                           </div>
                         ))}
@@ -558,12 +573,66 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                   {/* 5. Audience Targeting */}
                   <Box title="Audience Targeting" icon={<Users size={13} style={{ color: '#E1306C' }} />} bg={sectionBg} border={border}>
-                    {/* Linked reusable audience */}
+                    {/* Linked reusable audience — full profile */}
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Selected Audience</p>
                       {detail.audience ? (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(225,48,108,0.12)', color: '#E1306C', border: '1px solid rgba(225,48,108,0.28)' }}>{detail.audience.name}</span>
+                        <div style={{ padding: 12, borderRadius: 12, background: inputBg, border: '1.5px solid rgba(225,48,108,0.30)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <span style={{ display: 'inline-flex', alignSelf: 'flex-start', alignItems: 'center', padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: 'rgba(225,48,108,0.12)', color: '#E1306C', border: '1px solid rgba(225,48,108,0.28)' }}>{detail.audience.name}</span>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                            <div>
+                              <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Gender</p>
+                              <div style={{ padding: '7px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: bg, border: `1px solid ${border}`, color: textPrimary }}>{AUD_GENDER_LABEL[detail.audience.gender] ?? detail.audience.gender}</div>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Age Range</p>
+                              <div style={{ padding: '7px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: bg, border: `1px solid ${border}`, color: textPrimary }}>{detail.audience.ageMin} – {detail.audience.ageMax >= 65 ? '65+' : detail.audience.ageMax}</div>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Device Type</p>
+                              <div style={{ padding: '7px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: bg, border: `1px solid ${border}`, color: textPrimary }}>{AUD_DEVICE_LABEL[detail.audience.deviceType] ?? detail.audience.deviceType}</div>
+                            </div>
+                            <div>
+                              <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Operating System</p>
+                              <div style={{ padding: '7px 10px', borderRadius: 8, fontSize: 12, fontWeight: 600, background: bg, border: `1px solid ${border}`, color: textPrimary }}>{AUD_OS_LABEL[detail.audience.os] ?? detail.audience.os}</div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Locations</p>
+                            {detail.audience.locations.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                {detail.audience.locations.map((l, i) => (
+                                  <span key={`${l.type}-${l.value}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: 'rgba(245,197,24,0.10)', color: '#F5C518', border: '1px solid rgba(245,197,24,0.22)' }}>
+                                    <span style={{ opacity: 0.7 }}>{AUD_LOCATION_TYPE_LABEL[l.type] ?? l.type}:</span> {l.value}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : <p style={{ margin: 0, fontSize: 11, color: textMuted, fontStyle: 'italic', opacity: 0.6 }}>No locations set</p>}
+                          </div>
+
+                          <div>
+                            <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Interests</p>
+                            {detail.audience.interests.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                {detail.audience.interests.map(i => (
+                                  <span key={i} style={{ padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: 'rgba(225,48,108,0.10)', color: '#E1306C', border: '1px solid rgba(225,48,108,0.22)' }}>{i}</span>
+                                ))}
+                              </div>
+                            ) : <p style={{ margin: 0, fontSize: 11, color: textMuted, fontStyle: 'italic', opacity: 0.6 }}>No interests selected</p>}
+                          </div>
+
+                          <div>
+                            <p style={{ fontSize: 9, fontWeight: 700, color: textMuted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Behaviours</p>
+                            {detail.audience.behaviours.length > 0 ? (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                                {detail.audience.behaviours.map(b => (
+                                  <span key={b} style={{ padding: '3px 9px', borderRadius: 20, fontSize: 10, fontWeight: 600, background: 'rgba(125,187,145,0.10)', color: '#7DBB91', border: '1px solid rgba(125,187,145,0.22)' }}>{b}</span>
+                                ))}
+                              </div>
+                            ) : <p style={{ margin: 0, fontSize: 11, color: textMuted, fontStyle: 'italic', opacity: 0.6 }}>No behaviours selected</p>}
+                          </div>
                         </div>
                       ) : <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 12, background: inputBg, border: `1.5px solid ${border}`, color: textMuted, fontStyle: 'italic', opacity: 0.6 }}>No reusable audience linked</div>}
                     </div>

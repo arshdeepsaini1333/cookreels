@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { ReelModalClient } from './ReelModalClient'
+import { ReelDeepLinkClient } from '@/app/reel/[reelId]/ReelDeepLinkClient'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -67,7 +67,7 @@ export default async function ReelModalPage({ params }: Props) {
   ])
 
   return (
-    <ReelModalClient
+    <ReelDeepLinkClient
       initialReelId={id}
       allReels={allReels}
       creator={{

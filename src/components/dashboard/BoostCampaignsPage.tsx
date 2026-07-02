@@ -8,9 +8,10 @@ import { useTheme } from '@/context/ThemeContext'
 import {
   ArrowLeft, Plus, Megaphone, Search, FileText, CheckCircle2, Clock,
   XCircle, Eye, MousePointer, DollarSign, Zap, Target, MoreHorizontal,
-  PenLine, Pause, Trash2, Play, Filter, TrendingUp,
+  PenLine, Pause, Trash2, Play, Filter, TrendingUp, Smartphone,
 } from 'lucide-react'
 import CampaignDetailModal from './CampaignDetailModal'
+import CampaignPreviewModal from './CampaignPreviewModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,9 +141,10 @@ function DeleteConfirm({ isDark, onConfirm, onCancel }: {
 
 // ─── Campaign Row ─────────────────────────────────────────────────────────────
 
-function CampaignRow({ c, isDark, onRefresh, onOpen }: {
+function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
   c: Campaign; isDark: boolean; onRefresh: () => void
   onOpen: (id: string, editMode?: boolean) => void
+  onPreview: (id: string) => void
 }) {
   const [menuOpen, setMenuOpen]       = useState(false)
   const [confirming, setConfirming]   = useState(false)
@@ -174,7 +176,8 @@ function CampaignRow({ c, isDark, onRefresh, onOpen }: {
   }
 
   const menuItems = [
-    { icon: Eye,    label: 'View', onClick: () => { setMenuOpen(false); onOpen(c.id) } },
+    { icon: Eye,       label: 'View',    onClick: () => { setMenuOpen(false); onOpen(c.id) } },
+    { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(c.id) } },
     ...(c.status === 'draft' || c.status === 'paused'
       ? [{ icon: PenLine, label: 'Edit', onClick: () => { setMenuOpen(false); onOpen(c.id, true) } }]
       : []),
@@ -366,6 +369,7 @@ export default function BoostCampaignsPage() {
 
   const [modalId, setModalId]         = useState<string | null>(null)
   const [modalEditMode, setModalEditMode] = useState(false)
+  const [previewId, setPreviewId]     = useState<string | null>(null)
 
   const openModal = (id: string, editMode = false) => {
     setModalId(id)
@@ -553,7 +557,7 @@ export default function BoostCampaignsPage() {
                 <div className="w-20 text-right flex-shrink-0 pr-1">Budget</div>
                 <div className="w-8 flex-shrink-0" />
               </div>
-              {filtered.map(c => <CampaignRow key={c.id} c={c} isDark={isDark} onRefresh={refresh} onOpen={openModal} />)}
+              {filtered.map(c => <CampaignRow key={c.id} c={c} isDark={isDark} onRefresh={refresh} onOpen={openModal} onPreview={setPreviewId} />)}
             </div>
           ) : (
             <EmptyState isDark={isDark} filtered={search.trim().length > 0 || tab !== 'all'} />
@@ -566,6 +570,11 @@ export default function BoostCampaignsPage() {
         startInEditMode={modalEditMode}
         onClose={closeModal}
         onRefresh={refresh}
+      />
+
+      <CampaignPreviewModal
+        campaignId={previewId}
+        onClose={() => setPreviewId(null)}
       />
     </div>
   )

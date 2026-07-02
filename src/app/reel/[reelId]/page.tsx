@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
-import { InstagramReelViewer } from '@/components/reels/InstagramReelViewer'
+import { ReelDeepLinkClient } from './ReelDeepLinkClient'
 
 type Props = { params: Promise<{ reelId: string }> }
 
@@ -103,7 +103,7 @@ export default async function ReelPage({ params }: Props) {
   ])
 
   return (
-    <InstagramReelViewer
+    <ReelDeepLinkClient
       initialReelId={reelId}
       allReels={allReels}
       creator={{
@@ -121,6 +121,7 @@ export default async function ReelPage({ params }: Props) {
       currentUserName={currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : undefined}
       initialIsFollowing={isFollowing}
       isOwnReel={session?.userId === reel.userId}
+      standalone={true}
     />
   )
 }

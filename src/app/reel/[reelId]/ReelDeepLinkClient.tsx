@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation'
 import { InstagramReelViewer } from '@/components/reels/InstagramReelViewer'
 import type { InstagramReelViewerProps, ViewerReel, ViewerCreator } from '@/components/reels/InstagramReelViewer'
 
-type ReelModalClientProps = InstagramReelViewerProps
+export type ReelDeepLinkClientProps = InstagramReelViewerProps & {
+  /** true = direct URL access (/reel/[reelId] standalone page) */
+  standalone?: boolean
+}
 
 interface CtxItem {
   reel: ViewerReel
@@ -51,7 +54,7 @@ async function fetchCtxItem(id: string): Promise<CtxItem | null> {
   }
 }
 
-export function ReelModalClient(props: ReelModalClientProps) {
+export function ReelDeepLinkClient({ standalone = false, ...props }: ReelDeepLinkClientProps) {
   const router = useRouter()
 
   // Read nav context from sessionStorage immediately (synchronous, no flash)
@@ -131,6 +134,14 @@ export function ReelModalClient(props: ReelModalClientProps) {
   const onCtxPrev = useCallback(() => { goToCtx(ctxIdx - 1) }, [goToCtx, ctxIdx])
   const onCtxNext = useCallback(() => { goToCtx(ctxIdx + 1) }, [goToCtx, ctxIdx])
 
+  const handleClose = useCallback(() => {
+    if (standalone) {
+      router.push('/explore')
+    } else {
+      router.back()
+    }
+  }, [standalone, router])
+
   // Prevent background scroll while reel is open.
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -140,10 +151,10 @@ export function ReelModalClient(props: ReelModalClientProps) {
 
   // Close on Escape key.
   useEffect(() => {
-    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') router.back() }
+    const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose() }
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [router])
+  }, [handleClose])
 
   const useCtx = inCtxMode && ctxItem !== null
 
@@ -153,7 +164,7 @@ export function ReelModalClient(props: ReelModalClientProps) {
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-black/75 backdrop-blur-xl hidden md:block"
-        onClick={() => router.back()}
+        onClick={handleClose}
       />
       {/* Full-screen on mobile (black), transparent on desktop (DesktopReelViewer handles it) */}
       <div className="relative z-10 w-full h-full">
@@ -170,6 +181,7 @@ export function ReelModalClient(props: ReelModalClientProps) {
           ctxHasNext={useCtx ? ctxHasNext : undefined}
           ctxPrev={useCtx ? onCtxPrev : undefined}
           ctxNext={useCtx ? onCtxNext : undefined}
+          onClose={handleClose}
         />
       </div>
     </div>

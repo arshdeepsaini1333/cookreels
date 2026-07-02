@@ -17,6 +17,7 @@ import { useRecipeComments } from '@/hooks/useRecipeComments'
 import { CommentList, CommentInput } from '@/components/shared/CommentSection'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { GuestBanner } from '@/components/shared/GuestBanner'
+import { LoginPromptModal } from '@/components/auth/LoginPromptModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -85,12 +86,15 @@ const DIFF_COLOR: Record<string, string> = {
 }
 
 function Avatar({ src, name, size = 'md' }: { src?: string | null; name: string; size?: 'sm' | 'md' }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
   const initials = (name ?? '').split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?'
   const dim = size === 'sm' ? 'w-7 h-7' : 'w-9 h-9'
+  const showImg = src && !failed && !/googleusercontent\.com/i.test(src)
   return (
     <div className={`${dim} rounded-full overflow-hidden flex-shrink-0`}>
-      {src && !/googleusercontent\.com/i.test(src)
-        ? <img src={src} alt={name} className="w-full h-full object-cover" />
+      {showImg
+        ? <img src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
         : (
           <div className="w-full h-full flex items-center justify-center text-[10px] font-bold"
                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
@@ -137,6 +141,7 @@ export function RecipeViewerModal({
   const [direction,     setDirection]     = useState(0)
   const [shareOpen,     setShareOpen]     = useState(false)
   const [reportOpen,    setReportOpen]    = useState(false)
+  const [loginPromptOpen, setLoginPromptOpen] = useState(false)
   const [detail,        setDetail]        = useState<RecipeDetail | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [expanded,      setExpanded]      = useState(false)
@@ -284,13 +289,19 @@ export function RecipeViewerModal({
     return await addComment(text)
   }
 
+  const guardedLike = () => { currentUserId ? handleLike() : setLoginPromptOpen(true) }
+  const guardedSave = () => { currentUserId ? handleSave() : setLoginPromptOpen(true) }
+  const guardedCommentFocus = (ref: React.RefObject<HTMLInputElement | null>) => {
+    currentUserId ? ref.current?.focus() : setLoginPromptOpen(true)
+  }
+
   if (!recipe || !mounted) return null
 
   const gradient  = GRADIENTS[index % GRADIENTS.length]
   const diffKey   = recipe.difficulty ?? ''
   const totalTime = (recipe.cookTime ?? 0) + (recipe.prepTime ?? 0)
   const resolvedAvatar = currentUserAvatar ?? me?.profileImage ?? null
-  const resolvedName   = currentUserName   ?? (me ? `${me.firstName} ${me.lastName}` : activeUser.name)
+  const resolvedName   = currentUserName   ?? (me ? `${me.firstName} ${me.lastName}` : undefined)
   const commenter = resolvedName
 
   const modal = (
@@ -353,7 +364,10 @@ export function RecipeViewerModal({
             exit={{ opacity: 0, scale: 0.91, y: 24 }}
             transition={{ type: 'spring', stiffness: 310, damping: 30 }}
             className="fixed inset-0 flex items-center justify-center md:p-4 lg:p-6 pointer-events-none"
-            style={{ zIndex: 9999 }}
+            style={{
+              zIndex: 9999,
+              top: !currentUserId ? 'calc(60px + env(safe-area-inset-top, 0px))' : undefined,
+            }}
             role="dialog"
             aria-modal="true"
             aria-label={recipe.title}
@@ -365,8 +379,8 @@ export function RecipeViewerModal({
               onClick={e => e.stopPropagation()}
               className="
                 pointer-events-auto relative w-full h-full overflow-hidden flex flex-col
-                md:rounded-3xl md:max-w-2xl md:h-auto md:max-h-[92vh]
-                lg:max-w-5xl lg:h-[88vh] lg:max-h-[800px]
+                md:rounded-3xl md:max-w-2xl md:h-auto md:max-h-[92dvh]
+                lg:max-w-5xl lg:h-[88dvh] lg:max-h-[800px]
               "
               style={{ background: 'var(--cr-bg-card)' }}
             >
@@ -472,7 +486,7 @@ export function RecipeViewerModal({
                         <div className="flex items-center gap-0">
                           <motion.button
                             whileTap={{ scale: 0.8 }}
-                            onClick={handleLike}
+                            onClick={guardedLike}
                             aria-label={liked ? 'Unlike' : 'Like'}
                             className="p-2.5"
                           >
@@ -485,7 +499,7 @@ export function RecipeViewerModal({
                           </motion.button>
 
                           <button
-                            onClick={() => mobileCommentRef.current?.focus()}
+                            onClick={() => guardedCommentFocus(mobileCommentRef)}
                             aria-label="Comment"
                             className="p-2.5"
                             style={{ color: 'var(--cr-text-1)' }}
@@ -510,7 +524,7 @@ export function RecipeViewerModal({
 
                         <motion.button
                           whileTap={{ scale: 0.82 }}
-                          onClick={handleSave}
+                          onClick={guardedSave}
                           aria-label={saved ? 'Unsave' : 'Save'}
                           className="p-2.5"
                         >
@@ -625,6 +639,14 @@ export function RecipeViewerModal({
                     <p className="text-xs text-center py-1" style={{ color: 'var(--cr-text-muted)' }}>
                       Comments are disabled on this post.
                     </p>
+                  ) : !currentUserId ? (
+                    <button
+                      onClick={() => setLoginPromptOpen(true)}
+                      className="w-full text-xs text-center py-1"
+                      style={{ color: 'var(--cr-text-muted)' }}
+                    >
+                      Sign in to comment
+                    </button>
                   ) : (
                     <CommentInput
                       currentUserAvatar={resolvedAvatar}
@@ -800,7 +822,7 @@ export function RecipeViewerModal({
                             <div className="flex items-center">
                               <motion.button
                                 whileTap={{ scale: 0.8 }}
-                                onClick={handleLike}
+                                onClick={guardedLike}
                                 aria-label={liked ? 'Unlike' : 'Like'}
                                 className="flex items-center gap-1.5 px-3 py-2 rounded-full transition-colors"
                                 style={{ color: liked ? '#F5C518' : 'var(--cr-text-muted)' }}
@@ -817,7 +839,7 @@ export function RecipeViewerModal({
                               </motion.button>
 
                               <button
-                                onClick={() => commentRef.current?.focus()}
+                                onClick={() => guardedCommentFocus(commentRef)}
                                 aria-label="Comment"
                                 className="flex items-center gap-1.5 px-3 py-2 rounded-full"
                                 style={{ color: 'var(--cr-text-muted)' }}
@@ -832,7 +854,7 @@ export function RecipeViewerModal({
                             <div className="flex items-center">
                               <motion.button
                                 whileTap={{ scale: 0.82 }}
-                                onClick={handleSave}
+                                onClick={guardedSave}
                                 aria-label={saved ? 'Unsave' : 'Save'}
                                 className="w-9 h-9 rounded-full flex items-center justify-center"
                                 style={{ color: saved ? '#F5C518' : 'var(--cr-text-muted)' }}
@@ -868,6 +890,14 @@ export function RecipeViewerModal({
                               <p className="text-xs text-center py-1" style={{ color: 'var(--cr-text-muted)' }}>
                                 Comments are disabled on this post.
                               </p>
+                            ) : !currentUserId ? (
+                              <button
+                                onClick={() => setLoginPromptOpen(true)}
+                                className="w-full text-xs text-center py-1"
+                                style={{ color: 'var(--cr-text-muted)' }}
+                              >
+                                Sign in to comment
+                              </button>
                             ) : (
                               <CommentInput
                                 currentUserAvatar={resolvedAvatar}
@@ -915,6 +945,13 @@ export function RecipeViewerModal({
           onReported={onClose}
         />
       )}
+      <LoginPromptModal
+        isOpen={loginPromptOpen}
+        onClose={() => setLoginPromptOpen(false)}
+        redirectTo={recipe ? `/recipe/${recipe.id}` : '/explore'}
+        title="Login required"
+        message="Sign in to like, save and comment on recipes."
+      />
     </>
   )
 }

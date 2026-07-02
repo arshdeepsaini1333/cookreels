@@ -186,10 +186,12 @@ export function AddContentModal({
   open,
   onClose,
   userId,
+  initialType = 'recipe',
 }: {
   open: boolean
   onClose: () => void
   userId: string
+  initialType?: ContentType
 }) {
   const router = useRouter()
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
@@ -208,7 +210,9 @@ export function AddContentModal({
     }, 2000)
   }
 
-  const [type, setType] = useState<ContentType>('recipe')
+  const [type, setType] = useState<ContentType>(initialType)
+  // Reset to the requested tab each time the modal opens (e.g. FAB's "Upload Reel" vs "Add Recipe").
+  useEffect(() => { if (open) setType(initialType) }, [open, initialType])
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set())
 
   // ── Fetch categories from DB when modal opens ──────────────────────────────

@@ -72,7 +72,6 @@ interface SharePerson {
   name: string
   username: string
   avatar: string | null
-  isOnline?: boolean
 }
 
 export interface ShareModalProps {
@@ -87,23 +86,22 @@ export interface ShareModalProps {
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-function Avatar({ src, name, isOnline }: { src?: string | null; name: string; isOnline?: boolean }) {
+function Avatar({ src, name }: { src?: string | null; name: string }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
   const initials = (name ?? '').split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?'
+  const showImg = src && !failed && !/googleusercontent\.com/i.test(src)
   return (
     <div className="relative shrink-0">
       <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-[#F5C518]/20">
-        {src && !/googleusercontent\.com/i.test(src)
-          ? <img src={src} alt={name} className="w-full h-full object-cover" />
+        {showImg
+          ? <img src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
           : <div className="w-full h-full flex items-center justify-center text-[11px] font-bold"
                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}>
               {initials}
             </div>
         }
       </div>
-      {isOnline !== undefined && (
-        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-[var(--cr-bg-card)]"
-          style={{ background: isOnline ? '#22c55e' : 'var(--cr-border)' }} />
-      )}
     </div>
   )
 }
@@ -155,7 +153,7 @@ function PersonRow({
         cursor:     isSent ? 'default' : 'pointer',
       }}
     >
-      <Avatar src={person.avatar} name={person.name} isOnline={person.isOnline} />
+      <Avatar src={person.avatar} name={person.name} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold truncate" style={{ color: 'var(--cr-text-primary)' }}>
           {person.name}
@@ -231,14 +229,13 @@ export function ShareModal({
       const data = res.ok ? await res.json() : { friends: [] }
 
       const rawFriends = (data.users ?? []) as {
-        id: string; firstName: string; lastName: string; username: string; profileImage: string | null; isOnline?: boolean
+        id: string; firstName: string; lastName: string; username: string; profileImage: string | null
       }[]
       setPeople(rawFriends.map(f => ({
         id:       f.id,
         name:     `${f.firstName} ${f.lastName}`,
         username: f.username,
         avatar:   f.profileImage,
-        isOnline: f.isOnline,
       })))
     } catch { /* ignore */ }
     setLoading(false)

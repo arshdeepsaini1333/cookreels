@@ -9,9 +9,11 @@ export interface LoginPromptModalProps {
   onClose:     () => void
   redirectTo:  string
   userName?:   string
+  title?:      string
+  message?:    string
 }
 
-export function LoginPromptModal({ isOpen, onClose, redirectTo, userName }: LoginPromptModalProps) {
+export function LoginPromptModal({ isOpen, onClose, redirectTo, userName, title, message }: LoginPromptModalProps) {
   const router = useRouter()
 
   return (
@@ -68,10 +70,10 @@ export function LoginPromptModal({ isOpen, onClose, redirectTo, userName }: Logi
                 className="text-lg font-bold mb-1.5"
                 style={{ color: 'var(--cr-text-1)', fontFamily: 'var(--font-heading)' }}
               >
-                Login to view profile
+                {title ?? 'Login to view profile'}
               </h2>
               <p className="text-sm leading-relaxed mb-6" style={{ color: 'var(--cr-text-muted)' }}>
-                Sign in to see {userName ? `${userName}'s` : "this chef's"} full profile, recipes and reels.
+                {message ?? `Sign in to see ${userName ? `${userName}'s` : "this chef's"} full profile, recipes and reels.`}
               </p>
 
               <div className="flex flex-col gap-2">

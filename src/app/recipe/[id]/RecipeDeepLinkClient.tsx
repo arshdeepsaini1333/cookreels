@@ -43,7 +43,6 @@ async function fetchCtxItem(id: string): Promise<CtxItem | null> {
         username:         d.user.username,
         bio:              d.user.bio ?? null,
         verified:         d.user.isVerified,
-        isOnline:         false,
         topChef:          !!d.user.topChef,
         level:            'Chef',
         avatar:           d.user.profileImage,

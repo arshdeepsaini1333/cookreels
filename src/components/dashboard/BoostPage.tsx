@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 import AudienceStep, { type SelectedAudienceRef } from './AudienceManager'
+import { uploadToS3 } from '@/lib/uploadTos3'
 
 // ─── Razorpay global type ─────────────────────────────────────────────────────
 declare global {
@@ -116,6 +117,8 @@ const OBJECTIVES: { label: string; value: string }[] = [
 ]
 
 const RADIUS_OPTIONS = ['100m', '250m', '500m', '1km', '5km', '10km']
+
+const CTA_OPTIONS = ['Learn More', 'Shop Now', 'Order Now', 'Visit Website', 'Download App', 'Book Now', 'Get Offer', 'Subscribe']
 
 const PLATFORMS = [
   {
@@ -764,6 +767,25 @@ function AdSetCard({ state, update, isDark, errors }: {
         <MediaUploader state={state} update={update} isDark={isDark} />
         {errors.mediaFile && <ErrorText>{errors.mediaFile}</ErrorText>}
       </div>
+      <div>
+        <Label isDark={isDark}>Call to Action Button</Label>
+        <Select isDark={isDark} value={state.ctaText} onChange={e => update('ctaText', e.target.value)}>
+          {CTA_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+        </Select>
+      </div>
+      <div>
+        <Label isDark={isDark}>Destination Link (optional)</Label>
+        <Input
+          isDark={isDark}
+          type="url"
+          placeholder="https://yourwebsite.com"
+          value={state.destinationUrl}
+          onChange={e => update('destinationUrl', e.target.value)}
+        />
+        <p className="text-xs mt-1.5" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+          Where should people land when they tap the CTA button? Leave blank to link to your CookReels profile.
+        </p>
+      </div>
     </SectionCard>
   )
 }
@@ -1400,24 +1422,49 @@ export function BoostPage({ username }: { username: string }) {
       : 7
 
     try {
+      // Upload the selected banner/reel to storage before creating the campaign —
+      // without this, bannerUrl/adVideoUrl never reach the database and the
+      // detail view has nothing to show.
+      let bannerUrl: string | undefined
+      let adVideoUrl: string | undefined
+      if (campaign.mediaFile) {
+        const isBanner = campaign.adFormat === 'banner'
+        const prefix = isBanner ? 'banner' : 'reel'
+        try {
+          const url = await uploadToS3(campaign.mediaFile, isBanner ? 'campaigns/banner' : 'campaigns/video', `${prefix}_${Date.now()}_${campaign.mediaFile.name}`)
+          if (isBanner) bannerUrl = url
+          else adVideoUrl = url
+        } catch {
+          setSaveError('Failed to upload ad creative. Please try again.')
+          setSavingDraft(false)
+          return
+        }
+      }
+
       const res = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name:         campaign.campaignName,
           objective:    campaign.objective || 'BRAND_AWARENESS',
+          bannerUrl,
+          adVideoUrl,
           audienceData: {
             platform:       campaign.platform || 'cookreels',
             adFormat:       campaign.adFormat,
             description:    campaign.description,
             geofences:      campaign.geofences,
-            impressions,
             adHeading:      campaign.adHeading,
+            ctaText:        campaign.ctaText,
+            destinationUrl: campaign.destinationUrl,
+            bannerUrl,
+            adVideoUrl,
           },
           audienceId:   campaign.selectedAudience!.id,
           durationDays: days,
           dailyBudget:  totalINR / days,
           totalBudget:  totalINR,
+          impressions,
           startDate:    campaign.startDate || null,
           endDate:      campaign.endDate   || null,
         }),

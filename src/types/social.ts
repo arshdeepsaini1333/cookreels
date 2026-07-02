@@ -8,7 +8,6 @@ export interface SocialUser {
   cuisineSpecialty: string | null
   level: string | null
   isVerified: boolean
-  isOnline: boolean
   followersCount: number
   followingCount: number
   /** current viewer follows this user */

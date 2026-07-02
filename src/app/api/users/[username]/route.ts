@@ -21,7 +21,6 @@ export async function GET(_req: Request, { params }: Params) {
         cuisineSpecialty: true,
         level: true,
         isVerified: true,
-        isOnline: true,
         _count: {
           select: {
             recipes:   { where: { isPublished: true } },
@@ -76,7 +75,6 @@ export async function GET(_req: Request, { params }: Params) {
       cuisineSpecialty: user.cuisineSpecialty,
       level:            user.level,
       isVerified:       user.isVerified,
-      isOnline:         user.isOnline,
       recipesCount:     user._count.recipes,
       reelsCount:       user._count.reels,
       followersCount:   user._count.followers,

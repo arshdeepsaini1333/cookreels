@@ -142,16 +142,19 @@ interface AvatarProps {
 }
 
 function Avatar({ user, size = 'md', rounded = 'rounded-2xl' }: AvatarProps) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [user.profileImage])
   const dim = { sm: 'w-10 h-10 text-sm', md: 'w-14 h-14 text-lg', lg: 'w-16 h-16 text-xl' }[size]
   const grad = avatarGradient(user.username)
 
-  if (user.profileImage && !/googleusercontent\.com/i.test(user.profileImage)) {
+  if (user.profileImage && !failed && !/googleusercontent\.com/i.test(user.profileImage)) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={user.profileImage}
         alt={user.username}
         className={`${dim} ${rounded} object-cover shadow-md shrink-0`}
+        onError={() => setFailed(true)}
       />
     )
   }
@@ -163,14 +166,22 @@ function Avatar({ user, size = 'md', rounded = 'rounded-2xl' }: AvatarProps) {
   )
 }
 
-/* ─── Online indicator ───────────────────────────────────── */
-
-function OnlineDot() {
+function SquareAvatar({
+  src, alt, initial, gradient, className, imgClassName,
+}: {
+  src?: string | null; alt: string; initial: string; gradient: string; className: string; imgClassName: string
+}) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [src])
+  const showPhoto = src && !failed && !/googleusercontent\.com/i.test(src)
   return (
-    <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-400 border-2 border-white dark:border-zinc-800" />
-    </span>
+    <div className={`${className} bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold shadow-sm`}>
+      {showPhoto
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={src} alt={alt} className={imgClassName} onError={() => setFailed(true)} />
+        : <span>{initial}</span>
+      }
+    </div>
   )
 }
 
@@ -318,17 +329,8 @@ function FriendCard({ user, onToggle, isPending }: FriendCardProps) {
     >
       <div className="absolute -top-14 -right-14 w-36 h-36 rounded-full bg-[#F5C518]/6 dark:bg-[#f6c68b]/6 blur-2xl group-hover:bg-[#F5C518]/14 dark:group-hover:bg-[#f6c68b]/14 transition-all duration-500 pointer-events-none" />
 
-      {/* Online */}
-      {user.isOnline && (
-        <span className="absolute top-4 right-4 flex h-2.5 w-2.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400" />
-        </span>
-      )}
-
       <div className="relative w-16 h-16 mb-3">
         <Avatar user={user} size="lg" />
-        {user.isOnline && <OnlineDot />}
       </div>
 
       <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-[15px] leading-tight">
@@ -400,11 +402,6 @@ function FollowingCard({ user, onToggle, isPending }: FollowingCardProps) {
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm leading-tight truncate">
             {user.firstName} {user.lastName}
           </h3>
-          {user.isOnline && (
-            <span className="text-[9px] bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-bold px-2 py-0.5 rounded-full shrink-0">
-              ● Online
-            </span>
-          )}
           {user.isFriend && (
             <span className="text-[9px] bg-[#F5C518]/15 dark:bg-[#f6c68b]/15 text-[#B38B00] dark:text-[#f6c68b] font-bold px-2 py-0.5 rounded-full shrink-0">
               Friends
@@ -442,7 +439,6 @@ function FollowerCard({ user, onToggle, isPending }: FollowerCardProps) {
       <div className="flex items-center gap-3 mb-3">
         <div className="relative shrink-0">
           <Avatar user={user} size="md" />
-          {user.isOnline && <OnlineDot />}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm leading-tight">
@@ -483,7 +479,6 @@ function AddUserCard({ user, onToggle, isPending }: AddUserCardProps) {
       <div className="flex items-center gap-3">
         <div className="relative shrink-0">
           <Avatar user={user} size="md" />
-          {user.isOnline && <OnlineDot />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
@@ -593,17 +588,17 @@ function RightPanel() {
           <div className="flex flex-col gap-3">
             {creators.map((c) => {
               const grad = avatarGradient(c.username)
-              const showPhoto = c.profileImage && !/googleusercontent\.com/i.test(c.profileImage)
               const initial = `${c.firstName?.[0] ?? ''}${c.lastName?.[0] ?? ''}`.toUpperCase() || '?'
               return (
                 <div key={c.id} className="flex items-center gap-3 group">
-                  <div className={`w-10 h-10 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br ${grad} flex items-center justify-center text-white text-sm font-bold shadow-sm`}>
-                    {showPhoto
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={c.profileImage!} alt={c.firstName} className="w-full h-full object-cover" />
-                      : <span>{initial}</span>
-                    }
-                  </div>
+                  <SquareAvatar
+                    src={c.profileImage}
+                    alt={c.firstName}
+                    initial={initial}
+                    gradient={grad}
+                    className="w-10 h-10 rounded-xl overflow-hidden shrink-0 text-sm"
+                    imgClassName="w-full h-full object-cover"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
                       {c.firstName} {c.lastName}
@@ -651,7 +646,6 @@ function RightPanel() {
           <div className="flex flex-col gap-3">
             {activity.map((a, i) => {
               const grad = avatarGradient(a.username)
-              const showPhoto = a.profileImage && !/googleusercontent\.com/i.test(a.profileImage)
               const initial  = a.displayName?.[0]?.toUpperCase() ?? '?'
               return (
                 <motion.a
@@ -662,13 +656,14 @@ function RightPanel() {
                   transition={{ delay: 0.2 + i * 0.06, duration: 0.35, ease: EASE }}
                   className="flex items-start gap-3 group"
                 >
-                  <div className={`w-8 h-8 rounded-xl overflow-hidden shrink-0 bg-gradient-to-br ${grad} flex items-center justify-center text-white text-[11px] font-bold shadow-sm`}>
-                    {showPhoto
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={a.profileImage!} alt={a.displayName} className="w-full h-full object-cover" />
-                      : <span>{initial}</span>
-                    }
-                  </div>
+                  <SquareAvatar
+                    src={a.profileImage}
+                    alt={a.displayName}
+                    initial={initial}
+                    gradient={grad}
+                    className="w-8 h-8 rounded-xl overflow-hidden shrink-0 text-[11px]"
+                    imgClassName="w-full h-full object-cover"
+                  />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-snug group-hover:text-zinc-900 dark:group-hover:text-zinc-100 transition-colors">
                       <span className="font-semibold">{a.displayName}</span>

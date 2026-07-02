@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { ProtectedImg } from '@/components/shared/ProtectedMedia'
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
@@ -23,9 +23,13 @@ function getInitials(name: string | null | undefined): string {
 interface UserAvatarProps {
   src?: string | null
   name: string | null | undefined
-  size?: AvatarSize
+  /** Preset size, or a raw Tailwind size/text className (e.g. "w-10 h-10 text-xs") for one-off dimensions. */
+  size?: AvatarSize | (string & {})
   className?: string
+  style?: CSSProperties
   loading?: 'lazy' | 'eager'
+  fallbackClassName?: string
+  fallbackStyle?: CSSProperties
 }
 
 export function UserAvatar({
@@ -33,14 +37,17 @@ export function UserAvatar({
   name,
   size = 'md',
   className = '',
+  style,
   loading = 'lazy',
+  fallbackClassName = '',
+  fallbackStyle,
 }: UserAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false)
-  const dim = SIZE_MAP[size]
+  const dim = SIZE_MAP[size as AvatarSize] ?? size
   const showImage = src && !imgFailed
 
   return (
-    <div className={`${dim} rounded-full overflow-hidden flex-shrink-0 ${className}`}>
+    <div className={`${dim} rounded-full overflow-hidden flex-shrink-0 ${className}`} style={style}>
       {showImage ? (
         <ProtectedImg
           src={src}
@@ -51,8 +58,8 @@ export function UserAvatar({
         />
       ) : (
         <div
-          className="w-full h-full flex items-center justify-center font-bold"
-          style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+          className={`w-full h-full flex items-center justify-center font-bold ${fallbackClassName}`}
+          style={fallbackStyle ?? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
         >
           {getInitials(name)}
         </div>

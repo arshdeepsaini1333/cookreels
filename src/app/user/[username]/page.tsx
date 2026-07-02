@@ -27,7 +27,6 @@ const fetchUser = cache(async (username: string) => {
       cuisineSpecialty:  true,
       level:             true,
       isVerified:        true,
-      isOnline:          true,
       privateAccount:    true,
       _count: {
         select: {
@@ -140,7 +139,6 @@ export default async function Page({ params }: Props) {
           cuisineSpecialty:  true,
           level:     true,
           isVerified: true,
-          isOnline:  true,
           password:  true,
           _count: {
             select: {
@@ -222,7 +220,6 @@ export default async function Page({ params }: Props) {
           username:          `@${fullUser.username}`,
           bio:               fullUser.bio,
           verified:          fullUser.isVerified,
-          isOnline:          fullUser.isOnline,
           topChef:           fullUser._count.recipes >= 10,
           level:             fullUser.level ?? 'Home Chef',
           avatar:            fullUser.profileImage,
@@ -322,7 +319,6 @@ export default async function Page({ params }: Props) {
         username:          `@${user.username}`,
         bio:               user.bio,
         verified:          user.isVerified,
-        isOnline:          user.isOnline,
         topChef:           user._count.recipes >= 10,
         level:             user.level ?? 'Home Chef',
         avatar:            user.profileImage,
