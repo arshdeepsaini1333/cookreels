@@ -19,13 +19,13 @@ const CACHE = { headers: { 'Cache-Control': 'private, no-store' } }
 const PER_TYPE  = 15
 const PAGE_SIZE = 30
 
-// Trending tab: top-liked within 15 days, fixed counts, no pagination
+// Trending tab: top-liked, fixed counts, no pagination
 const TRENDING_RECIPES = 20
 const TRENDING_REELS   = 10
 
 // Recent tab: posted within 15 days, shuffled, no pagination
-const RECENT_RECIPES = 30
-const RECENT_REELS   = 15
+const RECENT_RECIPES = 15
+const RECENT_REELS   = 10
 
 export async function GET(req: NextRequest) {
   const session = await getSession()
@@ -39,17 +39,13 @@ export async function GET(req: NextRequest) {
   const reelReportFilter   = { NOT: [{ reports: { some: { reporterId: uid } } }, blockedAuthorFilter<Prisma.ReelWhereInput>(uid)] }
   const baseUser = { privateAccount: false, isBanned: false }
 
-  // ── Trending: most-liked within the past 15 days, shuffled, no pagination ──
+  // ── Trending: top 20 recipes + top 10 reels by likes, no time window, strict desc order ──
   if (tab === 'trending') {
-    const since = new Date()
-    since.setDate(since.getDate() - 15)
-
     const [recipes, reels] = await Promise.all([
       prisma.recipe.findMany({
         where: {
           isPublished: true,
           isBanned: false,
-          createdAt: { gte: since },
           ...recipeReportFilter,
           OR: [
             { userId: uid },
@@ -77,7 +73,6 @@ export async function GET(req: NextRequest) {
         where: {
           isPublished: true,
           isBanned: false,
-          createdAt: { gte: since },
           ...reelReportFilter,
           OR: [
             { userId: uid },
@@ -102,24 +97,20 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json({
-      recipes: shuffle(recipes).map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
-      reels:   shuffle(reels).map((r: any)   => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      recipes: recipes.map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
+      reels:   reels.map((r: any) => ({ ...r, likeCount: r.user.hideLikeCount ? null : r.likeCount, createdAt: r.createdAt.toISOString() })),
       hasMore: false,
       page: 0,
     }, CACHE)
   }
 
-  // ── Recent: posted within the past 15 days, shuffled, no pagination ──────────
+  // ── Recent: last N added overall (no time window), shuffled, no pagination ──
   if (tab === 'recent') {
-    const since = new Date()
-    since.setDate(since.getDate() - 15)
-
     const [recipes, reels] = await Promise.all([
       prisma.recipe.findMany({
         where: {
           isPublished: true,
           isBanned: false,
-          createdAt: { gte: since },
           ...recipeReportFilter,
           OR: [
             { userId: uid },
@@ -146,7 +137,6 @@ export async function GET(req: NextRequest) {
         where: {
           isPublished: true,
           isBanned: false,
-          createdAt: { gte: since },
           ...reelReportFilter,
           OR: [
             { userId: uid },

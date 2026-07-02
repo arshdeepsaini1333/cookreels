@@ -248,7 +248,7 @@ function FeedTab({
       .then(r => r.json())
       .then(data => {
         if (cancelled) return
-        const items = (tab === 'All' || tab === 'Trending' || tab === 'Recent')
+        const items = (tab === 'All' || tab === 'Recent')
           ? scatter(data.recipes ?? [], data.reels ?? [])
           : interleave(data.recipes ?? [], data.reels ?? [])
         allItemsRef.current = items

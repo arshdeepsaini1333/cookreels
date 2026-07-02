@@ -92,7 +92,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/media/reels/cookreels18.jpg\")",
       "Bash(curl -sI \"http://localhost:3000/media/reels/cookreels18.jpg\")",
       "Bash(ffmpeg -version)",
-      "Bash(rm -f d:/cookreels-main/scripts-temp-check-thumb.js)"
+      "Bash(rm -f d:/cookreels-main/scripts-temp-check-thumb.js)",
+      "Bash(node scripts-temp-check-counts.js)"
     ]
   }
 }
