@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/context/ThemeContext'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -48,6 +49,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, onReported 
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   const typeLabel = TYPE_LABEL[targetType]
 
@@ -109,7 +113,9 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, onReported 
     }
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -306,6 +312,7 @@ export function ReportModal({ isOpen, onClose, targetType, targetId, onReported 
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

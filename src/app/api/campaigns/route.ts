@@ -12,7 +12,7 @@ const CreateCampaignSchema = z.object({
   reelId:       z.string().optional(),
   objective:    z.enum(['VIEWS', 'LIKES', 'FOLLOWERS', 'WEBSITE_CLICKS']),
   audienceData: z.record(z.string(), z.unknown()).default({}),
-  locations:    z.array(z.string()).default([]),
+  locations:    z.array(z.string()).min(1, 'At least one target location is required'),
   ageMin:       z.number().int().min(13).max(65).optional(),
   ageMax:       z.number().int().min(13).max(65).optional(),
   gender:       z.string().optional(),

@@ -600,7 +600,7 @@ function AudienceTargeting({ state, update, isDark }: {
     <SectionCard title="Audience Targeting" icon={Target} isDark={isDark}>
       {/* Location */}
       <div>
-        <Label isDark={isDark}>Target Countries</Label>
+        <Label isDark={isDark}>Target Countries <span style={{ color: '#EF4444' }}>*</span></Label>
         <div className="relative mb-2">
           <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
           <input
@@ -1719,6 +1719,7 @@ export function BoostPage({ username }: { username: string }) {
   const handleLaunch = async () => {
     if (!campaign.campaignName.trim()) { setSaveError('Please enter a campaign name'); return }
     if (!campaign.objective) { setSaveError('Please select a campaign objective'); return }
+    if (campaign.countries.length === 0) { setSaveError('Please select at least one target location'); return }
 
     if (campaign.budgetType === 'daily') {
       if (!campaign.startDate) { setSaveError('A Start Date is required for Daily Budget campaigns.'); return }
