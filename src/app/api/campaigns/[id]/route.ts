@@ -3,19 +3,16 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@/generated/prisma'
-import type { AudienceData } from '@/types/campaign'
+import type { AudienceData, AudienceLocation } from '@/types/campaign'
 
 type Params = { params: Promise<{ id: string }> }
 
 const UpdateCampaignSchema = z.object({
   name:         z.string().min(1).max(100).optional(),
   reelId:       z.string().nullable().optional(),
-  objective:    z.enum(['VIEWS', 'LIKES', 'FOLLOWERS', 'WEBSITE_CLICKS']).optional(),
+  objective:    z.enum(['LEADS', 'WEBSITE_TRAFFIC', 'APP_INSTALLS', 'VIDEO_VIEWS', 'PROFILE_VISITS', 'BRAND_AWARENESS', 'ENGAGEMENT', 'REACH', 'CONVERSIONS']).optional(),
   audienceData: z.record(z.string(), z.unknown()).optional(),
-  locations:    z.array(z.string()).optional(),
-  ageMin:       z.number().int().min(13).max(65).nullable().optional(),
-  ageMax:       z.number().int().min(13).max(65).nullable().optional(),
-  gender:       z.string().nullable().optional(),
+  audienceId:   z.string().min(1).optional(),
   durationDays: z.number().int().positive().optional(),
   dailyBudget:  z.number().positive().optional(),
   totalBudget:  z.number().positive().optional(),
@@ -51,6 +48,10 @@ export async function GET(_req: Request, { params }: Params) {
         ageMin:      true,
         ageMax:      true,
         gender:      true,
+        audiences: {
+          select: { id: true, name: true },
+          take: 1,
+        },
         createdAt:   true,
         updatedAt:   true,
         analytics: {
@@ -112,6 +113,7 @@ export async function GET(_req: Request, { params }: Params) {
       ageMin:       campaign.ageMin,
       ageMax:       campaign.ageMax,
       gender:       campaign.gender,
+      audience:     campaign.audiences[0] ?? null,
       analytics: campaign.analytics ? {
         impressions:     campaign.analytics.impressions,
         views:           campaign.analytics.views,
@@ -185,15 +187,29 @@ export async function PATCH(req: Request, { params }: Params) {
   if (data.reelId       !== undefined) updateData.reelId       = data.reelId
   if (data.objective    !== undefined) updateData.objective    = data.objective
   if (data.audienceData !== undefined) updateData.audienceData = data.audienceData as Prisma.InputJsonValue
-  if (data.locations    !== undefined) updateData.locations    = data.locations as Prisma.InputJsonValue
-  if (data.ageMin       !== undefined) updateData.ageMin       = data.ageMin
-  if (data.ageMax       !== undefined) updateData.ageMax       = data.ageMax
-  if (data.gender       !== undefined) updateData.gender       = data.gender
   if (data.durationDays !== undefined) updateData.durationDays = data.durationDays
   if (data.dailyBudget  !== undefined) updateData.dailyBudget  = data.dailyBudget
   if (data.totalBudget  !== undefined) updateData.totalBudget  = data.totalBudget
   if (data.startDate    !== undefined) updateData.startDate    = data.startDate ? new Date(data.startDate) : null
   if (data.endDate      !== undefined) updateData.endDate      = data.endDate   ? new Date(data.endDate)   : null
+
+  if (data.audienceId !== undefined) {
+    const audience = await prisma.audience.findFirst({
+      where: { id: data.audienceId, userId: session.userId },
+      select: { id: true, gender: true, ageMin: true, ageMax: true, locations: true },
+    })
+    if (!audience) {
+      return NextResponse.json({ error: 'Audience not found or not owned by you' }, { status: 404 })
+    }
+
+    const derivedLocations = ((audience.locations as AudienceLocation[] | null) ?? []).map(l => l.value)
+
+    updateData.audiences = { set: { id: audience.id } }
+    updateData.locations = derivedLocations as Prisma.InputJsonValue
+    updateData.ageMin    = audience.ageMin
+    updateData.ageMax    = audience.ageMax
+    updateData.gender    = audience.gender
+  }
 
   try {
     const updated = await prisma.campaign.update({

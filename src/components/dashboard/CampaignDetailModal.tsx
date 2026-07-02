@@ -36,7 +36,9 @@ const STATUS_CFG: Record<string, { label: string; color: string; bg: string; Ico
 }
 
 const OBJECTIVE_LABELS: Record<string, string> = {
-  VIEWS: 'More Views', LIKES: 'More Likes', FOLLOWERS: 'More Followers', WEBSITE_CLICKS: 'Website Clicks',
+  LEADS: 'Leads', WEBSITE_TRAFFIC: 'Website Traffic', APP_INSTALLS: 'App Installs',
+  VIDEO_VIEWS: 'Video Views', PROFILE_VISITS: 'Profile Visits', BRAND_AWARENESS: 'Brand Awareness',
+  ENGAGEMENT: 'Engagement', REACH: 'Reach', CONVERSIONS: 'Conversions',
 }
 const PLATFORM_COLORS: Record<string, string> = {
   cookreels: '#F5C518', meta: '#E1306C', google: '#4285F4', geofencing: '#7DBB91',
@@ -492,8 +494,8 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                   {/* 3. Campaign Objective */}
                   <Box title="Campaign Objective" icon={<Target size={13} style={{ color: '#7DBB91' }} />} bg={sectionBg} border={border}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {(['VIEWS', 'LIKES', 'FOLLOWERS', 'WEBSITE_CLICKS'] as const).map(obj => (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      {(['LEADS', 'WEBSITE_TRAFFIC', 'APP_INSTALLS', 'VIDEO_VIEWS', 'PROFILE_VISITS', 'BRAND_AWARENESS', 'ENGAGEMENT', 'REACH', 'CONVERSIONS'] as const).map(obj => (
                         <div key={obj} style={{ padding: '9px 0', borderRadius: 10, border: `1.5px solid ${detail.objective === obj ? '#7DBB91' : border}`, background: detail.objective === obj ? 'rgba(125,187,145,0.10)' : inputBg, color: detail.objective === obj ? '#7DBB91' : textMuted, fontSize: 11, fontWeight: 700, textAlign: 'center', userSelect: 'none' }}>
                           {OBJECTIVE_LABELS[obj]}
                         </div>
@@ -556,6 +558,16 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                   {/* 5. Audience Targeting */}
                   <Box title="Audience Targeting" icon={<Users size={13} style={{ color: '#E1306C' }} />} bg={sectionBg} border={border}>
+                    {/* Linked reusable audience */}
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Selected Audience</p>
+                      {detail.audience ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(225,48,108,0.12)', color: '#E1306C', border: '1px solid rgba(225,48,108,0.28)' }}>{detail.audience.name}</span>
+                        </div>
+                      ) : <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 12, background: inputBg, border: `1.5px solid ${border}`, color: textMuted, fontStyle: 'italic', opacity: 0.6 }}>No reusable audience linked</div>}
+                    </div>
+
                     {/* Countries */}
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Countries</p>
@@ -830,8 +842,8 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                 {/* 3. Objective */}
                 <Box title="Campaign Objective" icon={<Target size={13} style={{ color: '#7DBB91' }} />} bg={sectionBg} border={border}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {(['VIEWS', 'LIKES', 'FOLLOWERS', 'WEBSITE_CLICKS'] as const).map(obj => (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                    {(['LEADS', 'WEBSITE_TRAFFIC', 'APP_INSTALLS', 'VIDEO_VIEWS', 'PROFILE_VISITS', 'BRAND_AWARENESS', 'ENGAGEMENT', 'REACH', 'CONVERSIONS'] as const).map(obj => (
                       <button key={obj} onClick={() => upd('objective', obj)} style={{ padding: '9px 0', borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${form.objective === obj ? '#7DBB91' : border}`, background: form.objective === obj ? 'rgba(125,187,145,0.10)' : inputBg, color: form.objective === obj ? '#7DBB91' : textMuted, fontSize: 11, fontWeight: 700, transition: 'all 0.15s' }}>
                         {OBJECTIVE_LABELS[obj]}
                       </button>

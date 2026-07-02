@@ -88,7 +88,7 @@ const RecipeCard = memo(function RecipeCard({ recipe, idx, onOpen }: RecipeCardP
   )
 })
 
-// ─── Reel card (tall ~380px, portrait) ───────────────────────────────────────
+// ─── Reel card (portrait, 260px on mobile / 380px sm+) ───────────────────────
 
 function fmtDuration(secs: number | null): string | null {
   if (!secs) return null
@@ -111,8 +111,8 @@ const ReelCard = memo(function ReelCard({ reel, idx, onOpen }: ReelCardProps) {
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.97 }}
       onClick={onOpen}
-      className={`relative overflow-hidden rounded-2xl cursor-pointer w-full group ${cls}`}
-      style={{ height: 380, ...style }}
+      className={`relative overflow-hidden rounded-2xl cursor-pointer w-full group h-[260px] sm:h-[380px] ${cls}`}
+      style={style}
     >
       <ReelThumbnail
         videoUrl={reel.videoUrl}

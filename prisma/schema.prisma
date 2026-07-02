@@ -85,10 +85,15 @@ enum CampaignStatus {
 }
 
 enum CampaignObjective {
-  VIEWS
-  LIKES
-  FOLLOWERS
-  WEBSITE_CLICKS
+  LEADS
+  WEBSITE_TRAFFIC
+  APP_INSTALLS
+  VIDEO_VIEWS
+  PROFILE_VISITS
+  BRAND_AWARENESS
+  ENGAGEMENT
+  REACH
+  CONVERSIONS
 }
 
 enum LeadStatus {
@@ -196,6 +201,7 @@ model User {
   sentMessages         Message[]      @relation("MessageSender")
 
   campaigns        Campaign[]
+  audiences        Audience[]
   payments         Payment[]
 
   reportsMade      Report[]  @relation("ReportsMade")
@@ -744,6 +750,7 @@ model Campaign {
 
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   reel         Reel?             @relation(fields: [reelId], references: [id], onDelete: SetNull)
+  audiences    Audience[]        @relation("CampaignAudiences")
   analytics    CampaignAnalytics?
   payments     Payment[]
   leads        CampaignLead[]
@@ -755,6 +762,33 @@ model Campaign {
   @@index([status])
   @@index([userId, status])
   @@map("campaigns")
+}
+
+// ─── Reusable Audiences (Boost Campaigns) ────────────────────────────────────
+
+model Audience {
+  id         String   @id @default(uuid())
+  userId     String
+
+  name       String
+  gender     String   @default("all")
+  ageMin     Int      @default(18)
+  ageMax     Int      @default(65)
+
+  locations  Json
+  interests  String[] @default([])
+  behaviours String[] @default([])
+  deviceType String   @default("all")
+  os         String   @default("all")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns  Campaign[] @relation("CampaignAudiences")
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@map("audiences")
 }
 
 model CampaignAnalytics {

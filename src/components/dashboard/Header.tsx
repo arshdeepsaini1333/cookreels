@@ -104,9 +104,10 @@ export function Header({
       if (mobileDropdownRef.current && !mobileDropdownRef.current.contains(e.target as Node)) {
         setMobileProfileOpen(false)
       }
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false)
-      }
+      // Notification panel is portaled to document.body (see NotificationDropdown),
+      // so it isn't a DOM descendant of notifRef — it handles its own outside-click
+      // close internally. A check here would incorrectly treat every click inside
+      // the portaled panel as "outside" and close it immediately.
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -263,6 +264,7 @@ export function Header({
               onClose={() => setNotifOpen(false)}
               isDark={isDark}
               newNotification={null}
+              anchorRef={notifRef}
             />
           </div>
 

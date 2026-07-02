@@ -3,19 +3,16 @@ import { z } from 'zod'
 import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, CampaignStatus } from '@/generated/prisma'
-import type { AudienceData } from '@/types/campaign'
+import type { AudienceData, AudienceLocation } from '@/types/campaign'
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
 const CreateCampaignSchema = z.object({
   name:         z.string().min(1, 'Name is required').max(100),
   reelId:       z.string().optional(),
-  objective:    z.enum(['VIEWS', 'LIKES', 'FOLLOWERS', 'WEBSITE_CLICKS']),
+  objective:    z.enum(['LEADS', 'WEBSITE_TRAFFIC', 'APP_INSTALLS', 'VIDEO_VIEWS', 'PROFILE_VISITS', 'BRAND_AWARENESS', 'ENGAGEMENT', 'REACH', 'CONVERSIONS']),
   audienceData: z.record(z.string(), z.unknown()).default({}),
-  locations:    z.array(z.string()).min(1, 'At least one target location is required'),
-  ageMin:       z.number().int().min(13).max(65).optional(),
-  ageMax:       z.number().int().min(13).max(65).optional(),
-  gender:       z.string().optional(),
+  audienceId:   z.string().min(1, 'An audience is required'),
   durationDays: z.number().int().positive(),
   dailyBudget:  z.number().positive(),
   totalBudget:  z.number().positive(),
@@ -50,6 +47,17 @@ export async function POST(req: Request) {
     if (!reel) return NextResponse.json({ error: 'Reel not found or not owned by you' }, { status: 404 })
   }
 
+  // Validate audience ownership and derive legacy targeting scalars from it
+  const audience = await prisma.audience.findFirst({
+    where: { id: data.audienceId, userId: session.userId },
+    select: { id: true, gender: true, ageMin: true, ageMax: true, locations: true },
+  })
+  if (!audience) {
+    return NextResponse.json({ error: 'Audience not found or not owned by you' }, { status: 404 })
+  }
+
+  const derivedLocations = ((audience.locations as AudienceLocation[] | null) ?? []).map(l => l.value)
+
   try {
     const campaign = await prisma.campaign.create({
       data: {
@@ -58,10 +66,11 @@ export async function POST(req: Request) {
         name:         data.name,
         objective:    data.objective,
         audienceData: data.audienceData as Prisma.InputJsonValue,
-        locations:    data.locations as Prisma.InputJsonValue,
-        ageMin:       data.ageMin ?? null,
-        ageMax:       data.ageMax ?? null,
-        gender:       data.gender ?? null,
+        locations:    derivedLocations as Prisma.InputJsonValue,
+        ageMin:       audience.ageMin,
+        ageMax:       audience.ageMax,
+        gender:       audience.gender,
+        audiences:    { connect: { id: audience.id } },
         durationDays: data.durationDays,
         dailyBudget:  data.dailyBudget,
         totalBudget:  data.totalBudget,

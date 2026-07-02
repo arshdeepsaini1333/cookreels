@@ -28,7 +28,49 @@ export interface AudienceData {
   destinationUrl?: string
   bannerUrl?: string
   adVideoUrl?: string
+  locationType?: 'city' | 'state' | 'country' | 'pincode'
+  adHeading?: string
 }
+
+// ─── Reusable Audiences ────────────────────────────────────────────────────────
+export type AudienceGender     = 'all' | 'male' | 'female'
+export type AudienceDeviceType = 'all' | 'mobile' | 'desktop' | 'tablet'
+export type AudienceOS         = 'all' | 'android' | 'ios' | 'windows' | 'macos' | 'linux'
+export type AudienceLocationType = 'country' | 'state' | 'city' | 'district' | 'pincode'
+
+export interface AudienceLocation {
+  type: AudienceLocationType
+  value: string
+}
+
+export interface Audience {
+  id: string
+  name: string
+  gender: AudienceGender
+  ageMin: number
+  ageMax: number
+  locations: AudienceLocation[]
+  interests: string[]
+  behaviours: string[]
+  deviceType: AudienceDeviceType
+  os: AudienceOS
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateAudienceBody {
+  name: string
+  gender: AudienceGender
+  ageMin: number
+  ageMax: number
+  locations: AudienceLocation[]
+  interests?: string[]
+  behaviours?: string[]
+  deviceType?: AudienceDeviceType
+  os?: AudienceOS
+}
+
+export type UpdateAudienceBody = Partial<CreateAudienceBody>
 
 // ─── Request bodies ───────────────────────────────────────────────────────────
 export interface CreateCampaignBody {
@@ -36,7 +78,8 @@ export interface CreateCampaignBody {
   reelId?: string
   objective: CampaignObjective
   audienceData: AudienceData
-  locations: string[]
+  audienceId: string
+  locations?: string[]
   ageMin?: number
   ageMax?: number
   gender?: string
@@ -47,7 +90,7 @@ export interface CreateCampaignBody {
   endDate?: string
 }
 
-export interface UpdateCampaignBody extends Partial<CreateCampaignBody> {}
+export type UpdateCampaignBody = Partial<CreateCampaignBody>
 
 export interface CreateOrderBody {
   campaignId: string
@@ -95,6 +138,7 @@ export interface CampaignDetail extends CampaignListItem {
   ageMin: number | null
   ageMax: number | null
   gender: string | null
+  audience: Pick<Audience, 'id' | 'name'> | null
   payment: PaymentDetail | null
 }
 

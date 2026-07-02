@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BellOff, CheckCheck } from 'lucide-react'
 import { useNotifications, type NotificationItem } from '@/hooks/useNotifications'
@@ -11,6 +12,13 @@ interface Props {
   onClose: () => void
   isDark: boolean
   newNotification?: NotificationItem | null
+  // The bell button (or its wrapper) the panel should hang from. Position is
+  // computed from its real on-screen rect rather than CSS `absolute right-0`,
+  // since the header's entrance animation puts a `transform` on an ancestor
+  // — any transformed ancestor becomes the containing block for descendants,
+  // which silently breaks plain `absolute`/`fixed` positioning math, and a
+  // fixed 360px width has no room on mobile viewports regardless.
+  anchorRef: React.RefObject<HTMLElement | null>
 }
 
 function Skeleton({ isDark }: { isDark: boolean }) {
@@ -35,9 +43,34 @@ function Skeleton({ isDark }: { isDark: boolean }) {
   )
 }
 
-export function NotificationDropdown({ open, onClose, isDark, newNotification }: Props) {
+export function NotificationDropdown({ open, onClose, isDark, newNotification, anchorRef }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+  const [coords, setCoords] = useState<{ top: number; right: number; width: number } | null>(null)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  // Compute the panel's fixed viewport position from the bell button's real
+  // on-screen rect, clamped so it always stays fully on-screen — this is what
+  // guarantees it never overflows the left edge on narrow mobile viewports.
+  useEffect(() => {
+    if (!open) return
+    const compute = () => {
+      const anchor = anchorRef.current
+      if (!anchor) return
+      const rect = anchor.getBoundingClientRect()
+      const margin = 12
+      const width = Math.min(360, window.innerWidth - margin * 2)
+      let right = window.innerWidth - rect.right
+      const left = window.innerWidth - right - width
+      if (left < margin) right = window.innerWidth - margin - width
+      setCoords({ top: rect.bottom + 10, right, width })
+    }
+    compute()
+    window.addEventListener('resize', compute)
+    return () => window.removeEventListener('resize', compute)
+  }, [open, anchorRef])
 
   const {
     notifications,
@@ -88,17 +121,22 @@ export function NotificationDropdown({ open, onClose, isDark, newNotification }:
     return () => document.removeEventListener('mousedown', handle)
   }, [open, onClose])
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <AnimatePresence>
-      {open && (
+      {open && coords && (
         <motion.div
           ref={panelRef}
           initial={{ opacity: 0, scale: 0.95, y: -8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -8 }}
           transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute right-0 mt-2.5 w-[360px] rounded-2xl backdrop-blur-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
+          className="fixed rounded-2xl backdrop-blur-2xl shadow-2xl overflow-hidden z-50 flex flex-col"
           style={{
+            top: coords.top,
+            right: coords.right,
+            width: coords.width,
             background: isDark ? 'rgba(30,30,31,0.97)' : 'rgba(255,255,255,0.97)',
             border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
             boxShadow: isDark
@@ -193,6 +231,7 @@ export function NotificationDropdown({ open, onClose, isDark, newNotification }:
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }

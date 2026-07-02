@@ -971,11 +971,104 @@ export function ReelsPage({
     window.history.replaceState(null, '', `/reels?reelId=${reel.id}`)
   }, [activeIdx, reels])
 
-  const scrollDesktop = (dir: -1 | 1) =>
-    desktopContainerRef.current?.scrollBy({
-      top: dir * (desktopContainerRef.current.clientHeight ?? 0),
-      behavior: 'smooth',
+  // ── One-reel-per-gesture scrolling ───────────────────────────────────────────
+  //
+  // Native scroll-snap alone lets a strong wheel flick or fast swipe carry the
+  // container past several snap points before it decelerates, so the feed can
+  // jump 2-3 reels at once. To guarantee exactly one reel moves per gesture we
+  // fully take over scrolling: wheel/touch events are intercepted and prevented
+  // natively (non-passive listeners — React's synthetic onWheel/onTouch are
+  // passive by default and can't reliably call preventDefault).
+  //
+  // A trackpad swipe does NOT fire one wheel event — it fires a continuous
+  // stream of small deltaY events for as long as the fingers are moving, and
+  // the OS/browser keeps synthesizing decaying "momentum" wheel events for a
+  // few hundred ms after the fingers actually lift. A fixed cooldown after the
+  // first event isn't enough: once it expires mid-swipe (or mid-momentum), the
+  // still-arriving events trigger another step, which is exactly what caused
+  // 2-3 reels to move on a longer (not even hard) scroll. Instead we track
+  // whether the wheel stream itself is still active — every event pushes back
+  // a 650ms idle timer — and only let a new gesture trigger a scroll once BOTH
+  // the stream has gone fully quiet for that long AND the in-flight scroll
+  // animation has finished, so one continuous gesture (plus its momentum
+  // tail), however long, only ever moves one reel.
+  const scrollLockRef    = useRef(false)
+  const animDoneRef      = useRef(true)
+  const wheelIdleTimerRef = useRef<number | null>(null)
+
+  const releaseScrollLockIfReady = useCallback(() => {
+    if (animDoneRef.current && wheelIdleTimerRef.current === null) {
+      scrollLockRef.current = false
+    }
+  }, [])
+
+  const scrollOneReel = useCallback((container: HTMLDivElement | null, dir: -1 | 1) => {
+    if (!container || scrollLockRef.current) return
+    scrollLockRef.current = true
+    animDoneRef.current = false
+    container.scrollBy({ top: dir * container.clientHeight, behavior: 'smooth' })
+    window.setTimeout(() => {
+      animDoneRef.current = true
+      releaseScrollLockIfReady()
+    }, 550)
+  }, [releaseScrollLockIfReady])
+
+  const scrollDesktop = (dir: -1 | 1) => scrollOneReel(desktopContainerRef.current, dir)
+
+  const hasReels = reels.length > 0
+
+  // Wheel: block native scroll, step exactly one reel per gesture (see note above).
+  useEffect(() => {
+    if (!hasReels) return
+    const targets = [mobileContainerRef.current, desktopContainerRef.current]
+      .filter((el): el is HTMLDivElement => el !== null)
+    const cleanups = targets.map(el => {
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault()
+
+        if (wheelIdleTimerRef.current !== null) window.clearTimeout(wheelIdleTimerRef.current)
+        wheelIdleTimerRef.current = window.setTimeout(() => {
+          wheelIdleTimerRef.current = null
+          releaseScrollLockIfReady()
+        }, 650)
+
+        if (scrollLockRef.current) return
+        scrollOneReel(el, e.deltaY > 0 ? 1 : -1)
+      }
+      el.addEventListener('wheel', onWheel, { passive: false })
+      return () => el.removeEventListener('wheel', onWheel)
     })
+    return () => cleanups.forEach(fn => fn())
+  }, [hasReels, scrollOneReel, releaseScrollLockIfReady])
+
+  // Touch (mobile): block native momentum scroll, step exactly one reel per swipe.
+  useEffect(() => {
+    if (!hasReels) return
+    const el = mobileContainerRef.current
+    if (!el) return
+    const touchStartY = { current: null as number | null }
+
+    const onTouchStart = (e: TouchEvent) => { touchStartY.current = e.touches[0].clientY }
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchStartY.current === null) return
+      e.preventDefault()
+    }
+    const onTouchEnd = (e: TouchEvent) => {
+      if (touchStartY.current === null) return
+      const dy = touchStartY.current - e.changedTouches[0].clientY
+      touchStartY.current = null
+      if (Math.abs(dy) > 40) scrollOneReel(el, dy > 0 ? 1 : -1)
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [hasReels, scrollOneReel])
 
   const glowColor = activeReel?.glow ?? '#F5C518'
 

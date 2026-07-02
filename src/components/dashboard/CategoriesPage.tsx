@@ -541,7 +541,11 @@ function ReelCard({ reel, idx = 0, height = '100%', onClick }: { reel: Reel; idx
 
 /* ─── Mixed Discovery Grid ───────────────────────────────────── */
 
-const ROW_HEIGHT = 340 // px — each grid cell height
+// Row height varies by breakpoint (shorter on mobile) via a CSS custom
+// property — a plain JS constant can't respond to a media query, and this
+// grid's cells (reel + recipe cards) share one row height, so the mobile
+// value has to be set where the row itself is defined, not per-card.
+const ROW_HEIGHT_CLASS = '[--row-h:220px] sm:[--row-h:340px]'
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -594,7 +598,7 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridAutoRows: ROW_HEIGHT }}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${ROW_HEIGHT_CLASS}`} style={{ gridAutoRows: 'var(--row-h)' }}>
         {Array.from({ length: 9 }).map((_, i) => (
           <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--cr-border)' }} />
         ))}
@@ -614,7 +618,7 @@ function MixedGrid({ query, activeTab, contentType }: { query: string; activeTab
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridAutoRows: ROW_HEIGHT }}>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${ROW_HEIGHT_CLASS}`} style={{ gridAutoRows: 'var(--row-h)' }}>
         {items.map((item, idx) =>
           item.type === 'reel'
             ? <ReelCard   key={`reel-${item.data.id}`}   reel={item.data}   idx={idx} height="100%" onClick={() => {
@@ -748,11 +752,12 @@ function TrendingSection() {
         variants={stagger}
         initial="hidden"
         animate={inView ? 'visible' : 'hidden'}
-        className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+        className={`grid grid-cols-2 sm:grid-cols-3 gap-3 ${ROW_HEIGHT_CLASS}`}
+        style={{ gridAutoRows: 'var(--row-h)' }}
       >
         {loading
           ? Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-2xl animate-pulse" style={{ aspectRatio: '9/16', minHeight: 180, background: 'var(--cr-card)', border: '1px solid var(--cr-border)' }} />
+              <div key={i} className="rounded-2xl animate-pulse" style={{ background: 'var(--cr-card)', border: '1px solid var(--cr-border)' }} />
             ))
           : reels.map((reel, i) => (
               <motion.div key={reel.id} variants={cardReveal}>

@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '@/context/ThemeContext'
 import {
-  Megaphone, Globe, Search as SearchIcon, MapPin, Check, Upload, X,
-  ChevronDown, Plus, Trash2, Zap, Target, BarChart2, Users, Calendar,
-  ExternalLink, Play, Image as ImageIcon, Video, TrendingUp, Rocket,
-  DollarSign, Eye, AlertCircle, CheckCircle2, Monitor, Share2, ArrowLeft,
-  Loader2,
+  Megaphone, Globe, MapPin, Check, Upload, X,
+  ChevronDown, Plus, Trash2, Target, BarChart2,
+  Play, Image as ImageIcon, Video, TrendingUp, Rocket,
+  AlertCircle, CheckCircle2, Monitor, Share2, ArrowLeft,
+  Loader2, FileText,
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
+import AudienceStep, { type SelectedAudienceRef } from './AudienceManager'
 
 // ─── Razorpay global type ─────────────────────────────────────────────────────
 declare global {
@@ -36,8 +37,6 @@ function loadRazorpayScript(): Promise<boolean> {
 
 type Platform = 'cookreels' | 'meta' | 'google' | 'geofencing' | ''
 type AdFormat = 'banner' | 'reel'
-type Gender = 'all' | 'male' | 'female'
-type BudgetType = 'daily' | 'lifetime'
 type MobileStep = 1 | 2 | 3 | 4 | 5 | 6
 
 interface GeofenceZone {
@@ -65,22 +64,16 @@ interface CampaignState {
   mediaFile: File | null
   mediaPreviewUrl: string | null
   mediaInfo: MediaInfo | null
-  countries: string[]
-  state: string
-  city: string
-  ageMin: number
-  ageMax: number
-  gender: Gender
-  languages: string[]
-  interests: string[]
   geofences: GeofenceZone[]
-  impressions: number
-  budgetType: BudgetType
   startDate: string
   endDate: string
   timezone: string
   ctaText: string
   destinationUrl: string
+  // ── CookReels platform only ──
+  selectedAudience: SelectedAudienceRef | null
+  adHeading: string
+  impressions: number
 }
 
 // ─── Pricing (USD display, INR charged via Razorpay) ─────────────────────────
@@ -89,7 +82,6 @@ interface CampaignState {
 const INR_PER_IMPRESSION = 0.10
 const INR_TO_USD         = 0.012
 const USD_PER_IMPRESSION = INR_PER_IMPRESSION * INR_TO_USD   // 0.0012
-const USD_TO_INR         = 1 / INR_TO_USD                    // ≈ 83.33
 
 function impressionsToUSD(impressions: number): number {
   return impressions * USD_PER_IMPRESSION
@@ -105,37 +97,23 @@ function formatUSD(amount: number): string {
   return `$${amount.toFixed(2)}`
 }
 
-function usdToINRPaise(usd: number): number {
-  // Razorpay expects amount in paise (₹ × 100)
-  return Math.round(usd / INR_TO_USD * 100)
+function formatINR(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
 // ─── Static Data ──────────────────────────────────────────────────────────────
 
-const COUNTRIES = [
-  'India', 'United States', 'Canada', 'United Kingdom', 'Australia',
-  'Germany', 'France', 'Singapore', 'UAE', 'Brazil', 'Japan',
-  'South Korea', 'Indonesia', 'Mexico', 'Italy', 'Spain', 'Netherlands',
-]
-
 const OBJECTIVES: { label: string; value: string }[] = [
-  { label: 'More Views',      value: 'VIEWS' },
-  { label: 'More Likes',      value: 'LIKES' },
-  { label: 'More Followers',  value: 'FOLLOWERS' },
-  { label: 'Website Clicks',  value: 'WEBSITE_CLICKS' },
+  { label: 'Leads',            value: 'LEADS' },
+  { label: 'Website Traffic',  value: 'WEBSITE_TRAFFIC' },
+  { label: 'App Installs',     value: 'APP_INSTALLS' },
+  { label: 'Video Views',      value: 'VIDEO_VIEWS' },
+  { label: 'Profile Visits',   value: 'PROFILE_VISITS' },
+  { label: 'Brand Awareness',  value: 'BRAND_AWARENESS' },
+  { label: 'Engagement',       value: 'ENGAGEMENT' },
+  { label: 'Reach',            value: 'REACH' },
+  { label: 'Conversions',      value: 'CONVERSIONS' },
 ]
-
-const LANGUAGES = ['English', 'Hindi', 'Spanish', 'French', 'German', 'Portuguese', 'Arabic', 'Japanese', 'Korean']
-
-const INTERESTS = [
-  'Cooking', 'Recipes', 'Fitness', 'Food Lovers', 'Restaurants',
-  'Travel', 'Technology', 'Fashion', 'Health & Wellness', 'Photography',
-  'Home Decor', 'Baking', 'Street Food', 'Vegan', 'Nutrition',
-]
-
-const CTA_OPTIONS = ['Learn More', 'Shop Now', 'Order Now', 'Visit Website', 'Download App', 'Book Now', 'Get Offer', 'Subscribe']
-
-const TIMEZONES = ['Asia/Kolkata', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Australia/Sydney', 'Asia/Singapore']
 
 const RADIUS_OPTIONS = ['100m', '250m', '500m', '1km', '5km', '10km']
 
@@ -287,21 +265,11 @@ function Textarea({ isDark, ...props }: React.TextareaHTMLAttributes<HTMLTextAre
   )
 }
 
-function Tag({ label, onRemove, isDark }: { label: string; onRemove: () => void; isDark: boolean }) {
+function ErrorText({ children }: { children: React.ReactNode }) {
   return (
-    <span
-      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
-      style={{
-        background: 'rgba(245,197,24,0.15)',
-        color: '#F5C518',
-        border: '1px solid rgba(245,197,24,0.30)',
-      }}
-    >
-      {label}
-      <button onClick={onRemove} className="ml-0.5 hover:opacity-70 transition-opacity">
-        <X size={11} />
-      </button>
-    </span>
+    <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#FF6B6B' }}>
+      <AlertCircle size={11} /> {children}
+    </p>
   )
 }
 
@@ -382,356 +350,6 @@ function CampaignTypeSelector({ value, onChange, isDark }: {
             </motion.button>
           )
         })}
-      </div>
-    </SectionCard>
-  )
-}
-
-// ─── Campaign Info ────────────────────────────────────────────────────────────
-
-function CampaignInfo({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  return (
-    <SectionCard title="Campaign Information" icon={BarChart2} isDark={isDark}>
-      <div className="space-y-3">
-        <div>
-          <Label isDark={isDark}>Campaign Name</Label>
-          <Input isDark={isDark} placeholder="e.g. Summer Food Festival 2025" value={state.campaignName} onChange={e => update('campaignName', e.target.value)} />
-        </div>
-        <div>
-          <Label isDark={isDark}>Campaign Objective</Label>
-          <Select isDark={isDark} value={state.objective} onChange={e => update('objective', e.target.value)}>
-            <option value="">Select objective…</option>
-            {OBJECTIVES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-        </div>
-        <div>
-          <Label isDark={isDark}>Campaign Description</Label>
-          <Textarea isDark={isDark} rows={3} placeholder="Describe your campaign goals and key message…" value={state.description} onChange={e => update('description', e.target.value)} />
-        </div>
-      </div>
-    </SectionCard>
-  )
-}
-
-// ─── Media Uploader ───────────────────────────────────────────────────────────
-
-function MediaUploader({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  const isBanner = state.adFormat === 'banner'
-
-  const onDrop = useCallback((accepted: File[]) => {
-    const file = accepted[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    const sizeKB = file.size / 1024
-    const sizeStr = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(0)} KB`
-    update('mediaFile', file)
-    update('mediaPreviewUrl', url)
-    const info: MediaInfo = { size: sizeStr, type: file.type }
-
-    if (file.type.startsWith('image/')) {
-      const img = new window.Image()
-      img.onload = () => {
-        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
-        const g = gcd(img.naturalWidth, img.naturalHeight)
-        update('mediaInfo', {
-          ...info,
-          dimensions: `${img.naturalWidth}×${img.naturalHeight}px`,
-          aspectRatio: `${img.naturalWidth / g}:${img.naturalHeight / g}`,
-        })
-      }
-      img.src = url
-    } else if (file.type.startsWith('video/')) {
-      const vid = document.createElement('video')
-      vid.onloadedmetadata = () => {
-        const mins = Math.floor(vid.duration / 60)
-        const secs = Math.floor(vid.duration % 60)
-        update('mediaInfo', {
-          ...info,
-          duration: `${mins}:${String(secs).padStart(2, '0')}`,
-          dimensions: `${vid.videoWidth}×${vid.videoHeight}px`,
-        })
-      }
-      vid.src = url
-    }
-  }, [update])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: isBanner
-      ? { 'image/jpeg': [], 'image/png': [], 'image/webp': [] }
-      : { 'video/mp4': [], 'video/quicktime': [], 'video/webm': [] },
-    maxSize: isBanner ? 10 * 1024 * 1024 : 100 * 1024 * 1024,
-    multiple: false,
-  })
-
-  return (
-    <SectionCard title="Ad Creative" icon={ImageIcon} isDark={isDark}>
-      {/* Format toggle */}
-      <div className="flex gap-2">
-        {(['banner', 'reel'] as AdFormat[]).map(fmt => (
-          <button
-            key={fmt}
-            onClick={() => { update('adFormat', fmt); update('mediaFile', null); update('mediaPreviewUrl', null); update('mediaInfo', null) }}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-            style={state.adFormat === fmt ? {
-              background: 'linear-gradient(135deg, #F5C518, #FFB800)',
-              color: '#1A1A1A',
-              boxShadow: '0 4px 16px rgba(245,197,24,0.35)',
-            } : {
-              background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
-              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-              color: isDark ? '#A1A1AA' : '#666666',
-            }}
-          >
-            {fmt === 'banner' ? <ImageIcon size={14} /> : <Video size={14} />}
-            {fmt === 'banner' ? 'Banner Ad' : 'Reel / Video Ad'}
-          </button>
-        ))}
-      </div>
-
-      <p className="text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-        {isBanner ? 'Supported: JPG, PNG, WEBP · Max 10 MB' : 'Supported: MP4, MOV, WEBM · Max 100 MB'}
-      </p>
-
-      {/* Drop zone */}
-      {!state.mediaPreviewUrl ? (
-        <div
-          {...getRootProps()}
-          className="relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all"
-          style={{
-            borderColor: isDragActive ? '#F5C518' : (isDark ? '#343438' : '#E8E8E8'),
-            background: isDragActive
-              ? 'rgba(245,197,24,0.06)'
-              : (isDark ? 'rgba(30,30,31,0.40)' : 'rgba(245,245,245,0.40)'),
-          }}
-        >
-          <input {...getInputProps()} />
-          <div className="flex flex-col items-center gap-3">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center"
-              style={{ background: 'rgba(245,197,24,0.12)', border: '1px solid rgba(245,197,24,0.25)' }}
-            >
-              <Upload size={22} style={{ color: '#F5C518' }} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
-                {isDragActive ? 'Drop your file here' : 'Drag & drop or click to upload'}
-              </p>
-              <p className="text-xs mt-1" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-                {isBanner ? 'JPG, PNG or WEBP up to 10 MB' : 'MP4, MOV or WEBM up to 100 MB'}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-2xl overflow-hidden relative" style={{ border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}>
-          {isBanner ? (
-            <img src={state.mediaPreviewUrl} alt="preview" className="w-full max-h-64 object-contain" style={{ background: isDark ? '#1E1E1F' : '#F5F5F5' }} />
-          ) : (
-            <video src={state.mediaPreviewUrl} controls className="w-full max-h-64 object-contain" style={{ background: '#000' }} />
-          )}
-          <button
-            onClick={() => { update('mediaFile', null); update('mediaPreviewUrl', null); update('mediaInfo', null) }}
-            className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.70)' }}
-          >
-            <X size={14} className="text-white" />
-          </button>
-          {state.mediaInfo && (
-            <div
-              className="p-3 grid grid-cols-2 gap-2"
-              style={{ background: isDark ? 'rgba(30,30,31,0.90)' : 'rgba(245,245,245,0.90)' }}
-            >
-              {(([
-                ['Size', state.mediaInfo.size],
-                ['Type', state.mediaInfo.type.split('/')[1]?.toUpperCase() ?? ''],
-                state.mediaInfo.dimensions ? ['Dimensions', state.mediaInfo.dimensions] : null,
-                state.mediaInfo.duration ? ['Duration', state.mediaInfo.duration] : null,
-                state.mediaInfo.aspectRatio ? ['Aspect Ratio', state.mediaInfo.aspectRatio] : null,
-              ] as (string[] | null)[]).filter((x): x is string[] => x !== null)).map(([k, v]) => (
-                <div key={k}>
-                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{k}</p>
-                  <p className="text-xs font-semibold mt-0.5" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{v}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </SectionCard>
-  )
-}
-
-// ─── Audience Targeting ───────────────────────────────────────────────────────
-
-function AudienceTargeting({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  const [countrySearch, setCountrySearch] = useState('')
-  const [langSearch, setLangSearch] = useState('')
-  const [interestSearch, setInterestSearch] = useState('')
-
-  const filteredCountries = COUNTRIES.filter(c =>
-    c.toLowerCase().includes(countrySearch.toLowerCase()) && !state.countries.includes(c)
-  )
-  const filteredLangs = LANGUAGES.filter(l =>
-    l.toLowerCase().includes(langSearch.toLowerCase()) && !state.languages.includes(l)
-  )
-  const filteredInterests = INTERESTS.filter(i =>
-    i.toLowerCase().includes(interestSearch.toLowerCase()) && !state.interests.includes(i)
-  )
-
-  const toggleArray = (key: 'countries' | 'languages' | 'interests', val: string) => {
-    const arr = state[key] as string[]
-    update(key, arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val])
-  }
-
-  return (
-    <SectionCard title="Audience Targeting" icon={Target} isDark={isDark}>
-      {/* Location */}
-      <div>
-        <Label isDark={isDark}>Target Countries <span style={{ color: '#EF4444' }}>*</span></Label>
-        <div className="relative mb-2">
-          <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-          <input
-            className="w-full rounded-xl pl-8 pr-3.5 py-2 text-sm outline-none"
-            placeholder="Search countries…"
-            value={countrySearch}
-            onChange={e => setCountrySearch(e.target.value)}
-            style={{ background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`, color: isDark ? '#F5F5F5' : '#1A1A1A' }}
-          />
-        </div>
-        {state.countries.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {state.countries.map(c => <Tag key={c} label={c} isDark={isDark} onRemove={() => toggleArray('countries', c)} />)}
-          </div>
-        )}
-        {countrySearch && filteredCountries.length > 0 && (
-          <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`, maxHeight: 160, overflowY: 'auto' }}>
-            {filteredCountries.slice(0, 8).map(c => (
-              <button
-                key={c}
-                onClick={() => { toggleArray('countries', c); setCountrySearch('') }}
-                className="w-full text-left px-3.5 py-2 text-sm transition-colors"
-                style={{ color: isDark ? '#F5F5F5' : '#1A1A1A', background: isDark ? 'rgba(30,30,31,0.90)' : '#fff' }}
-                onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.80)' : 'rgba(245,197,24,0.08)')}
-                onMouseLeave={e => (e.currentTarget.style.background = isDark ? 'rgba(30,30,31,0.90)' : '#fff')}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label isDark={isDark}>State / Province</Label>
-          <Input isDark={isDark} placeholder="e.g. Maharashtra" value={state.state} onChange={e => update('state', e.target.value)} />
-        </div>
-        <div>
-          <Label isDark={isDark}>City</Label>
-          <Input isDark={isDark} placeholder="e.g. Mumbai" value={state.city} onChange={e => update('city', e.target.value)} />
-        </div>
-      </div>
-
-      {/* Age Range */}
-      <div>
-        <Label isDark={isDark}>Age Range: {state.ageMin} – {state.ageMax === 65 ? '65+' : state.ageMax}</Label>
-        <div className="space-y-1.5 mt-2">
-          <div className="flex items-center gap-3">
-            <span className="text-xs w-6" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>18</span>
-            <input type="range" min={18} max={65} value={state.ageMin}
-              onChange={e => update('ageMin', Math.min(Number(e.target.value), state.ageMax - 1))}
-              className="flex-1 accent-[#F5C518]" />
-            <span className="text-xs w-6" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>65+</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs w-6" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>18</span>
-            <input type="range" min={18} max={65} value={state.ageMax}
-              onChange={e => update('ageMax', Math.max(Number(e.target.value), state.ageMin + 1))}
-              className="flex-1 accent-[#F5C518]" />
-            <span className="text-xs w-6" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>65+</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Gender */}
-      <div>
-        <Label isDark={isDark}>Gender</Label>
-        <div className="flex gap-2">
-          {(['all', 'male', 'female'] as Gender[]).map(g => (
-            <button
-              key={g}
-              onClick={() => update('gender', g)}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold capitalize transition-all"
-              style={state.gender === g ? {
-                background: 'linear-gradient(135deg, #F5C518, #FFB800)',
-                color: '#1A1A1A',
-              } : {
-                background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
-                border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                color: isDark ? '#A1A1AA' : '#666666',
-              }}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Languages */}
-      <div>
-        <Label isDark={isDark}>Languages</Label>
-        <div className="relative mb-2">
-          <SearchIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-          <input className="w-full rounded-xl pl-8 pr-3.5 py-2 text-sm outline-none" placeholder="Add language…"
-            value={langSearch} onChange={e => setLangSearch(e.target.value)}
-            style={{ background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`, color: isDark ? '#F5F5F5' : '#1A1A1A' }} />
-        </div>
-        {state.languages.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {state.languages.map(l => <Tag key={l} label={l} isDark={isDark} onRemove={() => toggleArray('languages', l)} />)}
-          </div>
-        )}
-        {langSearch && (
-          <div className="flex flex-wrap gap-1.5">
-            {filteredLangs.slice(0, 6).map(l => (
-              <button key={l} onClick={() => { toggleArray('languages', l); setLangSearch('') }}
-                className="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-                style={{ background: isDark ? 'rgba(52,52,56,0.80)' : '#F5F5F5', color: isDark ? '#A1A1AA' : '#666', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}>
-                + {l}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Interests */}
-      <div>
-        <Label isDark={isDark}>Interest Tags</Label>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {state.interests.map(i => <Tag key={i} label={i} isDark={isDark} onRemove={() => toggleArray('interests', i)} />)}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {INTERESTS.filter(i => !state.interests.includes(i)).slice(0, 10).map(i => (
-            <button key={i} onClick={() => toggleArray('interests', i)}
-              className="px-2.5 py-1 rounded-full text-xs font-medium transition-all hover:scale-105"
-              style={{ background: isDark ? 'rgba(52,52,56,0.60)' : 'rgba(245,245,245,0.90)', color: isDark ? '#A1A1AA' : '#666', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}>
-              + {i}
-            </button>
-          ))}
-        </div>
       </div>
     </SectionCard>
   )
@@ -869,209 +487,58 @@ function GeofencingBuilder({ state, update, isDark }: {
   )
 }
 
-// ─── Budget Calculator ────────────────────────────────────────────────────────
+// ─── CookReels: Campaign Details ─────────────────────────────────────────────
 
-function BudgetCalculator({ state, update, isDark }: {
+function CampaignDetailsCard({ state, update, isDark, errors }: {
   state: CampaignState
   update: (k: keyof CampaignState, v: unknown) => void
   isDark: boolean
+  errors: Record<string, string>
 }) {
-  const totalUSD = impressionsToUSD(state.impressions)
-  const estimatedReach = Math.round(state.impressions * 0.72)
-  const estimatedClicks = Math.round(state.impressions * 0.025)
-  const estimatedCTR = 2.5
-
-  const MetricCard = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
-    <div
-      className="rounded-xl p-3 text-center"
-      style={{ background: isDark ? 'rgba(30,30,31,0.70)' : 'rgba(245,245,245,0.80)', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{label}</p>
-      <p className="text-lg font-bold text-gradient-yellow" style={{ fontFamily: 'var(--font-poppins), sans-serif' }}>{value}</p>
-      {sub && <p className="text-[10px] mt-0.5" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{sub}</p>}
-    </div>
-  )
-
   return (
-    <SectionCard title="Budget & Impressions" icon={DollarSign} isDark={isDark}>
-      <div
-        className="rounded-xl p-3 flex items-center gap-3"
-        style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.25)' }}
-      >
-        <Zap size={16} style={{ color: '#F5C518' }} />
-        <p className="text-xs font-medium" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
-          Base rate: <span className="font-bold text-[#F5C518]">$0.0012 USD</span> per impression.
-        </p>
-      </div>
-
+    <SectionCard title="Campaign Details" icon={BarChart2} isDark={isDark}>
       <div>
-        <Label isDark={isDark}>Desired Impressions</Label>
-        <div className="relative">
-          <Eye size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-          <input
-            type="number"
-            min={1000}
-            step={1000}
-            value={state.impressions}
-            onChange={e => update('impressions', Math.max(0, Number(e.target.value)))}
-            className="w-full rounded-xl pl-9 pr-3.5 py-2.5 text-sm outline-none transition-all"
-            style={{
-              background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
-              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-              color: isDark ? '#F5F5F5' : '#1A1A1A',
-            }}
-            onFocus={e => { e.currentTarget.style.border = '1px solid rgba(245,197,24,0.60)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,197,24,0.12)' }}
-            onBlur={e => { e.currentTarget.style.border = `1px solid ${isDark ? '#343438' : '#E8E8E8'}`; e.currentTarget.style.boxShadow = 'none' }}
-          />
-        </div>
-        <div className="flex gap-2 mt-2">
-          {[10000, 50000, 100000, 500000].map(n => (
-            <button key={n} onClick={() => update('impressions', n)}
-              className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-105"
-              style={{
-                background: state.impressions === n ? 'rgba(245,197,24,0.15)' : (isDark ? 'rgba(30,30,31,0.80)' : '#F5F5F5'),
-                border: state.impressions === n ? '1px solid rgba(245,197,24,0.40)' : `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                color: state.impressions === n ? '#F5C518' : (isDark ? '#A1A1AA' : '#666'),
-              }}>
-              {n >= 100000 ? `${n / 100000}L` : `${n / 1000}K`}
-            </button>
-          ))}
-        </div>
+        <Label isDark={isDark}>Campaign Name</Label>
+        <Input isDark={isDark} placeholder="e.g. Summer Food Festival 2025" value={state.campaignName} onChange={e => update('campaignName', e.target.value)} />
+        {errors.campaignName && <ErrorText>{errors.campaignName}</ErrorText>}
       </div>
-
-      {/* Live calculations */}
-      <div className="grid grid-cols-2 gap-2">
-        <MetricCard label="Total Cost (USD)" value={formatUSD(totalUSD)} />
-        <MetricCard label="Cost per 1K Impr." value={formatUSD(USD_PER_IMPRESSION * 1000)} sub="$1.20 CPM" />
-        <MetricCard label="Est. Reach" value={estimatedReach.toLocaleString()} sub="unique users" />
-        <MetricCard label="Est. Clicks" value={estimatedClicks.toLocaleString()} sub={`${estimatedCTR}% CTR`} />
-      </div>
-
-      {/* Budget type */}
-      <div>
-        <Label isDark={isDark}>Budget Type</Label>
-        <div className="flex gap-2">
-          {(['daily', 'lifetime'] as BudgetType[]).map(t => (
-            <button key={t} onClick={() => update('budgetType', t)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all"
-              style={state.budgetType === t ? {
-                background: 'linear-gradient(135deg, #F5C518, #FFB800)',
-                color: '#1A1A1A',
-                boxShadow: '0 4px 12px rgba(245,197,24,0.30)',
-              } : {
-                background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
-                border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                color: isDark ? '#A1A1AA' : '#666',
-              }}>
-              {t} Budget
-            </button>
-          ))}
-        </div>
-      </div>
-    </SectionCard>
-  )
-}
-
-// ─── Scheduling ───────────────────────────────────────────────────────────────
-
-function SchedulingSection({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  const isDaily    = state.budgetType === 'daily'
-  const isLifetime = state.budgetType === 'lifetime'
-  const showImmediateNotice = isLifetime && !state.startDate
-
-  return (
-    <SectionCard title="Campaign Schedule" icon={Calendar} isDark={isDark}>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
-            Start Date{(isDaily || isLifetime) && <span style={{ color: '#FF6B6B', marginLeft: 3 }}>*</span>}
-          </label>
-          <Input
-            isDark={isDark}
-            type="date"
-            value={state.startDate}
-            onChange={e => update('startDate', e.target.value)}
-            style={{ borderColor: isDaily && !state.startDate ? 'rgba(255,107,107,0.55)' : undefined }}
-          />
+          <Label isDark={isDark}>Start Date</Label>
+          <Input isDark={isDark} type="date" value={state.startDate} onChange={e => update('startDate', e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wider" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
-            End Date{isDaily && <span style={{ color: '#FF6B6B', marginLeft: 3 }}>*</span>}
-            {isLifetime && <span className="ml-1 normal-case font-normal" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>(optional)</span>}
-          </label>
-          <Input
-            isDark={isDark}
-            type="date"
-            value={state.endDate}
-            onChange={e => update('endDate', e.target.value)}
-            style={{ borderColor: isDaily && !state.endDate ? 'rgba(255,107,107,0.55)' : undefined }}
-          />
+          <Label isDark={isDark}>End Date</Label>
+          <Input isDark={isDark} type="date" value={state.endDate} onChange={e => update('endDate', e.target.value)} />
         </div>
       </div>
-
-      {/* Lifetime budget: no start date → immediate-launch notice */}
-      {showImmediateNotice && (
-        <div
-          className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-xs"
-          style={{
-            background: isDark ? 'rgba(66,133,244,0.10)' : 'rgba(66,133,244,0.07)',
-            border: '1px solid rgba(66,133,244,0.28)',
-            color: isDark ? '#93C5FD' : '#1D6FCC',
-          }}
-        >
-          <AlertCircle size={14} className="shrink-0 mt-0.5" />
-          <p className="leading-relaxed">
-            <span className="font-bold">No start date selected — </span>
-            this campaign will go live immediately after it is approved. Set a start date to schedule it for a specific day.
-          </p>
-        </div>
-      )}
-
-      {/* Daily budget: both dates missing → helper text */}
-      {isDaily && (!state.startDate || !state.endDate) && (
-        <p className="text-xs" style={{ color: '#FF9F1C' }}>
-          Both Start Date and End Date are required for daily budget campaigns.
+      {errors.endDate && <ErrorText>{errors.endDate}</ErrorText>}
+      <div>
+        <Label isDark={isDark}>Number of Impressions</Label>
+        <p className="text-xs mb-2" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>
+          Each impression costs <span className="font-semibold" style={{ color: '#F5C518' }}>₹0.10 (10 paisa)</span>. Enter how many impressions you&apos;d like to buy.
         </p>
-      )}
-
-      <div>
-        <Label isDark={isDark}>Time Zone</Label>
-        <Select isDark={isDark} value={state.timezone} onChange={e => update('timezone', e.target.value)}>
-          {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
-        </Select>
-      </div>
-    </SectionCard>
-  )
-}
-
-// ─── CTA Settings ─────────────────────────────────────────────────────────────
-
-function CTASettings({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  const [urlError, setUrlError] = useState('')
-
-  const validateUrl = (val: string) => {
-    if (!val) { setUrlError(''); return }
-    try { new URL(val); setUrlError('') }
-    catch { setUrlError('Please enter a valid URL (e.g. https://example.com)') }
-  }
-
-  return (
-    <SectionCard title="Call to Action" icon={ExternalLink} isDark={isDark}>
-      <div>
-        <Label isDark={isDark}>CTA Button Text</Label>
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {CTA_OPTIONS.map(c => (
-            <button key={c} onClick={() => update('ctaText', c)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105"
-              style={state.ctaText === c ? {
+        <input
+          type="number"
+          min={0}
+          step={100}
+          value={state.impressions || ''}
+          onChange={e => update('impressions', Math.max(0, Math.round(Number(e.target.value))))}
+          placeholder="e.g. 50000"
+          className="w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all"
+          style={{
+            background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
+            border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+            color: isDark ? '#F5F5F5' : '#1A1A1A',
+          }}
+        />
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {[10_000, 25_000, 50_000, 100_000, 250_000, 500_000].map(n => (
+            <button
+              key={n}
+              onClick={() => update('impressions', n)}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all"
+              style={state.impressions === n ? {
                 background: 'rgba(245,197,24,0.20)',
                 border: '1px solid rgba(245,197,24,0.50)',
                 color: '#F5C518',
@@ -1079,27 +546,223 @@ function CTASettings({ state, update, isDark }: {
                 background: isDark ? 'rgba(30,30,31,0.80)' : '#F5F5F5',
                 border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
                 color: isDark ? '#A1A1AA' : '#666',
-              }}>
-              {c}
+              }}
+            >
+              {n >= 100_000 ? `${n / 100_000}L` : `${n / 1_000}K`}
             </button>
           ))}
         </div>
-        <Input isDark={isDark} placeholder="Or type custom text…" value={state.ctaText} onChange={e => update('ctaText', e.target.value)} />
+        {errors.budget && <ErrorText>{errors.budget}</ErrorText>}
+        {state.impressions > 0 && (
+          <div className="flex items-center justify-between mt-3 rounded-xl px-3.5 py-2.5" style={{ background: 'rgba(245,197,24,0.08)', border: '1px solid rgba(245,197,24,0.25)' }}>
+            <span className="text-xs font-semibold" style={{ color: isDark ? '#A1A1AA' : '#666666' }}>Estimated Cost</span>
+            <span className="text-sm font-bold" style={{ color: '#F5C518' }}>{formatINR(impressionsToINR(state.impressions))}</span>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
+// ─── CookReels: Objective ─────────────────────────────────────────────────────
+
+function ObjectiveCard({ state, update, isDark, errors }: {
+  state: CampaignState
+  update: (k: keyof CampaignState, v: unknown) => void
+  isDark: boolean
+  errors: Record<string, string>
+}) {
+  return (
+    <SectionCard title="Campaign Objective" icon={Target} isDark={isDark}>
+      <div>
+        <Label isDark={isDark}>Objective</Label>
+        <Select isDark={isDark} value={state.objective} onChange={e => update('objective', e.target.value)}>
+          <option value="">Select objective…</option>
+          {OBJECTIVES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </Select>
+        {errors.objective && <ErrorText>{errors.objective}</ErrorText>}
+      </div>
+    </SectionCard>
+  )
+}
+
+// ─── Media Uploader ───────────────────────────────────────────────────────────
+
+function MediaUploader({ state, update, isDark }: {
+  state: CampaignState
+  update: (k: keyof CampaignState, v: unknown) => void
+  isDark: boolean
+}) {
+  const isBanner = state.adFormat === 'banner'
+
+  const onDrop = useCallback((accepted: File[]) => {
+    const file = accepted[0]
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    const sizeKB = file.size / 1024
+    const sizeStr = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB.toFixed(0)} KB`
+    update('mediaFile', file)
+    update('mediaPreviewUrl', url)
+    const info: MediaInfo = { size: sizeStr, type: file.type }
+
+    if (file.type.startsWith('image/')) {
+      const img = new window.Image()
+      img.onload = () => {
+        const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b)
+        const g = gcd(img.naturalWidth, img.naturalHeight)
+        update('mediaInfo', {
+          ...info,
+          dimensions: `${img.naturalWidth}×${img.naturalHeight}px`,
+          aspectRatio: `${img.naturalWidth / g}:${img.naturalHeight / g}`,
+        })
+      }
+      img.src = url
+    } else if (file.type.startsWith('video/')) {
+      const vid = document.createElement('video')
+      vid.onloadedmetadata = () => {
+        const mins = Math.floor(vid.duration / 60)
+        const secs = Math.floor(vid.duration % 60)
+        update('mediaInfo', {
+          ...info,
+          duration: `${mins}:${String(secs).padStart(2, '0')}`,
+          dimensions: `${vid.videoWidth}×${vid.videoHeight}px`,
+        })
+      }
+      vid.src = url
+    }
+  }, [update])
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: isBanner
+      ? { 'image/jpeg': [], 'image/png': [], 'image/webp': [] }
+      : { 'video/mp4': [], 'video/quicktime': [], 'video/webm': [] },
+    maxSize: isBanner ? 10 * 1024 * 1024 : 100 * 1024 * 1024,
+    multiple: false,
+  })
+
+  return (
+    <div className="space-y-4">
+      {/* Format toggle */}
+      <div className="flex gap-2">
+        {(['banner', 'reel'] as AdFormat[]).map(fmt => (
+          <button
+            key={fmt}
+            onClick={() => { update('adFormat', fmt); update('mediaFile', null); update('mediaPreviewUrl', null); update('mediaInfo', null) }}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={state.adFormat === fmt ? {
+              background: 'linear-gradient(135deg, #F5C518, #FFB800)',
+              color: '#1A1A1A',
+              boxShadow: '0 4px 16px rgba(245,197,24,0.35)',
+            } : {
+              background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
+              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+              color: isDark ? '#A1A1AA' : '#666666',
+            }}
+          >
+            {fmt === 'banner' ? <ImageIcon size={14} /> : <Video size={14} />}
+            {fmt === 'banner' ? 'Banner Ad' : 'Reel / Video Ad'}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+        {isBanner ? 'Supported: JPG, PNG, WEBP · Max 10 MB' : 'Supported: MP4, MOV, WEBM · Max 100 MB'}
+      </p>
+
+      {/* Drop zone */}
+      {!state.mediaPreviewUrl ? (
+        <div
+          {...getRootProps()}
+          className="relative rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all"
+          style={{
+            borderColor: isDragActive ? '#F5C518' : (isDark ? '#343438' : '#E8E8E8'),
+            background: isDragActive
+              ? 'rgba(245,197,24,0.06)'
+              : (isDark ? 'rgba(30,30,31,0.40)' : 'rgba(245,245,245,0.40)'),
+          }}
+        >
+          <input {...getInputProps()} />
+          <div className="flex flex-col items-center gap-3">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ background: 'rgba(245,197,24,0.12)', border: '1px solid rgba(245,197,24,0.25)' }}
+            >
+              <Upload size={22} style={{ color: '#F5C518' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
+                {isDragActive ? 'Drop your file here' : 'Drag & drop or click to upload'}
+              </p>
+              <p className="text-xs mt-1" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+                {isBanner ? 'JPG, PNG or WEBP up to 10 MB' : 'MP4, MOV or WEBM up to 100 MB'}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl overflow-hidden relative" style={{ border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}>
+          {isBanner ? (
+            <img src={state.mediaPreviewUrl} alt="preview" className="w-full max-h-64 object-contain" style={{ background: isDark ? '#1E1E1F' : '#F5F5F5' }} />
+          ) : (
+            <video src={state.mediaPreviewUrl} controls className="w-full max-h-64 object-contain" style={{ background: '#000' }} />
+          )}
+          <button
+            onClick={() => { update('mediaFile', null); update('mediaPreviewUrl', null); update('mediaInfo', null) }}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.70)' }}
+          >
+            <X size={14} className="text-white" />
+          </button>
+          {state.mediaInfo && (
+            <div
+              className="p-3 grid grid-cols-2 gap-2"
+              style={{ background: isDark ? 'rgba(30,30,31,0.90)' : 'rgba(245,245,245,0.90)' }}
+            >
+              {(([
+                ['Size', state.mediaInfo.size],
+                ['Type', state.mediaInfo.type.split('/')[1]?.toUpperCase() ?? ''],
+                state.mediaInfo.dimensions ? ['Dimensions', state.mediaInfo.dimensions] : null,
+                state.mediaInfo.duration ? ['Duration', state.mediaInfo.duration] : null,
+                state.mediaInfo.aspectRatio ? ['Aspect Ratio', state.mediaInfo.aspectRatio] : null,
+              ] as (string[] | null)[]).filter((x): x is string[] => x !== null)).map(([k, v]) => (
+                <div key={k}>
+                  <p className="text-[10px] uppercase tracking-wider font-bold" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{k}</p>
+                  <p className="text-xs font-semibold mt-0.5" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{v}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── CookReels: Ad Set ─────────────────────────────────────────────────────────
+
+function AdSetCard({ state, update, isDark, errors }: {
+  state: CampaignState
+  update: (k: keyof CampaignState, v: unknown) => void
+  isDark: boolean
+  errors: Record<string, string>
+}) {
+  return (
+    <SectionCard title="Ad Set" icon={FileText} isDark={isDark}>
+      <div>
+        <Label isDark={isDark}>Ad Heading</Label>
+        <Input isDark={isDark} placeholder="e.g. Fresh Recipes Delivered Daily" value={state.adHeading} onChange={e => update('adHeading', e.target.value)} />
+        {errors.adHeading && <ErrorText>{errors.adHeading}</ErrorText>}
       </div>
       <div>
-        <Label isDark={isDark}>Destination URL</Label>
-        <Input
-          isDark={isDark}
-          type="url"
-          placeholder="https://yourwebsite.com"
-          value={state.destinationUrl}
-          onChange={e => { update('destinationUrl', e.target.value); validateUrl(e.target.value) }}
-        />
-        {urlError && (
-          <p className="text-xs mt-1 flex items-center gap-1" style={{ color: '#FF6B6B' }}>
-            <AlertCircle size={11} /> {urlError}
-          </p>
-        )}
+        <Label isDark={isDark}>Ad Description</Label>
+        <Textarea isDark={isDark} rows={3} placeholder="Describe your campaign goals and key message…" value={state.description} onChange={e => update('description', e.target.value)} />
+        {errors.adDescription && <ErrorText>{errors.adDescription}</ErrorText>}
+      </div>
+      <div>
+        <Label isDark={isDark}>Ad Creative</Label>
+        <MediaUploader state={state} update={update} isDark={isDark} />
+        {errors.mediaFile && <ErrorText>{errors.mediaFile}</ErrorText>}
       </div>
     </SectionCard>
   )
@@ -1398,8 +1061,9 @@ function CampaignSummary({ state, onLaunch, isDark, saving, saveError }: {
   saving?: boolean
   saveError?: string
 }) {
-  const totalUSD = impressionsToUSD(state.impressions)
-  const estimatedReach = Math.round(state.impressions * 0.72)
+  const impressions = state.impressions
+  const totalUSD = impressionsToUSD(impressions)
+  const estimatedReach = Math.round(impressions * 0.72)
   const platform = PLATFORMS.find(p => p.id === state.platform)
 
   return (
@@ -1420,8 +1084,8 @@ function CampaignSummary({ state, onLaunch, isDark, saving, saveError }: {
         {[
           { label: 'Platform', value: platform?.name ?? '—' },
           { label: 'Campaign', value: state.campaignName || '—', truncate: true },
-          { label: 'Audience', value: state.countries.length ? state.countries.slice(0,2).join(', ') : '—', truncate: true },
-          { label: 'Impressions', value: state.impressions.toLocaleString() },
+          { label: 'Audience', value: state.selectedAudience?.name ?? '—', truncate: true },
+          { label: 'Impressions', value: impressions.toLocaleString() },
           { label: 'Est. Reach', value: estimatedReach.toLocaleString() },
           { label: 'Total Cost', value: formatUSD(totalUSD) },
         ].map(({ label, value, truncate }) => (
@@ -1470,8 +1134,9 @@ function LaunchModal({ state, onConfirm, onClose, isDark, campaignId }: {
   isDark: boolean
   campaignId: string | null
 }) {
-  const totalUSD = impressionsToUSD(state.impressions)
-  const totalINR = impressionsToINR(state.impressions)
+  const impressions = state.impressions
+  const totalUSD = impressionsToUSD(impressions)
+  const totalINR = impressionsToINR(impressions)
   const platform = PLATFORMS.find(p => p.id === state.platform)
   const [launched, setLaunched] = useState(false)
   const [paying, setPaying] = useState(false)
@@ -1585,7 +1250,7 @@ function LaunchModal({ state, onConfirm, onClose, isDark, campaignId }: {
                 ['Platform', platform?.name ?? '—'],
                 ['Campaign', state.campaignName || '—'],
                 ['Objective', state.objective || '—'],
-                ['Impressions', state.impressions.toLocaleString()],
+                ['Impressions', impressions.toLocaleString()],
                 ['Total Cost', `${formatUSD(totalUSD)} (≈ ₹${totalINR.toLocaleString('en-IN')})`],
                 ['Schedule', state.startDate && state.endDate ? `${state.startDate} → ${state.endDate}` : 'Not set'],
               ].map(([k, v]) => (
@@ -1683,22 +1348,15 @@ const INITIAL_STATE: CampaignState = {
   mediaFile: null,
   mediaPreviewUrl: null,
   mediaInfo: null,
-  countries: [],
-  state: '',
-  city: '',
-  ageMin: 18,
-  ageMax: 65,
-  gender: 'all',
-  languages: [],
-  interests: [],
   geofences: [],
-  impressions: 10000,
-  budgetType: 'daily',
   startDate: '',
   endDate: '',
   timezone: 'Asia/Kolkata',
   ctaText: 'Learn More',
   destinationUrl: '',
+  selectedAudience: null,
+  adHeading: '',
+  impressions: 0,
 }
 
 export function BoostPage({ username }: { username: string }) {
@@ -1711,25 +1369,32 @@ export function BoostPage({ username }: { username: string }) {
   const [savingDraft, setSavingDraft] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [campaignId, setCampaignId] = useState<string | null>(null)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
 
   const update = useCallback((key: keyof CampaignState, value: unknown) => {
     setCampaign(prev => ({ ...prev, [key]: value }))
   }, [])
 
-  const handleLaunch = async () => {
-    if (!campaign.campaignName.trim()) { setSaveError('Please enter a campaign name'); return }
-    if (!campaign.objective) { setSaveError('Please select a campaign objective'); return }
-    if (campaign.countries.length === 0) { setSaveError('Please select at least one target location'); return }
+  const formErrors: Record<string, string> = {
+    ...(!campaign.campaignName.trim() && { campaignName: 'Campaign Name is required.' }),
+    ...(!campaign.objective && { objective: 'Please select a Campaign Objective.' }),
+    ...(!campaign.selectedAudience && { audiences: 'Please select an audience.' }),
+    ...(!campaign.adHeading.trim() && { adHeading: 'Ad Heading is required.' }),
+    ...(!campaign.description.trim() && { adDescription: 'Ad Description is required.' }),
+    ...(!campaign.mediaFile && { mediaFile: 'Please upload an Ad Banner or Reel.' }),
+    ...(!(campaign.impressions > 0) && { budget: 'Please enter the number of impressions you want to buy.' }),
+    ...((!campaign.startDate || !campaign.endDate || new Date(campaign.endDate) <= new Date(campaign.startDate)) && { endDate: 'End Date must be after Start Date.' }),
+  }
 
-    if (campaign.budgetType === 'daily') {
-      if (!campaign.startDate) { setSaveError('A Start Date is required for Daily Budget campaigns.'); return }
-      if (!campaign.endDate)   { setSaveError('An End Date is required for Daily Budget campaigns.'); return }
-    }
+  const handleLaunch = async () => {
+    setSubmitAttempted(true)
+    if (Object.keys(formErrors).length > 0) { setSaveError('Please fix the highlighted errors before launching.'); return }
 
     setSavingDraft(true)
     setSaveError('')
 
-    const totalINR = campaign.impressions * INR_PER_IMPRESSION
+    const impressions = campaign.impressions
+    const totalINR = impressionsToINR(impressions)
     const days = campaign.startDate && campaign.endDate
       ? Math.max(1, Math.round((new Date(campaign.endDate).getTime() - new Date(campaign.startDate).getTime()) / 86_400_000))
       : 7
@@ -1740,26 +1405,16 @@ export function BoostPage({ username }: { username: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name:         campaign.campaignName,
-          objective:    campaign.objective || 'VIEWS',
+          objective:    campaign.objective || 'BRAND_AWARENESS',
           audienceData: {
             platform:       campaign.platform || 'cookreels',
             adFormat:       campaign.adFormat,
             description:    campaign.description,
-            state:          campaign.state,
-            city:           campaign.city,
-            languages:      campaign.languages,
-            interests:      campaign.interests,
             geofences:      campaign.geofences,
-            impressions:    campaign.impressions,
-            budgetType:     campaign.budgetType,
-            timezone:       campaign.timezone,
-            ctaText:        campaign.ctaText,
-            destinationUrl: campaign.destinationUrl,
+            impressions,
+            adHeading:      campaign.adHeading,
           },
-          locations:    campaign.countries,
-          ageMin:       campaign.ageMin,
-          ageMax:       campaign.ageMax,
-          gender:       campaign.gender,
+          audienceId:   campaign.selectedAudience!.id,
           durationDays: days,
           dailyBudget:  totalINR / days,
           totalBudget:  totalINR,
@@ -1786,22 +1441,30 @@ export function BoostPage({ username }: { username: string }) {
       setCampaign(INITIAL_STATE)
       setCampaignId(null)
       setMobileStep(1)
+      setSubmitAttempted(false)
       router.push('/boost')
     }, 2200)
   }
 
-  const sectionProps = { state: campaign, update, isDark }
+  const visibleErrors = submitAttempted ? formErrors : {}
+  const sectionProps = { state: campaign, update, isDark, errors: visibleErrors }
+  const isGeofencing = campaign.platform === 'geofencing'
 
   const mobileSections: Record<MobileStep, React.ReactNode> = {
     1: <CampaignTypeSelector value={campaign.platform} onChange={p => update('platform', p)} isDark={isDark} />,
-    2: <div className="space-y-4"><CampaignInfo {...sectionProps} /><MediaUploader {...sectionProps} /></div>,
+    2: <div className="space-y-4"><CampaignDetailsCard {...sectionProps} /><ObjectiveCard {...sectionProps} /></div>,
     3: (
       <div className="space-y-4">
-        <AudienceTargeting {...sectionProps} />
-        {campaign.platform === 'geofencing' && <GeofencingBuilder {...sectionProps} />}
+        <AudienceStep
+          selected={campaign.selectedAudience}
+          onChange={next => update('selectedAudience', next)}
+          isDark={isDark}
+          errorMessage={visibleErrors.audiences}
+        />
+        {isGeofencing && <GeofencingBuilder state={campaign} update={update} isDark={isDark} />}
       </div>
     ),
-    4: <div className="space-y-4"><BudgetCalculator {...sectionProps} /><SchedulingSection {...sectionProps} /><CTASettings {...sectionProps} /></div>,
+    4: <AdSetCard {...sectionProps} />,
     5: <AdPreviewPanel state={campaign} isDark={isDark} />,
     6: <CampaignSummary state={campaign} onLaunch={handleLaunch} isDark={isDark} saving={savingDraft} saveError={saveError} />,
   }
@@ -1931,14 +1594,23 @@ export function BoostPage({ username }: { username: string }) {
           {/* Left: form (70%) */}
           <div className="flex-1 min-w-0 space-y-4">
             <CampaignTypeSelector value={campaign.platform} onChange={p => update('platform', p)} isDark={isDark} />
-            <CampaignInfo {...sectionProps} />
-            <MediaUploader {...sectionProps} />
-            <AudienceTargeting {...sectionProps} />
-            {campaign.platform === 'geofencing' && <GeofencingBuilder {...sectionProps} />}
-            <BudgetCalculator {...sectionProps} />
-            <SchedulingSection {...sectionProps} />
-            <CTASettings {...sectionProps} />
-            <CampaignSummary state={campaign} onLaunch={handleLaunch} isDark={isDark} saving={savingDraft} saveError={saveError} />
+            <CampaignDetailsCard {...sectionProps} />
+            <ObjectiveCard {...sectionProps} />
+            <AudienceStep
+              selected={campaign.selectedAudience}
+              onChange={next => update('selectedAudience', next)}
+              isDark={isDark}
+              errorMessage={visibleErrors.audiences}
+            />
+            {isGeofencing && <GeofencingBuilder state={campaign} update={update} isDark={isDark} />}
+            <AdSetCard {...sectionProps} />
+            <CampaignSummary
+              state={campaign}
+              onLaunch={handleLaunch}
+              isDark={isDark}
+              saving={savingDraft}
+              saveError={saveError}
+            />
           </div>
 
           {/* Right: preview (30%) */}
