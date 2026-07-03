@@ -36,9 +36,7 @@ const STATUS_CFG: Record<PaymentStatus, { label: string; color: string; bg: stri
 }
 
 function fmtINR(n: number): string {
-  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(2)}L`
-  if (n >= 1_000) return `₹${(n / 1_000).toFixed(2)}K`
-  return `₹${n.toFixed(2)}`
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
 function fmtDate(iso: string) {

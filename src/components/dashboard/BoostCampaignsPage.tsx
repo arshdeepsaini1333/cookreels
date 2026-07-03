@@ -47,9 +47,7 @@ function formatNum(n: number): string {
 }
 
 function formatINR(n: number): string {
-  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(1)}L`
-  if (n >= 1_000) return `₹${(n / 1_000).toFixed(0)}K`
-  return `₹${n.toFixed(0)}`
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
 const STATUS_CFG: Record<Campaign['status'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
@@ -178,7 +176,7 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
   const menuItems = [
     { icon: Eye,       label: 'View',    onClick: () => { setMenuOpen(false); onOpen(c.id) } },
     { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(c.id) } },
-    ...(c.status === 'draft' || c.status === 'paused'
+    ...(c.status === 'draft' || c.status === 'paused' || c.status === 'pending'
       ? [{ icon: PenLine, label: 'Edit', onClick: () => { setMenuOpen(false); onOpen(c.id, true) } }]
       : []),
     ...(c.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),

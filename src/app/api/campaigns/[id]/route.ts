@@ -14,10 +14,11 @@ const UpdateCampaignSchema = z.object({
   objective:    z.enum(['LEADS', 'WEBSITE_TRAFFIC', 'APP_INSTALLS', 'VIDEO_VIEWS', 'PROFILE_VISITS', 'BRAND_AWARENESS', 'ENGAGEMENT', 'REACH', 'CONVERSIONS']).optional(),
   audienceData: z.record(z.string(), z.unknown()).optional(),
   audienceId:   z.string().min(1).optional(),
+  locations:    z.array(z.string()).optional(),
+  ageMin:       z.number().int().min(18).max(65).optional(),
+  ageMax:       z.number().int().min(18).max(65).optional(),
+  gender:       z.enum(['all', 'male', 'female']).optional(),
   durationDays: z.number().int().positive().optional(),
-  dailyBudget:  z.number().positive().optional(),
-  totalBudget:  z.number().positive().optional(),
-  impressions:  z.number().int().positive().optional(),
   startDate:    z.string().nullable().optional(),
   endDate:      z.string().nullable().optional(),
   bannerUrl:    z.string().nullable().optional(),
@@ -182,8 +183,8 @@ export async function PATCH(req: Request, { params }: Params) {
 
   if (!existing) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  if (!['DRAFT', 'PAUSED'].includes(existing.status)) {
-    return NextResponse.json({ error: 'Only DRAFT or PAUSED campaigns can be edited' }, { status: 409 })
+  if (!['DRAFT', 'PAUSED', 'PENDING_PAYMENT'].includes(existing.status)) {
+    return NextResponse.json({ error: 'Only DRAFT, PAUSED, or PENDING_PAYMENT campaigns can be edited' }, { status: 409 })
   }
 
   const data = result.data
@@ -203,13 +204,16 @@ export async function PATCH(req: Request, { params }: Params) {
   if (data.objective    !== undefined) updateData.objective    = data.objective
   if (data.audienceData !== undefined) updateData.audienceData = data.audienceData as Prisma.InputJsonValue
   if (data.durationDays !== undefined) updateData.durationDays = data.durationDays
-  if (data.dailyBudget  !== undefined) updateData.dailyBudget  = data.dailyBudget
-  if (data.totalBudget  !== undefined) updateData.totalBudget  = data.totalBudget
-  if (data.impressions  !== undefined) updateData.impressions  = data.impressions
+  // dailyBudget / totalBudget / impressions are intentionally not editable — the
+  // campaign is paid for once upfront via Razorpay against the original amounts.
   if (data.startDate    !== undefined) updateData.startDate    = data.startDate ? new Date(data.startDate) : null
   if (data.endDate      !== undefined) updateData.endDate      = data.endDate   ? new Date(data.endDate)   : null
   if (data.bannerUrl    !== undefined) updateData.bannerUrl    = data.bannerUrl
   if (data.adVideoUrl   !== undefined) updateData.adVideoUrl   = data.adVideoUrl
+  if (data.locations    !== undefined) updateData.locations    = data.locations as Prisma.InputJsonValue
+  if (data.ageMin       !== undefined) updateData.ageMin       = data.ageMin
+  if (data.ageMax       !== undefined) updateData.ageMax       = data.ageMax
+  if (data.gender       !== undefined) updateData.gender       = data.gender
 
   if (data.audienceId !== undefined) {
     const audience = await prisma.audience.findFirst({

@@ -50,9 +50,7 @@ function formatNumber(n: number): string {
 }
 
 function formatINR(n: number): string {
-  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(1)}L`
-  if (n >= 1_000)    return `₹${(n / 1_000).toFixed(0)}K`
-  return `₹${n.toFixed(0)}`
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 
 const STATUS_CONFIG: Record<Campaign['status'], { label: string; color: string; bg: string; icon: React.ElementType }> = {
@@ -230,7 +228,7 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
   const menuItems = [
     { icon: Eye,        label: 'View',    href: `/boost/create?id=${campaign.id}` },
     { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(campaign.id) } },
-    ...(campaign.status === 'draft' ? [{ icon: PenLine, label: 'Edit', href: `/boost/create?id=${campaign.id}&edit=true` }] : []),
+    ...(campaign.status === 'draft' || campaign.status === 'pending' ? [{ icon: PenLine, label: 'Edit', href: `/boost/create?id=${campaign.id}&edit=true` }] : []),
     ...(campaign.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),
     ...(campaign.status === 'paused' ? [{ icon: Play,  label: 'Resume', onClick: () => doStatusAction('resume') }] : []),
     { icon: Trash2, label: 'Delete', onClick: () => { setMenuOpen(false); setConfirming(true) }, danger: true },

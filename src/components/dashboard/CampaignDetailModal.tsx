@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '@/context/ThemeContext'
-import type { CampaignDetail } from '@/types/campaign'
+import type { CampaignDetail, Audience } from '@/types/campaign'
 import {
   X, Edit2, Save, Loader2, CheckCircle2, Clock, FileText, Pause,
   XCircle, DollarSign, Users, ExternalLink, Image as ImageIcon, Video,
@@ -53,9 +53,7 @@ const PLATFORM_LABELS: Record<string, string> = {
 }
 
 function fmtINR(n: number) {
-  if (n >= 1_00_000) return `₹${(n / 1_00_000).toFixed(1)}L`
-  if (n >= 1_000) return `₹${(n / 1_000).toFixed(0)}K`
-  return `₹${n.toFixed(0)}`
+  return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 }
 function fmtNum(n: number) {
   if (n >= 1_00_000) return `${(n / 1_00_000).toFixed(1)}L`
@@ -72,6 +70,7 @@ interface GeofenceZone { id: string; name: string; lat: string; lng: string; rad
 interface EditForm {
   name:           string
   description:    string
+  adHeading:      string
   objective:      string
   adFormat:       'banner' | 'reel'
   ctaText:        string
@@ -79,6 +78,7 @@ interface EditForm {
   bannerUrl:      string
   adVideoUrl:     string
   // targeting
+  audienceId:     string
   locations:      string[]
   state:          string
   city:           string
@@ -104,12 +104,14 @@ function initForm(d: CampaignDetail): EditForm {
   return {
     name:           d.name,
     description:    (ad.description as string) ?? '',
+    adHeading:      (ad.adHeading as string) ?? '',
     objective:      d.objective,
     adFormat:       ((ad.adFormat as string) ?? 'reel') as 'banner' | 'reel',
     ctaText:        (ad.ctaText as string) ?? '',
     destinationUrl: (ad.destinationUrl as string) ?? '',
     bannerUrl:      d.bannerUrl  ?? (ad.bannerUrl as string)  ?? '',
     adVideoUrl:     d.adVideoUrl ?? (ad.adVideoUrl as string) ?? '',
+    audienceId:     d.audience?.id ?? '',
     locations:      (d.locations as string[]) ?? [],
     state:          (ad.state as string) ?? '',
     city:           (ad.city as string) ?? '',
@@ -154,6 +156,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
   const [saving,  setSaving]  = useState(false)
   const [form,    setForm]    = useState<EditForm | null>(null)
   const [error,   setError]   = useState('')
+  const [audiences, setAudiences] = useState<Audience[]>([])
 
   // search states for edit-mode chip inputs
   const [langQ,     setLangQ]     = useState('')
@@ -174,14 +177,22 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
       .then(r => r.json())
       .then((d: CampaignDetail) => {
         setDetail(d); setLoading(false)
-        if (startInEditMode && ['DRAFT', 'PAUSED'].includes(d.status)) {
+        if (startInEditMode && ['DRAFT', 'PAUSED', 'PENDING_PAYMENT'].includes(d.status)) {
           setForm(initForm(d)); setEditing(true)
         }
       })
       .catch(() => setLoading(false))
   }, [campaignId, startInEditMode])
 
-  const canEdit = detail && ['DRAFT', 'PAUSED'].includes(detail.status)
+  const canEdit = detail && ['DRAFT', 'PAUSED', 'PENDING_PAYMENT'].includes(detail.status)
+
+  useEffect(() => {
+    if (!editing) return
+    fetch('/api/audiences')
+      .then(r => r.ok ? r.json() : { audiences: [] })
+      .then(d => setAudiences(d.audiences ?? []))
+      .catch(() => setAudiences([]))
+  }, [editing])
 
   const startEditing = () => {
     if (!detail) return
@@ -192,7 +203,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
   const handleSave = async () => {
     if (!detail || !form) return
     setSaving(true); setError('')
-    const body = {
+    const body: Record<string, unknown> = {
       name:         form.name,
       objective:    form.objective,
       locations:    form.locations,
@@ -200,9 +211,6 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
       ageMax:       form.ageMax,
       gender:       form.gender,
       durationDays: form.durationDays,
-      dailyBudget:  form.dailyBudget,
-      totalBudget:  form.totalBudget,
-      impressions:  form.impressions,
       startDate:    form.startDate || null,
       endDate:      form.endDate   || null,
       bannerUrl:    form.bannerUrl  || null,
@@ -210,6 +218,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
       audienceData: {
         ...detail.audienceData,
         description:    form.description,
+        adHeading:      form.adHeading,
         adFormat:       form.adFormat,
         ctaText:        form.ctaText,
         destinationUrl: form.destinationUrl,
@@ -223,6 +232,12 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
         budgetType:     form.budgetType,
         timezone:       form.timezone,
       },
+    }
+    // Only send audienceId when the linked reusable audience was actually changed —
+    // the API derives ageMin/ageMax/gender/locations from it, which would otherwise
+    // silently clobber the custom targeting fields above on every save.
+    if (form.audienceId && form.audienceId !== (detail.audience?.id ?? '')) {
+      body.audienceId = form.audienceId
     }
     const res = await fetch(`/api/campaigns/${detail.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -773,7 +788,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                   {detail.payment && (
                     <Box title="Payment" icon={<CreditCard size={13} style={{ color: '#7DBB91' }} />} bg={sectionBg} border={border}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <StatCard label="Amount Paid" value={fmtINR(detail.payment.amount / 100)} color="#7DBB91" isDark={isDark} border={border} />
+                        <StatCard label="Amount Paid" value={fmtINR(detail.payment.amount)} color="#7DBB91" isDark={isDark} border={border} />
                         <div style={{ padding: '10px 12px', borderRadius: 10, background: isDark ? 'rgba(30,30,31,0.80)' : '#F9FAFB', border: `1px solid ${border}` }}>
                           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: textPrimary, textTransform: 'capitalize' }}>{detail.payment.status}</p>
                           <p style={{ margin: '3px 0 0', fontSize: 9, fontWeight: 700, color: textMuted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</p>
@@ -895,6 +910,7 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
                     <p style={{ fontSize: 11, color: '#FF6B6B', margin: 0, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,107,107,0.10)', border: '1px solid rgba(255,107,107,0.25)' }}>{mediaError}</p>
                   )}
 
+                  {inp('Ad Heading', form.adHeading, v => upd('adHeading', v), { placeholder: 'e.g. Fresh Recipes Delivered Daily' })}
                   {inp('Campaign Description', form.description, v => upd('description', v), { rows: 3, placeholder: 'Describe your campaign goals and key message…' })}
                   {/* CTA Text presets */}
                   <div>
@@ -922,24 +938,19 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                 {/* 4. Budget & Schedule */}
                 <Box title="Budget & Schedule" icon={<DollarSign size={13} style={{ color: '#FF9F1C' }} />} bg={sectionBg} border={border}>
+                  {/* Budget is locked — it was charged once upfront and can't be changed after payment */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                    {inp('Daily Budget (₹)', String(form.dailyBudget), v => upd('dailyBudget', Number(v)), { type: 'number' })}
-                    {inp('Total Budget (₹)', String(form.totalBudget), v => upd('totalBudget', Number(v)), { type: 'number' })}
+                    <StatCard label="Daily Budget (₹)" value={fmtINR(form.dailyBudget)} color="#FF9F1C" isDark={isDark} border={border} />
+                    <StatCard label="Total Budget (₹)" value={fmtINR(form.totalBudget)} color="#F5C518" isDark={isDark} border={border} />
                   </div>
-                  {/* Target Impressions */}
+                  <p style={{ margin: 0, fontSize: 11, color: textMuted }}>Budget can&apos;t be changed after payment.</p>
+                  {/* Target Impressions — locked, tied to the paid budget */}
                   <div>
                     <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Impressions</p>
-                    <input type="number" min={1000} step={1000} value={form.impressions} onChange={e => upd('impressions', Number(e.target.value))}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 500, background: inputBg, border: `1.5px solid ${border}`, color: textPrimary, outline: 'none', boxSizing: 'border-box' }}
-                      onFocus={e => (e.currentTarget.style.borderColor = 'rgba(245,197,24,0.65)')}
-                      onBlur={e => (e.currentTarget.style.borderColor = border)} />
-                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                      {[10000, 50000, 100000, 500000].map(n => (
-                        <button key={n} onClick={() => upd('impressions', n)} style={{ flex: 1, padding: '6px 0', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${form.impressions === n ? 'rgba(245,197,24,0.45)' : border}`, background: form.impressions === n ? 'rgba(245,197,24,0.10)' : inputBg, color: form.impressions === n ? '#F5C518' : textMuted, transition: 'all 0.12s' }}>
-                          {n >= 100000 ? `${n / 100000}L` : `${n / 1000}K`}
-                        </button>
-                      ))}
+                    <div style={{ padding: '9px 12px', borderRadius: 10, fontSize: 13, fontWeight: 600, background: inputBg, border: `1.5px solid ${border}`, color: textPrimary }}>
+                      {form.impressions ? fmtNum(form.impressions) : '—'}
                     </div>
+                    <p style={{ margin: '6px 0 0', fontSize: 11, color: textMuted }}>Impressions can&apos;t be changed after payment.</p>
                   </div>
                   {/* Budget Type */}
                   <div>
@@ -971,6 +982,21 @@ export default function CampaignDetailModal({ campaignId, startInEditMode, onClo
 
                 {/* 5. Audience */}
                 <Box title="Audience Targeting" icon={<Users size={13} style={{ color: '#E1306C' }} />} bg={sectionBg} border={border}>
+                  {/* Linked reusable audience */}
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Saved Audience (optional)</p>
+                    <select value={form.audienceId} onChange={e => upd('audienceId', e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: 10, fontSize: 12, fontWeight: 500, background: inputBg, border: `1.5px solid ${border}`, color: textPrimary, outline: 'none', boxSizing: 'border-box', appearance: 'none' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'rgba(245,197,24,0.65)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = border)}>
+                      <option value="">No saved audience — use custom targeting below</option>
+                      {audiences.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                    {form.audienceId && form.audienceId !== (detail.audience?.id ?? '') && (
+                      <p style={{ margin: '6px 0 0', fontSize: 11, color: textMuted }}>Switching the saved audience will overwrite age, gender, and location targeting below on save.</p>
+                    )}
+                  </div>
+
                   {/* Countries */}
                   <div>
                     <p style={{ fontSize: 10, fontWeight: 700, color: textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Target Countries</p>
