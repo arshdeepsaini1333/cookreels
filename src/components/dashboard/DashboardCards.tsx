@@ -1626,11 +1626,6 @@ function RecentFriends() {
               >
                 <FriendActivityAvatar profileImage={friend.profileImage} displayName={friend.displayName} isDark={isDark} />
               </div>
-              {/* New-post dot */}
-              <span
-                className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2"
-                style={{ background: '#F5C518', borderColor: isDark ? '#2B2B2D' : '#FFFFFF' }}
-              />
             </div>
 
             {/* Name + post */}
