@@ -129,6 +129,14 @@ enum ReportReason {
   OTHER
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  CAMPAIGN_MANAGER
+  MODERATOR
+  ANALYST
+  SUPPORT
+}
+
 
 // ─── User ───────
 
@@ -872,6 +880,30 @@ model Report {
   @@index([targetRecipeCommentId])
   @@index([targetReelCommentId])
   @@map("reports")
+}
+
+
+// ─── Admin ────────────────────────────────────────────────────────────────
+
+model Admin {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         AdminRole @default(SUPPORT)
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+
+  // Login 2FA — email OTP required after password, before a session is issued
+  loginOtp          String?
+  loginOtpExpiresAt DateTime?
+  loginOtpCreatedAt DateTime?
+  loginOtpAttempts  Int       @default(0)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("admins")
 }
 
 

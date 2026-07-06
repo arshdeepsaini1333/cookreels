@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useTheme } from '@/context/ThemeContext'
 import {
-  ArrowLeft, Users, Plus, Search, Phone, Mail, MessageSquare,
+  ArrowLeft, Users, Plus, Search, Phone, Mail, Megaphone,
   CheckCircle2, Clock, XCircle, RefreshCw, Filter,
 } from 'lucide-react'
 
@@ -43,89 +43,6 @@ const TABS: { id: StatusFilter; label: string }[] = [
   { id: 'CONVERTED', label: 'Converted' },
   { id: 'DROPPED', label: 'Dropped' },
 ]
-
-// ─── Lead Row ─────────────────────────────────────────────────────────────────
-
-function LeadRow({ lead, isDark }: { lead: Lead; isDark: boolean }) {
-  const cfg = STATUS_CFG[lead.status]
-  const StatusIcon = cfg.icon
-  const [expanded, setExpanded] = useState(false)
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl overflow-hidden transition-colors"
-      style={{ border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
-    >
-      <button
-        onClick={() => setExpanded(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors"
-        onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.35)' : 'rgba(245,197,24,0.03)')}
-        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-      >
-        {/* Avatar */}
-        <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
-          style={{ background: `${cfg.color}18`, color: cfg.color, border: `1px solid ${cfg.color}28` }}>
-          {lead.name.charAt(0).toUpperCase()}
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{lead.name}</p>
-          <p className="text-[11px] mt-0.5 truncate" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-            {lead.campaign.name}
-          </p>
-        </div>
-
-        {/* Status */}
-        <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold flex-shrink-0"
-          style={{ background: cfg.bg, color: cfg.color }}>
-          <StatusIcon size={10} strokeWidth={2.5} /> {cfg.label}
-        </span>
-
-        {/* Date */}
-        <p className="text-xs flex-shrink-0 hidden md:block" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-          {new Date(lead.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-        </p>
-      </button>
-
-      {/* Expanded details */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            style={{ overflow: 'hidden', borderTop: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
-          >
-            <div className="px-5 py-3.5 flex flex-wrap gap-4"
-              style={{ background: isDark ? 'rgba(30,30,31,0.50)' : 'rgba(248,248,248,0.60)' }}>
-              <div className="flex items-center gap-2 text-xs" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
-                <Phone size={12} style={{ color: '#7DBB91' }} />
-                <span className="font-medium">{lead.mobile}</span>
-              </div>
-              {lead.email && (
-                <div className="flex items-center gap-2 text-xs" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
-                  <Mail size={12} style={{ color: '#4285F4' }} />
-                  <span className="font-medium">{lead.email}</span>
-                </div>
-              )}
-              {lead.notes && (
-                <div className="flex items-start gap-2 text-xs" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
-                  <MessageSquare size={12} style={{ color: '#FF9F1C', marginTop: 1 }} />
-                  <span>{lead.notes}</span>
-                </div>
-              )}
-              <div className="text-xs" style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>
-                Added {new Date(lead.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  )
-}
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
@@ -176,6 +93,7 @@ export default function BoostLeadsPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
+  const [campaignFilter, setCampaignFilter] = useState('all')
 
   useEffect(() => {
     fetch('/api/boost/leads')
@@ -191,15 +109,19 @@ export default function BoostLeadsPage() {
     boxShadow: isDark ? '0 4px 24px rgba(0,0,0,0.30), 0 0 0 1px rgba(52,52,56,0.80)' : '0 2px 8px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.06)',
   }
 
+  const campaigns = Array.from(new Map(leads.map(l => [l.campaign.id, l.campaign])).values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+
   const tabFiltered = tab === 'all' ? leads : leads.filter(l => l.status === tab)
+  const campaignFiltered = campaignFilter === 'all' ? tabFiltered : tabFiltered.filter(l => l.campaign.id === campaignFilter)
   const filtered = search.trim()
-    ? tabFiltered.filter(l =>
+    ? campaignFiltered.filter(l =>
         l.name.toLowerCase().includes(search.toLowerCase()) ||
         l.mobile.includes(search) ||
         (l.email ?? '').toLowerCase().includes(search.toLowerCase()) ||
         l.campaign.name.toLowerCase().includes(search.toLowerCase())
       )
-    : tabFiltered
+    : campaignFiltered
 
   const counts: Record<StatusFilter, number> = {
     all: leads.length,
@@ -210,7 +132,7 @@ export default function BoostLeadsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-5 pb-10">
+    <div className="max-w-5xl mx-auto space-y-5 pb-10">
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -254,9 +176,9 @@ export default function BoostLeadsPage() {
         className="rounded-2xl overflow-hidden" style={cardStyle}>
 
         {/* Top bar */}
-        <div className="flex items-center gap-3 px-5 py-4"
+        <div className="flex items-center gap-3 px-5 py-4 flex-wrap"
           style={{ borderBottom: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}>
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-w-[180px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
             <input
               className="w-full rounded-xl pl-8 pr-3.5 py-2 text-sm outline-none"
@@ -270,6 +192,19 @@ export default function BoostLeadsPage() {
               }}
             />
           </div>
+          <select
+            value={campaignFilter}
+            onChange={e => setCampaignFilter(e.target.value)}
+            className="rounded-xl px-3 py-2 text-xs font-semibold outline-none max-w-[200px]"
+            style={{
+              background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(245,245,245,0.80)',
+              border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+              color: isDark ? '#F5F5F5' : '#1A1A1A',
+            }}
+          >
+            <option value="all">All Campaigns</option>
+            {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
           <div className="flex items-center gap-1.5 text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
             <Filter size={13} /> {filtered.length} leads
           </div>
@@ -298,20 +233,66 @@ export default function BoostLeadsPage() {
           ))}
         </div>
 
-        {/* List */}
-        <div className="p-4">
+        {/* Table */}
+        <div className="p-4 overflow-x-auto">
           {loading ? (
             <div className="space-y-2">
               {[0, 1, 2, 3].map(i => (
-                <div key={i} className="h-16 rounded-xl" style={{ background: isDark ? 'rgba(52,52,56,0.4)' : 'rgba(0,0,0,0.04)' }} />
+                <div key={i} className="h-12 rounded-xl" style={{ background: isDark ? 'rgba(52,52,56,0.4)' : 'rgba(0,0,0,0.04)' }} />
               ))}
             </div>
           ) : filtered.length > 0 ? (
-            <div className="space-y-1.5">
-              {filtered.map(lead => <LeadRow key={lead.id} lead={lead} isDark={isDark} />)}
-            </div>
+            <table className="w-full border-collapse min-w-[760px]">
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}>
+                  {['Name', 'Mobile', 'Email', 'Campaign', 'Status', 'Notes', 'Date'].map(h => (
+                    <th key={h} className="text-left py-2 px-3 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+                      style={{ color: isDark ? '#52525B' : '#C4C4C4' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(lead => {
+                  const cfg = STATUS_CFG[lead.status]
+                  const StatusIcon = cfg.icon
+                  return (
+                    <tr key={lead.id} className="transition-colors"
+                      style={{ borderBottom: `1px solid ${isDark ? '#28282B' : '#F5F5F5'}` }}
+                      onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.30)' : 'rgba(245,197,24,0.03)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                      <td className="py-2.5 px-3 text-sm font-semibold whitespace-nowrap" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{lead.name}</td>
+                      <td className="py-2.5 px-3 text-xs whitespace-nowrap" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
+                        <span className="inline-flex items-center gap-1.5"><Phone size={11} style={{ color: '#7DBB91' }} />{lead.mobile}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-xs whitespace-nowrap" style={{ color: isDark ? '#A1A1AA' : '#666' }}>
+                        {lead.email ? <span className="inline-flex items-center gap-1.5"><Mail size={11} style={{ color: '#4285F4' }} />{lead.email}</span> : '—'}
+                      </td>
+                      <td className="py-2.5 px-3 text-xs whitespace-nowrap">
+                        <Link href={`/boost/campaigns/${lead.campaign.id}/leads`}
+                          className="inline-flex items-center gap-1.5 font-semibold hover:underline"
+                          style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
+                          <Megaphone size={11} style={{ color: '#F5C518' }} />
+                          <span className="max-w-[160px] truncate">{lead.campaign.name}</span>
+                        </Link>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: cfg.bg, color: cfg.color }}>
+                          <StatusIcon size={9} strokeWidth={2.5} /> {cfg.label}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-xs max-w-[200px] truncate" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{lead.notes ?? '—'}</td>
+                      <td className="py-2.5 px-3 text-xs whitespace-nowrap" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+                        {new Date(lead.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           ) : (
-            <EmptyState isDark={isDark} filtered={search.trim().length > 0 || tab !== 'all'} />
+            <EmptyState isDark={isDark} filtered={search.trim().length > 0 || tab !== 'all' || campaignFilter !== 'all'} />
           )}
         </div>
       </motion.div>

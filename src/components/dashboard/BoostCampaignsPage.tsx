@@ -144,9 +144,13 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
   onOpen: (id: string, editMode?: boolean) => void
   onPreview: (id: string) => void
 }) {
+  const router = useRouter()
   const [menuOpen, setMenuOpen]       = useState(false)
   const [confirming, setConfirming]   = useState(false)
   const [acting, setActing]           = useState(false)
+
+  const hasLeadsPage = c.status === 'active' || c.status === 'paused' || c.status === 'completed'
+  const openLeads = () => router.push(`/boost/campaigns/${c.id}/leads`)
 
   const cfg = STATUS_CFG[c.status]
   const StatusIcon = cfg.icon
@@ -175,6 +179,7 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
 
   const menuItems = [
     { icon: Eye,       label: 'View',    onClick: () => { setMenuOpen(false); onOpen(c.id) } },
+    ...(hasLeadsPage ? [{ icon: Target, label: 'View Leads', onClick: () => { setMenuOpen(false); openLeads() } }] : []),
     { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(c.id) } },
     ...(c.status === 'draft' || c.status === 'paused' || c.status === 'pending'
       ? [{ icon: PenLine, label: 'Edit', onClick: () => { setMenuOpen(false); onOpen(c.id, true) } }]
@@ -195,7 +200,10 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
         border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}`,
         opacity: acting ? 0.6 : 1,
         pointerEvents: acting ? 'none' : 'auto',
+        cursor: hasLeadsPage ? 'pointer' : 'default',
       }}
+      onClick={() => { if (hasLeadsPage) openLeads() }}
+      title={hasLeadsPage ? 'View leads, impressions & clicks' : undefined}
       onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.35)' : 'rgba(245,197,24,0.03)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
@@ -253,7 +261,7 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
         </div>
 
         {/* Actions — w-8, matches header spacer */}
-        <div className="relative w-8 flex-shrink-0 flex justify-center">
+        <div className="relative w-8 flex-shrink-0 flex justify-center" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => { setMenuOpen(o => !o); setConfirming(false) }}
             className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

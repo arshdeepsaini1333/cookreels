@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, CampaignStatus } from '@/generated/prisma'
 import type { AudienceData, AudienceLocation } from '@/types/campaign'
+import { computeSpend } from '@/lib/campaignSpend'
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -188,7 +189,6 @@ export async function GET(req: Request) {
               likes:           true,
               clicks:          true,
               followersGained: true,
-              spend:           true,
             },
           },
         },
@@ -216,7 +216,7 @@ export async function GET(req: Request) {
         likes:           c.analytics.likes,
         clicks:          c.analytics.clicks,
         followersGained: c.analytics.followersGained,
-        spend:           Number(c.analytics.spend),
+        spend:           computeSpend(c.analytics.impressions),
       } : null,
       paymentId:    c.paymentId,
       createdAt:    c.createdAt.toISOString(),

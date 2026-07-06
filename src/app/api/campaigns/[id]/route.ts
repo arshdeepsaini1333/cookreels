@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@/generated/prisma'
 import type { AudienceData, AudienceLocation } from '@/types/campaign'
 import { serializeAudience } from '@/lib/serializeAudience'
+import { computeSpend } from '@/lib/campaignSpend'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -73,7 +74,6 @@ export async function GET(_req: Request, { params }: Params) {
             likes:           true,
             clicks:          true,
             followersGained: true,
-            spend:           true,
           },
         },
         payments: {
@@ -136,7 +136,7 @@ export async function GET(_req: Request, { params }: Params) {
         likes:           campaign.analytics.likes,
         clicks:          campaign.analytics.clicks,
         followersGained: campaign.analytics.followersGained,
-        spend:           Number(campaign.analytics.spend),
+        spend:           computeSpend(campaign.analytics.impressions),
       } : null,
       payment: payment ? {
         id:               payment.id,

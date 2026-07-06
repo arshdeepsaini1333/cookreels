@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import type { CampaignStatus } from '@/generated/prisma'
 import type { AudienceData, BoostCampaignRow } from '@/types/campaign'
+import { computeSpend } from '@/lib/campaignSpend'
 
 function mapStatus(s: CampaignStatus): BoostCampaignRow['status'] {
   switch (s) {
@@ -22,7 +23,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
-    const [activeCnt, draftCnt, analyticsAgg, campaigns] = await Promise.all([
+    const [activeCnt, draftCnt, analyticsAgg, totalLeads, campaigns] = await Promise.all([
       prisma.campaign.count({
         where: { userId: session.userId, status: 'ACTIVE' },
       }),
@@ -34,9 +35,11 @@ export async function GET() {
         _sum: {
           impressions:     true,
           clicks:          true,
-          spend:           true,
           followersGained: true,
         },
+      }),
+      prisma.campaignLead.count({
+        where: { campaign: { userId: session.userId } },
       }),
       prisma.campaign.findMany({
         where:   { userId: session.userId },
@@ -75,8 +78,8 @@ export async function GET() {
       draftCampaigns:    draftCnt,
       totalImpressions:  analyticsAgg._sum.impressions     ?? 0,
       totalClicks:       analyticsAgg._sum.clicks          ?? 0,
-      totalSpend:        Number(analyticsAgg._sum.spend    ?? 0),
-      totalLeads:        analyticsAgg._sum.followersGained ?? 0,
+      totalSpend:        computeSpend(analyticsAgg._sum.impressions ?? 0),
+      totalLeads,
       campaigns:         rows,
     })
   } catch (error) {
