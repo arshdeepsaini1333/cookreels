@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '@/context/ThemeContext'
 import {
-  Megaphone, Globe, MapPin, Check, Upload, X,
-  ChevronDown, Plus, Trash2, Target, BarChart2,
+  Megaphone, Upload, X,
+  ChevronDown, Target, BarChart2,
   Play, Image as ImageIcon, Video, TrendingUp, Rocket,
-  AlertCircle, CheckCircle2, Monitor, Share2, ArrowLeft,
+  AlertCircle, CheckCircle2, ArrowLeft,
   Loader2, FileText,
 } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
@@ -36,17 +36,9 @@ function loadRazorpayScript(): Promise<boolean> {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type Platform = 'cookreels' | 'meta' | 'google' | 'geofencing' | ''
+type Platform = 'cookreels'
 type AdFormat = 'banner' | 'reel'
-type MobileStep = 1 | 2 | 3 | 4 | 5 | 6
-
-interface GeofenceZone {
-  id: string
-  name: string
-  lat: string
-  lng: string
-  radius: string
-}
+type MobileStep = 1 | 2 | 3 | 4 | 5
 
 interface MediaInfo {
   size: string
@@ -65,7 +57,6 @@ interface CampaignState {
   mediaFile: File | null
   mediaPreviewUrl: string | null
   mediaInfo: MediaInfo | null
-  geofences: GeofenceZone[]
   startDate: string
   endDate: string
   timezone: string
@@ -116,8 +107,6 @@ const OBJECTIVES: { label: string; value: string }[] = [
   { label: 'Conversions',      value: 'CONVERSIONS' },
 ]
 
-const RADIUS_OPTIONS = ['100m', '250m', '500m', '1km', '5km', '10km']
-
 const CTA_OPTIONS = ['Learn More', 'Shop Now', 'Order Now', 'Visit Website', 'Download App', 'Book Now', 'Get Offer', 'Subscribe']
 
 const PLATFORMS = [
@@ -125,47 +114,18 @@ const PLATFORMS = [
     id: 'cookreels' as Platform,
     name: 'CookReels Ads',
     desc: 'Reach food lovers exclusively — across Feeds, Reels, Explore, Search and Category pages. A food-first audience with high purchase intent.',
-    features: ['In-Feed & Reel Ads', 'Explore & Search Placement', 'Food-Intent Audience'],
     icon: Megaphone,
     color: '#F5C518',
     badge: 'Best Value',
   },
-  {
-    id: 'meta' as Platform,
-    name: 'Meta Ads',
-    desc: 'Run ads across Facebook News Feed, Instagram Feed, Reels and Stories. Massive social reach with advanced interest and demographic targeting.',
-    features: ['Instagram & Facebook Feed', 'Reels & Stories Ads', 'Interest Targeting'],
-    icon: Share2,
-    color: '#E1306C',
-    badge: 'Popular',
-  },
-  {
-    id: 'google' as Platform,
-    name: 'Google Ads',
-    desc: 'Capture demand on Google Search, Shopping, Display Network and YouTube pre-roll. Keyword targeting for high-intent food and restaurant searches.',
-    features: ['Search & Shopping Ads', 'YouTube Pre-Roll', 'Display Network'],
-    icon: Monitor,
-    color: '#4285F4',
-    badge: 'High Reach',
-  },
-  {
-    id: 'geofencing' as Platform,
-    name: 'Geofencing Ads',
-    desc: 'Draw virtual fences around restaurants, malls, events and competitor locations. Serve ads on mobile, OTT/CTV and web to real-world nearby visitors.',
-    features: ['Competitor Targeting', 'OTT / CTV Ads', 'Mobile & Web Reach'],
-    icon: MapPin,
-    color: '#7DBB91',
-    badge: 'Hyper-Local',
-  },
 ]
 
 const MOBILE_STEPS = [
-  { step: 1 as MobileStep, label: 'Platform' },
-  { step: 2 as MobileStep, label: 'Creative' },
-  { step: 3 as MobileStep, label: 'Audience' },
-  { step: 4 as MobileStep, label: 'Budget' },
-  { step: 5 as MobileStep, label: 'Preview' },
-  { step: 6 as MobileStep, label: 'Launch' },
+  { step: 1 as MobileStep, label: 'Creative' },
+  { step: 2 as MobileStep, label: 'Audience' },
+  { step: 3 as MobileStep, label: 'Budget' },
+  { step: 4 as MobileStep, label: 'Preview' },
+  { step: 5 as MobileStep, label: 'Launch' },
 ]
 
 // ─── Input / Label helpers ────────────────────────────────────────────────────
@@ -273,220 +233,6 @@ function ErrorText({ children }: { children: React.ReactNode }) {
     <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: '#FF6B6B' }}>
       <AlertCircle size={11} /> {children}
     </p>
-  )
-}
-
-// ─── Platform Selector ────────────────────────────────────────────────────────
-
-function CampaignTypeSelector({ value, onChange, isDark }: {
-  value: Platform
-  onChange: (p: Platform) => void
-  isDark: boolean
-}) {
-  return (
-    <SectionCard title="Campaign Network" icon={Globe} isDark={isDark}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {PLATFORMS.map(p => {
-          const Icon = p.icon
-          const isSelected = value === p.id
-          return (
-            <motion.button
-              key={p.id}
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onChange(p.id)}
-              className="relative text-left rounded-2xl p-4 transition-all"
-              style={{
-                background: isSelected
-                  ? (isDark ? 'rgba(43,43,45,0.90)' : 'rgba(255,255,255,0.95)')
-                  : (isDark ? 'rgba(30,30,31,0.60)' : 'rgba(245,245,245,0.60)'),
-                border: isSelected
-                  ? `2px solid ${p.id === 'cookreels' ? '#F5C518' : p.color}`
-                  : `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                boxShadow: isSelected
-                  ? `0 0 0 3px ${p.id === 'cookreels' ? 'rgba(245,197,24,0.15)' : `${p.color}25`}, 0 8px 24px rgba(0,0,0,0.12)`
-                  : 'none',
-              }}
-            >
-              {isSelected && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute top-3 right-3 w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background: p.id === 'cookreels' ? '#F5C518' : p.color }}
-                >
-                  <Check size={11} className="text-white" strokeWidth={3} />
-                </motion.div>
-              )}
-              <div className="flex items-start gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: `${p.color}20`, border: `1px solid ${p.color}40` }}
-                >
-                  <Icon size={20} style={{ color: p.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
-                      {p.name}
-                    </span>
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{ background: `${p.color}20`, color: p.color }}
-                    >
-                      {p.badge}
-                    </span>
-                  </div>
-                  <p className="text-xs mt-1 leading-relaxed" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-                    {p.desc}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {p.features.map(f => (
-                      <span key={f} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-                        style={{ background: `${p.color}14`, color: p.color, border: `1px solid ${p.color}28` }}>
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </motion.button>
-          )
-        })}
-      </div>
-    </SectionCard>
-  )
-}
-
-// ─── Geofencing Builder ───────────────────────────────────────────────────────
-
-function GeofencingBuilder({ state, update, isDark }: {
-  state: CampaignState
-  update: (k: keyof CampaignState, v: unknown) => void
-  isDark: boolean
-}) {
-  const addZone = () => {
-    update('geofences', [...state.geofences, {
-      id: Math.random().toString(36).slice(2),
-      name: '', lat: '28.6139', lng: '77.2090', radius: '1km',
-    }])
-  }
-
-  const updateZone = (id: string, field: keyof GeofenceZone, val: string) => {
-    update('geofences', state.geofences.map(z => z.id === id ? { ...z, [field]: val } : z))
-  }
-
-  const removeZone = (id: string) => {
-    update('geofences', state.geofences.filter(z => z.id !== id))
-  }
-
-  return (
-    <SectionCard title="Geofencing Zones" icon={MapPin} isDark={isDark}>
-      <p className="text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-        Add physical locations to target users in a specific area. Each zone can have an independent radius.
-      </p>
-
-      <div className="space-y-3">
-        {state.geofences.map((zone, idx) => (
-          <motion.div
-            key={zone.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-xl p-4 space-y-3"
-            style={{ background: isDark ? 'rgba(30,30,31,0.60)' : 'rgba(245,245,245,0.70)', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#F5C518' }}>Zone {idx + 1}</span>
-              <button onClick={() => removeZone(zone.id)} className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors hover:opacity-70">
-                <Trash2 size={13} style={{ color: isDark ? '#71717A' : '#9CA3AF' }} />
-              </button>
-            </div>
-            <div>
-              <Label isDark={isDark}>Location Name</Label>
-              <Input isDark={isDark} placeholder="e.g. Connaught Place" value={zone.name} onChange={e => updateZone(zone.id, 'name', e.target.value)} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label isDark={isDark}>Latitude</Label>
-                <Input isDark={isDark} placeholder="28.6139" value={zone.lat} onChange={e => updateZone(zone.id, 'lat', e.target.value)} />
-              </div>
-              <div>
-                <Label isDark={isDark}>Longitude</Label>
-                <Input isDark={isDark} placeholder="77.2090" value={zone.lng} onChange={e => updateZone(zone.id, 'lng', e.target.value)} />
-              </div>
-            </div>
-            <div>
-              <Label isDark={isDark}>Radius</Label>
-              <div className="flex gap-2 flex-wrap">
-                {RADIUS_OPTIONS.map(r => (
-                  <button
-                    key={r}
-                    onClick={() => updateZone(zone.id, 'radius', r)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                    style={zone.radius === r ? {
-                      background: 'rgba(245,197,24,0.20)',
-                      border: '1px solid rgba(245,197,24,0.50)',
-                      color: '#F5C518',
-                    } : {
-                      background: isDark ? 'rgba(30,30,31,0.80)' : 'rgba(255,255,255,0.80)',
-                      border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
-                      color: isDark ? '#A1A1AA' : '#666',
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Map preview */}
-            <div
-              className="relative rounded-xl overflow-hidden"
-              style={{ height: 120, background: isDark ? '#1A2340' : '#E8F0FE', border: `1px solid ${isDark ? '#343438' : '#CBD5E1'}` }}
-            >
-              {/* Fake map grid */}
-              <div className="absolute inset-0 opacity-20"
-                style={{ backgroundImage: `linear-gradient(${isDark ? '#4285F425' : '#4285F430'} 1px, transparent 1px), linear-gradient(90deg, ${isDark ? '#4285F425' : '#4285F430'} 1px, transparent 1px)`, backgroundSize: '20px 20px' }} />
-              {/* Roads simulation */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="absolute w-full h-px opacity-30" style={{ background: isDark ? '#4285F4' : '#4285F4' }} />
-                <div className="absolute w-px h-full opacity-30" style={{ background: isDark ? '#4285F4' : '#4285F4' }} />
-              </div>
-              {/* Radius circle */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className="rounded-full border-2 flex items-center justify-center"
-                  style={{
-                    width: 60, height: 60,
-                    borderColor: '#F5C518',
-                    background: 'rgba(245,197,24,0.15)',
-                  }}
-                >
-                  <div className="w-3 h-3 rounded-full" style={{ background: '#F5C518', boxShadow: '0 0 8px rgba(245,197,24,0.80)' }} />
-                </div>
-              </div>
-              <div
-                className="absolute bottom-2 left-2 px-2 py-0.5 rounded-lg text-[10px] font-bold"
-                style={{ background: 'rgba(0,0,0,0.60)', color: '#fff' }}
-              >
-                {zone.name || 'Unnamed Zone'} · {zone.radius}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <button
-        onClick={addZone}
-        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all hover:scale-[1.02]"
-        style={{
-          border: '1.5px dashed rgba(245,197,24,0.40)',
-          color: '#F5C518',
-          background: 'rgba(245,197,24,0.05)',
-        }}
-      >
-        <Plus size={15} /> Add Geofence Zone
-      </button>
-    </SectionCard>
   )
 }
 
@@ -793,25 +539,17 @@ function AdSetCard({ state, update, isDark, errors }: {
 // ─── Ad Preview Panel ─────────────────────────────────────────────────────────
 
 function AdPreviewPanel({ state, isDark }: { state: CampaignState; isDark: boolean }) {
-  const [activeTab, setActiveTab] = useState<'feed' | 'reel' | 'search' | 'display' | 'map'>('feed')
+  const [activeTab, setActiveTab] = useState<'feed' | 'reel'>('feed')
   const hasMedia = !!state.mediaPreviewUrl
   const isBanner = state.adFormat === 'banner'
 
-  const platformTabs: Record<Platform, { id: string; label: string }[]> = {
-    cookreels: [{ id: 'feed', label: 'Feed' }, { id: 'reel', label: 'Reel' }],
-    meta: [{ id: 'feed', label: 'FB Feed' }, { id: 'reel', label: 'Instagram' }],
-    google: [{ id: 'search', label: 'Search' }, { id: 'display', label: 'Display' }],
-    geofencing: [{ id: 'map', label: 'Map View' }],
-    '': [{ id: 'feed', label: 'Preview' }],
-  }
-
-  const tabs = platformTabs[state.platform] || platformTabs['']
+  const tabs = [{ id: 'feed', label: 'Feed' }, { id: 'reel', label: 'Reel' }]
 
   const PreviewFrame = () => {
     const campaignName = state.campaignName || 'Your Campaign'
     const ctaLabel = state.ctaText || 'Learn More'
 
-    if (activeTab === 'reel' && state.platform !== 'google') {
+    if (activeTab === 'reel') {
       return (
         <div
           className="relative rounded-2xl overflow-hidden mx-auto"
@@ -847,124 +585,6 @@ function AdPreviewPanel({ state, isDark }: { state: CampaignState; isDark: boole
               </div>
             ))}
           </div>
-        </div>
-      )
-    }
-
-    if (activeTab === 'search') {
-      return (
-        <div className="space-y-2 mx-auto max-w-xs">
-          <div
-            className="rounded-xl p-3"
-            style={{ background: isDark ? '#1E1E1F' : '#fff', border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <Monitor size={12} style={{ color: '#4285F4' }} />
-              <span className="text-[10px]" style={{ color: '#4285F4' }}>google.com</span>
-              <span
-                className="ml-auto text-[9px] px-1.5 py-0.5 rounded font-bold"
-                style={{ background: '#e8f0fe', color: '#4285F4' }}
-              >Ad</span>
-            </div>
-            <p className="text-xs font-bold mb-0.5" style={{ color: '#1558d6' }}>{campaignName}</p>
-            <p className="text-[10px]" style={{ color: isDark ? '#9CA3AF' : '#202124' }}>
-              {state.description || 'Discover amazing products and experiences. Click to learn more and get started today.'}
-            </p>
-            <p className="text-[10px] mt-1.5 font-semibold" style={{ color: '#4285F4' }}>
-              {state.destinationUrl || 'https://yourwebsite.com'}
-            </p>
-          </div>
-        </div>
-      )
-    }
-
-    if (activeTab === 'display') {
-      return (
-        <div className="mx-auto" style={{ maxWidth: 280 }}>
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}` }}
-          >
-            <div
-              className="relative flex items-center justify-center"
-              style={{ height: 140, background: isDark ? '#1a1a2e' : '#e8f0fe' }}
-            >
-              {hasMedia && isBanner ? (
-                <img src={state.mediaPreviewUrl!} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <Monitor size={36} style={{ color: isDark ? '#4285F470' : '#4285F450' }} />
-              )}
-              <span
-                className="absolute top-2 right-2 text-[9px] px-1.5 py-0.5 rounded font-bold"
-                style={{ background: '#e8f0fe', color: '#4285F4' }}
-              >Ad</span>
-            </div>
-            <div className="p-3" style={{ background: isDark ? '#2B2B2D' : '#fff' }}>
-              <p className="text-xs font-bold mb-1" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{campaignName}</p>
-              <button className="w-full py-1.5 rounded-lg text-xs font-semibold" style={{ background: '#4285F4', color: '#fff' }}>
-                {ctaLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )
-    }
-
-    if (activeTab === 'map' && state.platform === 'geofencing') {
-      return (
-        <div className="space-y-2">
-          <div
-            className="relative rounded-2xl overflow-hidden"
-            style={{ height: 220, background: isDark ? '#1A2340' : '#E8F0FE' }}
-          >
-            <div className="absolute inset-0 opacity-20"
-              style={{ backgroundImage: `linear-gradient(#4285F430 1px, transparent 1px), linear-gradient(90deg, #4285F430 1px, transparent 1px)`, backgroundSize: '24px 24px' }} />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="absolute w-full h-px opacity-20" style={{ background: '#4285F4' }} />
-              <div className="absolute w-px h-full opacity-20" style={{ background: '#4285F4' }} />
-            </div>
-            {state.geofences.slice(0, 3).map((zone, i) => {
-              const positions = [
-                { top: '40%', left: '50%' },
-                { top: '25%', left: '30%' },
-                { top: '60%', left: '70%' },
-              ]
-              return (
-                <div
-                  key={zone.id}
-                  className="absolute -translate-x-1/2 -translate-y-1/2"
-                  style={positions[i]}
-                >
-                  <div
-                    className="rounded-full border-2 flex items-center justify-center"
-                    style={{
-                      width: 56 - i * 8, height: 56 - i * 8,
-                      borderColor: '#F5C518',
-                      background: 'rgba(245,197,24,0.15)',
-                    }}
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: '#F5C518', boxShadow: '0 0 6px rgba(245,197,24,0.80)' }} />
-                  </div>
-                </div>
-              )
-            })}
-            {state.geofences.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>Add geofence zones to see them here</p>
-              </div>
-            )}
-          </div>
-          {state.geofences.length > 0 && (
-            <div className="space-y-1.5">
-              {state.geofences.map((z, i) => (
-                <div key={z.id} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: isDark ? 'rgba(30,30,31,0.60)' : '#F5F5F5' }}>
-                  <div className="w-2 h-2 rounded-full" style={{ background: '#F5C518' }} />
-                  <span className="text-xs font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>{z.name || `Zone ${i + 1}`}</span>
-                  <span className="ml-auto text-xs" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>{z.radius}</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )
     }
@@ -1362,7 +982,7 @@ function LaunchModal({ state, onConfirm, onClose, isDark, campaignId }: {
 // ─── Main BoostPage ───────────────────────────────────────────────────────────
 
 const INITIAL_STATE: CampaignState = {
-  platform: '',
+  platform: 'cookreels',
   campaignName: '',
   objective: '',
   description: '',
@@ -1370,7 +990,6 @@ const INITIAL_STATE: CampaignState = {
   mediaFile: null,
   mediaPreviewUrl: null,
   mediaInfo: null,
-  geofences: [],
   startDate: '',
   endDate: '',
   timezone: 'Asia/Kolkata',
@@ -1450,10 +1069,9 @@ export function BoostPage({ username }: { username: string }) {
           bannerUrl,
           adVideoUrl,
           audienceData: {
-            platform:       campaign.platform || 'cookreels',
+            platform:       campaign.platform,
             adFormat:       campaign.adFormat,
             description:    campaign.description,
-            geofences:      campaign.geofences,
             adHeading:      campaign.adHeading,
             ctaText:        campaign.ctaText,
             destinationUrl: campaign.destinationUrl,
@@ -1495,25 +1113,20 @@ export function BoostPage({ username }: { username: string }) {
 
   const visibleErrors = submitAttempted ? formErrors : {}
   const sectionProps = { state: campaign, update, isDark, errors: visibleErrors }
-  const isGeofencing = campaign.platform === 'geofencing'
 
   const mobileSections: Record<MobileStep, React.ReactNode> = {
-    1: <CampaignTypeSelector value={campaign.platform} onChange={p => update('platform', p)} isDark={isDark} />,
-    2: <div className="space-y-4"><CampaignDetailsCard {...sectionProps} /><ObjectiveCard {...sectionProps} /></div>,
-    3: (
-      <div className="space-y-4">
-        <AudienceStep
-          selected={campaign.selectedAudience}
-          onChange={next => update('selectedAudience', next)}
-          isDark={isDark}
-          errorMessage={visibleErrors.audiences}
-        />
-        {isGeofencing && <GeofencingBuilder state={campaign} update={update} isDark={isDark} />}
-      </div>
+    1: <div className="space-y-4"><CampaignDetailsCard {...sectionProps} /><ObjectiveCard {...sectionProps} /></div>,
+    2: (
+      <AudienceStep
+        selected={campaign.selectedAudience}
+        onChange={next => update('selectedAudience', next)}
+        isDark={isDark}
+        errorMessage={visibleErrors.audiences}
+      />
     ),
-    4: <AdSetCard {...sectionProps} />,
-    5: <AdPreviewPanel state={campaign} isDark={isDark} />,
-    6: <CampaignSummary state={campaign} onLaunch={handleLaunch} isDark={isDark} saving={savingDraft} saveError={saveError} />,
+    3: <AdSetCard {...sectionProps} />,
+    4: <AdPreviewPanel state={campaign} isDark={isDark} />,
+    5: <CampaignSummary state={campaign} onLaunch={handleLaunch} isDark={isDark} saving={savingDraft} saveError={saveError} />,
   }
 
   return (
@@ -1622,7 +1235,7 @@ export function BoostPage({ username }: { username: string }) {
                 ← Back
               </button>
             )}
-            {mobileStep < 6 && (
+            {mobileStep < 5 && (
               <motion.button
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
@@ -1640,7 +1253,6 @@ export function BoostPage({ username }: { username: string }) {
         <div className="hidden lg:flex gap-6 pb-6">
           {/* Left: form (70%) */}
           <div className="flex-1 min-w-0 space-y-4">
-            <CampaignTypeSelector value={campaign.platform} onChange={p => update('platform', p)} isDark={isDark} />
             <CampaignDetailsCard {...sectionProps} />
             <ObjectiveCard {...sectionProps} />
             <AudienceStep
@@ -1649,7 +1261,6 @@ export function BoostPage({ username }: { username: string }) {
               isDark={isDark}
               errorMessage={visibleErrors.audiences}
             />
-            {isGeofencing && <GeofencingBuilder state={campaign} update={update} isDark={isDark} />}
             <AdSetCard {...sectionProps} />
             <CampaignSummary
               state={campaign}

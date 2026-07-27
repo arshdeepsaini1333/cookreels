@@ -9,9 +9,11 @@ import {
   ArrowLeft, Plus, Megaphone, Search, FileText, CheckCircle2, Clock,
   XCircle, Eye, MousePointer, DollarSign, Zap, Target, MoreHorizontal,
   PenLine, Pause, Trash2, Play, Filter, TrendingUp, Smartphone,
+  CreditCard, Loader2, AlertCircle,
 } from 'lucide-react'
 import CampaignDetailModal from './CampaignDetailModal'
 import CampaignPreviewModal from './CampaignPreviewModal'
+import { payForCampaign } from '@/lib/razorpay-client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +150,8 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
   const [menuOpen, setMenuOpen]       = useState(false)
   const [confirming, setConfirming]   = useState(false)
   const [acting, setActing]           = useState(false)
+  const [paying, setPaying]           = useState(false)
+  const [payError, setPayError]       = useState('')
 
   const hasLeadsPage = c.status === 'active' || c.status === 'paused' || c.status === 'completed'
   const openLeads = () => router.push(`/boost/campaigns/${c.id}/leads`)
@@ -177,10 +181,22 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
     onRefresh()
   }
 
+  const doPay = () => {
+    setMenuOpen(false)
+    setPayError('')
+    setPaying(true)
+    payForCampaign(c.id, {
+      onSuccess: () => { setPaying(false); onRefresh() },
+      onError:   msg => { setPaying(false); setPayError(msg) },
+      onDismiss: () => setPaying(false),
+    })
+  }
+
   const menuItems = [
     { icon: Eye,       label: 'View',    onClick: () => { setMenuOpen(false); onOpen(c.id) } },
     ...(hasLeadsPage ? [{ icon: Target, label: 'View Leads', onClick: () => { setMenuOpen(false); openLeads() } }] : []),
     { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(c.id) } },
+    ...(c.status === 'draft' ? [{ icon: CreditCard, label: 'Make Payment', onClick: doPay }] : []),
     ...(c.status === 'draft' || c.status === 'paused' || c.status === 'pending'
       ? [{ icon: PenLine, label: 'Edit', onClick: () => { setMenuOpen(false); onOpen(c.id, true) } }]
       : []),
@@ -199,7 +215,7 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
       style={{
         border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}`,
         opacity: acting ? 0.6 : 1,
-        pointerEvents: acting ? 'none' : 'auto',
+        pointerEvents: acting || paying ? 'none' : 'auto',
         cursor: hasLeadsPage ? 'pointer' : 'default',
       }}
       onClick={() => { if (hasLeadsPage) openLeads() }}
@@ -233,10 +249,10 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
         <div className="hidden sm:flex w-36 justify-center flex-shrink-0">
           <span
             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold"
-            style={{ background: cfg.bg, color: cfg.color }}
+            style={{ background: paying ? 'rgba(245,197,24,0.15)' : cfg.bg, color: paying ? '#F5C518' : cfg.color }}
           >
-            <StatusIcon size={10} strokeWidth={2.5} />
-            {cfg.label}
+            {paying ? <Loader2 size={10} strokeWidth={2.5} className="animate-spin" /> : <StatusIcon size={10} strokeWidth={2.5} />}
+            {paying ? 'Opening payment…' : cfg.label}
           </span>
         </div>
 
@@ -312,6 +328,39 @@ function CampaignRow({ c, isDark, onRefresh, onOpen, onPreview }: {
                     onCancel={() => setConfirming(false)}
                   />
                 </div>
+              </>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {payError && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setPayError('')} />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                  transition={{ duration: 0.14 }}
+                  className="absolute right-0 top-8 z-20 w-56 rounded-xl p-3 shadow-2xl"
+                  style={{
+                    background: isDark ? '#2B2B2D' : '#fff',
+                    border: '1px solid rgba(255,107,107,0.30)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
+                  }}
+                >
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <AlertCircle size={13} style={{ color: '#FF6B6B' }} />
+                    <p className="text-xs font-semibold" style={{ color: '#FF6B6B' }}>Payment failed</p>
+                  </div>
+                  <p className="text-[11px] mb-3" style={{ color: isDark ? '#A1A1AA' : '#666' }}>{payError}</p>
+                  <button
+                    onClick={doPay}
+                    className="w-full px-2 py-1.5 rounded-lg text-xs font-semibold"
+                    style={{ background: 'rgba(245,197,24,0.15)', color: '#F5C518' }}
+                  >
+                    Try Again
+                  </button>
+                </motion.div>
               </>
             )}
           </AnimatePresence>

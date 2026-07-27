@@ -11,9 +11,10 @@ import {
   Eye, MousePointer, DollarSign, Target, Zap, ChevronRight,
   Plus, Play, PenLine, Pause, Trash2, MoreHorizontal, Smartphone,
   CheckCircle2, Clock, XCircle, FileText, Film,
-  ArrowRight, Sparkles,
+  ArrowRight, Sparkles, CreditCard, Loader2, AlertCircle,
 } from 'lucide-react'
 import CampaignPreviewModal from './CampaignPreviewModal'
+import { payForCampaign } from '@/lib/razorpay-client'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -200,6 +201,8 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
   const [menuOpen, setMenuOpen]     = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [acting, setActing]         = useState(false)
+  const [paying, setPaying]         = useState(false)
+  const [payError, setPayError]     = useState('')
 
   const cfg = STATUS_CONFIG[campaign.status]
   const StatusIcon = cfg.icon
@@ -225,9 +228,21 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
     onRefresh()
   }
 
+  const doPay = () => {
+    setMenuOpen(false)
+    setPayError('')
+    setPaying(true)
+    payForCampaign(campaign.id, {
+      onSuccess: () => { setPaying(false); onRefresh() },
+      onError:   msg => { setPaying(false); setPayError(msg) },
+      onDismiss: () => setPaying(false),
+    })
+  }
+
   const menuItems = [
     { icon: Eye,        label: 'View',    href: `/boost/create?id=${campaign.id}` },
     { icon: Smartphone, label: 'Preview', onClick: () => { setMenuOpen(false); onPreview(campaign.id) } },
+    ...(campaign.status === 'draft' ? [{ icon: CreditCard, label: 'Make Payment', onClick: doPay }] : []),
     ...(campaign.status === 'draft' || campaign.status === 'pending' ? [{ icon: PenLine, label: 'Edit', href: `/boost/create?id=${campaign.id}&edit=true` }] : []),
     ...(campaign.status === 'active' ? [{ icon: Pause, label: 'Pause',  onClick: () => doStatusAction('pause') }] : []),
     ...(campaign.status === 'paused' ? [{ icon: Play,  label: 'Resume', onClick: () => doStatusAction('resume') }] : []),
@@ -242,7 +257,7 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
       style={{
         border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}`,
         opacity: acting ? 0.6 : 1,
-        pointerEvents: acting ? 'none' : 'auto',
+        pointerEvents: acting || paying ? 'none' : 'auto',
       }}
       onMouseEnter={e => (e.currentTarget.style.background = isDark ? 'rgba(52,52,56,0.40)' : 'rgba(245,197,24,0.04)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -263,10 +278,10 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
       {/* Status badge */}
       <span
         className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold flex-shrink-0"
-        style={{ background: cfg.bg, color: cfg.color }}
+        style={{ background: paying ? 'rgba(245,197,24,0.15)' : cfg.bg, color: paying ? '#F5C518' : cfg.color }}
       >
-        <StatusIcon size={10} strokeWidth={2.5} />
-        {cfg.label}
+        {paying ? <Loader2 size={10} strokeWidth={2.5} className="animate-spin" /> : <StatusIcon size={10} strokeWidth={2.5} />}
+        {paying ? 'Opening payment…' : cfg.label}
       </span>
 
       {/* Stats */}
@@ -388,8 +403,115 @@ function CampaignRow({ campaign, isDark, onRefresh, onPreview }: { campaign: Cam
             </>
           )}
         </AnimatePresence>
+
+        <AnimatePresence>
+          {payError && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setPayError('')} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                transition={{ duration: 0.14 }}
+                className="absolute right-0 top-8 z-20 w-56 rounded-xl p-3 shadow-2xl"
+                style={{
+                  background: isDark ? '#2B2B2D' : '#fff',
+                  border: '1px solid rgba(255,107,107,0.30)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.20)',
+                }}
+              >
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <AlertCircle size={13} style={{ color: '#FF6B6B' }} />
+                  <p className="text-xs font-semibold" style={{ color: '#FF6B6B' }}>Payment failed</p>
+                </div>
+                <p className="text-[11px] mb-3" style={{ color: isDark ? '#A1A1AA' : '#666' }}>{payError}</p>
+                <button
+                  onClick={doPay}
+                  className="w-full px-2 py-1.5 rounded-lg text-xs font-semibold"
+                  style={{ background: 'rgba(245,197,24,0.15)', color: '#F5C518' }}
+                >
+                  Try Again
+                </button>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
+  )
+}
+
+// ─── Draft Campaign Card ──────────────────────────────────────────────────────
+
+function DraftCampaignCard({ draft, isDark, onRefresh }: { draft: Campaign; isDark: boolean; onRefresh: () => void }) {
+  const [paying, setPaying]     = useState(false)
+  const [payError, setPayError] = useState('')
+
+  const doPay = () => {
+    setPayError('')
+    setPaying(true)
+    payForCampaign(draft.id, {
+      onSuccess: () => { setPaying(false); onRefresh() },
+      onError:   msg => { setPaying(false); setPayError(msg) },
+      onDismiss: () => setPaying(false),
+    })
+  }
+
+  return (
+    <div
+      className="p-3 rounded-xl"
+      style={{ background: isDark ? 'rgba(30,30,31,0.60)' : 'rgba(245,245,245,0.70)', border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
+            {draft.name || 'Untitled Draft'}
+          </p>
+          <p className="text-[11px]" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
+            Last edited {new Date(draft.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Link href={`/boost/create?draftId=${draft.id}`}>
+            <motion.span
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
+              style={{
+                background: isDark ? 'rgba(52,52,56,0.80)' : '#F5F5F5',
+                border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
+                color: isDark ? '#A1A1AA' : '#666',
+              }}
+            >
+              <PenLine size={12} /> Edit
+            </motion.span>
+          </Link>
+          <motion.button
+            whileHover={paying ? {} : { scale: 1.03 }}
+            whileTap={paying ? {} : { scale: 0.97 }}
+            onClick={doPay}
+            disabled={paying}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+            style={{
+              background: 'rgba(245,197,24,0.12)',
+              border: '1px solid rgba(245,197,24,0.30)',
+              color: '#F5C518',
+            }}
+          >
+            {paying
+              ? <><Loader2 size={12} className="animate-spin" /> Opening…</>
+              : <><CreditCard size={12} /> Make Payment</>
+            }
+          </motion.button>
+        </div>
+      </div>
+      {payError && (
+        <div className="flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium"
+          style={{ background: 'rgba(255,107,107,0.12)', color: '#FF6B6B' }}>
+          <AlertCircle size={11} /> {payError}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -865,34 +987,7 @@ export function BoostCenter({ username }: { username: string }) {
           </div>
           <div className="space-y-2">
             {draftCampaigns.map(draft => (
-              <div
-                key={draft.id}
-                className="flex items-center justify-between p-3 rounded-xl"
-                style={{ background: isDark ? 'rgba(30,30,31,0.60)' : 'rgba(245,245,245,0.70)', border: `1px solid ${isDark ? '#343438' : '#F0F0F0'}` }}
-              >
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>
-                    {draft.name || 'Untitled Draft'}
-                  </p>
-                  <p className="text-[11px]" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>
-                    Last edited {new Date(draft.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                <Link href={`/boost/create?draftId=${draft.id}`}>
-                  <motion.span
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
-                    style={{
-                      background: 'rgba(245,197,24,0.12)',
-                      border: '1px solid rgba(245,197,24,0.30)',
-                      color: '#F5C518',
-                    }}
-                  >
-                    <PenLine size={12} /> Continue Editing
-                  </motion.span>
-                </Link>
-              </div>
+              <DraftCampaignCard key={draft.id} draft={draft} isDark={isDark} onRefresh={refresh} />
             ))}
           </div>
         </motion.div>

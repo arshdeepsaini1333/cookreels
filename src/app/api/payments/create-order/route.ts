@@ -85,7 +85,12 @@ export async function POST(req: Request) {
       campaignName: campaign.name,
     })
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error)
+    // The Razorpay SDK throws plain objects like { statusCode, error: { code, description } }
+    // rather than Error instances, so pull the description out before falling back to JSON.
+    const rzpError = error as { error?: { description?: string; code?: string } } | null
+    const msg = error instanceof Error
+      ? error.message
+      : rzpError?.error?.description ?? JSON.stringify(error)
     console.error('[POST /api/payments/create-order]', msg, error)
     return NextResponse.json({ error: 'Failed to create payment order', detail: msg }, { status: 500 })
   }

@@ -85,7 +85,8 @@
       "Bash(curl -s -D - -o /dev/null \"http://localhost:3000/reels?reelId=673cacf7-b285-44f9-8dfb-9fb1e02cfb35\")",
       "Bash(curl -s -D - -o /dev/null \"http://localhost:3000/reels\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/reel/673cacf7-b285-44f9-8dfb-9fb1e02cfb35\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/categories)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/categories)",
+      "Bash(grep -v \"admin.cookreels\\\\|from '@/\\\\|import \")"
     ],
     "additionalDirectories": [
       "e:\\Cookreels\\cookreels-main\\src\\app",
