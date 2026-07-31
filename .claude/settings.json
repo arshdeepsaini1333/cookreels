@@ -177,7 +177,8 @@
       "Bash(node \"/c/Users/acer/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/notif-panel-check.mjs\")",
       "Bash(cp \"C:/Users/acer/AppData/Local/Temp/claude/d--cookreels-main/75fc616a-144f-4256-b2c0-341ef4e776ca/scratchpad/notif-interaction-check.mjs\" \"/c/Users/acer/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/notif-interaction-check.mjs\")",
       "Bash(node \"/c/Users/acer/AppData/Local/npm-cache/_npx/e41f203b7505f1fb/notif-interaction-check.mjs\")",
-      "Bash(echo \"FINAL_TYPECHECK_EXIT=$?\")"
+      "Bash(echo \"FINAL_TYPECHECK_EXIT=$?\")",
+      "Bash(node scripts/fix-genuine-counts.mjs)"
     ],
     "additionalDirectories": [
       "\\tmp"

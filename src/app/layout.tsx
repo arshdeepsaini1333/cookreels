@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Playfair_Display, Manrope, Poppins, Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -49,6 +50,18 @@ export default function RootLayout({
       className={`${playfairDisplay.variable} ${manrope.variable} ${poppins.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="font-body min-h-full flex flex-col dark:bg-[#1E1E1F] text-[#1A1A1A] dark:text-[#F5F5F5]" style={{ background: 'var(--cr-bg-main)' }}>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-KS7GCS0J4F"
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-KS7GCS0J4F');
+          `}
+        </Script>
         <ThemeProvider>
           {children}
           {modal}
