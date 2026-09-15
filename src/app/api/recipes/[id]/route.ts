@@ -127,3 +127,56 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ message: 'Server error' }, { status: 500 })
   }
 }
+
+export async function PATCH(req: Request, { params }: Params) {
+  try {
+    const { id } = await params
+    const session = await getSession()
+    if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+
+    const recipe = await prisma.recipe.findUnique({ where: { id }, select: { userId: true } })
+    if (!recipe) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    if (recipe.userId !== session.userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const data: Record<string, unknown> = {}
+
+    if (typeof body.title === 'string') data.title = body.title.trim()
+    if (typeof body.description === 'string') data.description = body.description.trim()
+    if (typeof body.cuisine === 'string') data.cuisine = body.cuisine
+    if (body.cookTime !== undefined) data.cookTime = body.cookTime ? Number(body.cookTime) : null
+    if (body.prepTime !== undefined) data.prepTime = body.prepTime ? Number(body.prepTime) : null
+    if (body.servings !== undefined) data.servings = body.servings ? Number(body.servings) : null
+    if (typeof body.difficulty === 'string') data.difficulty = body.difficulty
+    if (typeof body.isVeg === 'boolean') data.isVeg = body.isVeg
+    if (typeof body.isPublished === 'boolean') data.isPublished = body.isPublished
+
+    const updated = await prisma.recipe.update({ where: { id }, data })
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('[recipes/[id] PATCH]', error)
+    return NextResponse.json({ message: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: Request, { params }: Params) {
+  try {
+    const { id } = await params
+    const session = await getSession()
+    if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+
+    const recipe = await prisma.recipe.findUnique({ where: { id }, select: { userId: true } })
+    if (!recipe) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    if (recipe.userId !== session.userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    await prisma.recipe.delete({ where: { id } })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[recipes/[id] DELETE]', error)
+    return NextResponse.json({ message: 'Server error' }, { status: 500 })
+  }
+}

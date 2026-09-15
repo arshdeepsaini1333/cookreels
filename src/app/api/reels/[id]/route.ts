@@ -11,7 +11,7 @@ export async function GET(_req: Request, { params }: Params) {
     const session = await getSession()
 
     const reel = await prisma.reel.findUnique({
-      where: { id, isPublished: true },
+      where: { id },
       select: {
         id:           true,
         title:        true,
@@ -24,6 +24,7 @@ export async function GET(_req: Request, { params }: Params) {
         duration:     true,
         gradient:     true,
         emoji:        true,
+        isPublished:  true,
         createdAt:    true,
         user: {
           select: {
@@ -47,6 +48,12 @@ export async function GET(_req: Request, { params }: Params) {
     }
 
     const isOwner = session?.userId === reel.user.id
+
+    // Archived reels are only visible to their owner.
+    if (!reel.isPublished && !isOwner) {
+      return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+
     let isFollowing = false
     if (session && !isOwner) {
       const accepted = await prisma.follow.findFirst({
@@ -96,6 +103,53 @@ export async function GET(_req: Request, { params }: Params) {
     })
   } catch (error) {
     console.error('[reels/[id] GET]', error)
+    return NextResponse.json({ message: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: Request, { params }: Params) {
+  try {
+    const { id } = await params
+    const session = await getSession()
+    if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+
+    const reel = await prisma.reel.findUnique({ where: { id }, select: { userId: true } })
+    if (!reel) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    if (reel.userId !== session.userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    const body = await req.json()
+    const data: Record<string, unknown> = {}
+
+    if (typeof body.title === 'string') data.title = body.title.trim()
+    if (typeof body.description === 'string') data.description = body.description.trim()
+    if (typeof body.isPublished === 'boolean') data.isPublished = body.isPublished
+
+    const updated = await prisma.reel.update({ where: { id }, data })
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('[reels/[id] PATCH]', error)
+    return NextResponse.json({ message: 'Server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_req: Request, { params }: Params) {
+  try {
+    const { id } = await params
+    const session = await getSession()
+    if (!session) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+
+    const reel = await prisma.reel.findUnique({ where: { id }, select: { userId: true } })
+    if (!reel) return NextResponse.json({ message: 'Not found' }, { status: 404 })
+    if (reel.userId !== session.userId) {
+      return NextResponse.json({ message: 'Forbidden' }, { status: 403 })
+    }
+
+    await prisma.reel.delete({ where: { id } })
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('[reels/[id] DELETE]', error)
     return NextResponse.json({ message: 'Server error' }, { status: 500 })
   }
 }

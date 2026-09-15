@@ -7,33 +7,33 @@ import { DashboardCards } from '@/components/dashboard/DashboardCards'
 export default async function HomePage() {
   const session = await getSession()
 
-  if (!session) {
-    redirect('/auth/login')
-  }
-
+  // Guests get the full homepage too — only account-requiring actions on it
+  // are gated (via the shared AuthModal), not the page itself.
   let user = null
-  try {
-    user = await prisma.user.findUnique({
-      where: { id: session.userId },
-      select: {
-        isBanned: true,
-        profileImage: true,
-        _count: {
-          select: {
-            recipes: { where: { isPublished: true } },
-            reels:   { where: { isPublished: true } },
-            followers: true,
-            following: true,
+  if (session) {
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: {
+          isBanned: true,
+          profileImage: true,
+          _count: {
+            select: {
+              recipes: { where: { isPublished: true } },
+              reels:   { where: { isPublished: true } },
+              followers: true,
+              following: true,
+            },
           },
         },
-      },
-    })
-  } catch {
-    // DB temporarily unreachable — render page without stats
-  }
+      })
+    } catch {
+      // DB temporarily unreachable — render page without stats
+    }
 
-  if (user?.isBanned) {
-    redirect('/banned')
+    if (user?.isBanned) {
+      redirect('/banned')
+    }
   }
 
   const profileStats = user
@@ -45,10 +45,10 @@ export default async function HomePage() {
     : undefined
 
   return (
-    <DashboardLayout username={session.username}>
+    <DashboardLayout username={session?.username} isAuthenticated={!!session}>
       <DashboardCards
-        username={session.username}
-        userId={session.userId}
+        username={session?.username}
+        userId={session?.userId}
         currentUserAvatar={user?.profileImage ?? null}
         profileStats={profileStats}
       />

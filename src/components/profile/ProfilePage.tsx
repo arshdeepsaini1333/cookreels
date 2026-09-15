@@ -23,6 +23,8 @@ import { ChangePasswordModal } from '@/components/profile/ChangePasswordModal'
 import { SetPasswordModal } from '@/components/profile/SetPasswordModal'
 import { ProtectedImg } from '@/components/shared/ProtectedMedia'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { PostActionsMenu } from '@/components/shared/PostActionsMenu'
+import { EditPostModal, type EditablePost } from '@/components/shared/EditPostModal'
 // ─── Prop Types (data from server / DB) 
 
 export interface ProfileUser {
@@ -59,6 +61,8 @@ export interface ProfileRecipe {
   description?: string | null
   servings?: number | null
   createdAt?: string | null
+  /** false = archived by the owner — hidden from everyone else, still manageable here. */
+  isPublished?: boolean
 }
 
 export interface ProfileReel {
@@ -70,6 +74,8 @@ export interface ProfileReel {
   duration: number | null     // seconds
   viewCount: number
   likeCount: number
+  /** false = archived by the owner — hidden from everyone else, still manageable here. */
+  isPublished?: boolean
 }
 
 export interface ProfileCollection {
@@ -213,7 +219,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
 // ─── RecipeCard ───
 
 function RecipeCard({
-  r, idx, saved, onSave, liked, onLike, onClick,
+  r, idx, saved, onSave, liked, onLike, onClick, ownerActions, onEdit,
 }: {
   r: ProfileRecipe
   idx: number
@@ -222,9 +228,12 @@ function RecipeCard({
   liked?: boolean
   onLike?: () => void
   onClick?: () => void
+  ownerActions?: boolean
+  onEdit?: () => void
 }) {
   const gradient = CARD_GRADIENTS[idx % CARD_GRADIENTS.length]
   const diffKey  = r.difficulty ?? ''
+  const archived = ownerActions && r.isPublished === false
 
   return (
     <motion.div
@@ -232,7 +241,7 @@ function RecipeCard({
       whileHover={{ scale: 1.025, y: -4 }}
       onClick={onClick}
       className="group relative rounded-2xl overflow-hidden cursor-pointer"
-      style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)' }}
+      style={{ background: 'var(--cr-bg-card)', boxShadow: 'var(--cr-shadow-card)', opacity: archived ? 0.6 : 1 }}
     >
       {/* Image or gradient placeholder */}
       <div className="relative aspect-[4/3] overflow-hidden">
@@ -268,10 +277,18 @@ function RecipeCard({
             {DIFF_LABEL[diffKey] ?? diffKey}
           </span>
         )}
-        {saved && (
+        {archived && (
+          <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm bg-black/60 text-white">
+            Archived
+          </span>
+        )}
+        {saved && !ownerActions && (
           <div className="absolute top-2 right-2">
             <Bookmark className="w-4 h-4" style={{ color: '#F5C518', fill: '#F5C518' }} />
           </div>
+        )}
+        {ownerActions && (
+          <PostActionsMenu id={r.id} type="recipe" isPublished={r.isPublished !== false} onEdit={() => onEdit?.()} />
         )}
       </div>
       {/* Info */}
@@ -296,9 +313,18 @@ function RecipeCard({
 
 // ─── ReelCard ─────────────────────────────────────────────────────────────────
 
-function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: () => void }) {
+function ReelCard({
+  r, idx, onClick, ownerActions, onEdit,
+}: {
+  r: ProfileReel
+  idx: number
+  onClick?: () => void
+  ownerActions?: boolean
+  onEdit?: () => void
+}) {
   const [hovered, setHovered] = useState(false)
   const gradient = CARD_GRADIENTS[idx % CARD_GRADIENTS.length]
+  const archived = ownerActions && r.isPublished === false
 
   return (
     <motion.div
@@ -308,7 +334,7 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
       onHoverEnd={() => setHovered(false)}
       onClick={onClick}
       className="relative rounded-xl overflow-hidden cursor-pointer"
-      style={{ aspectRatio: '9/16' }}
+      style={{ aspectRatio: '9/16', opacity: archived ? 0.6 : 1 }}
     >
       {/* Fallback gradient shown behind cover while it loads */}
       {!r.videoUrl && (
@@ -331,10 +357,18 @@ function ReelCard({ r, idx, onClick }: { r: ProfileReel; idx: number; onClick?: 
           <Play className="w-4 h-4 text-white fill-white ml-0.5" />
         </div>
       </motion.div>
+      {archived && (
+        <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm bg-black/60 text-white">
+          Archived
+        </span>
+      )}
       {/* Duration */}
-      <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white">
+      <div className={`absolute top-2 ${ownerActions ? 'right-10' : 'right-2'} bg-black/50 backdrop-blur-sm rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-white`}>
         {fmtDuration(r.duration)}
       </div>
+      {ownerActions && (
+        <PostActionsMenu id={r.id} type="reel" isPublished={r.isPublished !== false} onEdit={() => onEdit?.()} />
+      )}
       {/* Hover stats */}
       <AnimatePresence>
         {hovered && (
@@ -618,6 +652,7 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
   const [showChangePassword, setShowChangePassword] = useState(false)
   const [showSetPassword,    setShowSetPassword]    = useState(false)
   const [showAddModal,    setShowAddModal]    = useState(false)
+  const [editingPost, setEditingPost] = useState<{ type: 'recipe' | 'reel'; post: EditablePost } | null>(null)
   const [savedSet,        setSavedSet]        = useState<Set<string>>(new Set())
   const [likedSet,        setLikedSet]        = useState<Set<string>>(new Set())
   const [isFollowing,     setIsFollowing]     = useState(false)
@@ -1027,7 +1062,12 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 ) : (
                   <motion.div variants={staggerContainer(0.04)} initial="hidden" animate="visible" className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                     {recipes.map((r, i) => (
-                      <RecipeCard key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)} liked={likedSet.has(r.id)} onLike={() => toggleLike(r.id)} onClick={() => router.push(`/recipe/${r.id}`)} />
+                      <RecipeCard
+                        key={r.id} r={r} idx={i} saved={savedSet.has(r.id)} onSave={() => toggleSave(r.id)}
+                        liked={likedSet.has(r.id)} onLike={() => toggleLike(r.id)} onClick={() => router.push(`/recipe/${r.id}`)}
+                        ownerActions
+                        onEdit={() => setEditingPost({ type: 'recipe', post: r })}
+                      />
                     ))}
                   </motion.div>
                 )}
@@ -1042,7 +1082,11 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
                 ) : (
                   <motion.div variants={staggerContainer(0.03)} initial="hidden" animate="visible" className="grid grid-cols-3 sm:grid-cols-4 gap-2 sm:gap-3">
                     {reels.map((r, i) => (
-                      <ReelCard key={r.id} r={r} idx={i} onClick={() => router.push(`/reel/${r.id}`)} />
+                      <ReelCard
+                        key={r.id} r={r} idx={i} onClick={() => router.push(`/reel/${r.id}`)}
+                        ownerActions
+                        onEdit={() => setEditingPost({ type: 'reel', post: r })}
+                      />
                     ))}
                   </motion.div>
                 )}
@@ -1191,6 +1235,14 @@ export function ProfilePage({ user, stats, recipes, reels, collections }: Profil
 
       {/* Add content modal */}
       <AddContentModal open={showAddModal} onClose={() => setShowAddModal(false)} userId={user.id} />
+
+      {/* Edit post modal */}
+      <EditPostModal
+        open={editingPost !== null}
+        onClose={() => setEditingPost(null)}
+        type={editingPost?.type ?? 'recipe'}
+        post={editingPost?.post ?? null}
+      />
 
       {/* Social list modal */}
       <SocialListModal

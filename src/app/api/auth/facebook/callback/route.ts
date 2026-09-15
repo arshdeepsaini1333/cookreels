@@ -19,12 +19,12 @@ export async function GET(req: Request) {
 
   // User denied access or Facebook returned an error
   if (oauthError) {
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=fb_cancelled`)
+    return NextResponse.redirect(`${APP_URL}/login?error=fb_cancelled`)
   }
 
   // CSRF state validation
   if (!code || !state || !storedState || state !== storedState) {
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=fb_failed`)
+    return NextResponse.redirect(`${APP_URL}/login?error=fb_failed`)
   }
 
   try {
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       // CASE 1: Brand-new signup via Facebook
       if (!fbUser.email) {
         // Cannot create an account without an email address
-        return NextResponse.redirect(`${APP_URL}/auth/login?error=fb_no_email`)
+        return NextResponse.redirect(`${APP_URL}/login?error=fb_no_email`)
       }
 
       const username = await generateUniqueUsername(fbUser.email, fbUser.first_name ?? fbUser.name)
@@ -92,7 +92,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${APP_URL}/`)
   } catch (error) {
     console.error('[facebook/callback]', error)
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=fb_failed`)
+    return NextResponse.redirect(`${APP_URL}/login?error=fb_failed`)
   }
 }
 

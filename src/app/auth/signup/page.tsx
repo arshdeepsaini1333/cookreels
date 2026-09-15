@@ -1,12 +1,13 @@
+import { redirect } from 'next/navigation'
 
-import type { Metadata } from 'next'
-import SignupClient from './SignupClient'
-export const metadata: Metadata = {
-  title: 'Sign Up | CookReels',
-  description: 'Create your CookReels account and start sharing cooking videos with the world.',
-}
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
-export default function Page() {
-  
-  return <SignupClient />
+// Old URL — kept as a redirect to the canonical /signup so existing links/bookmarks still work.
+export default async function LegacySignupRedirect({ searchParams }: Props) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') params.set(key, value)
+  }
+  const qs = params.toString()
+  redirect(`/signup${qs ? `?${qs}` : ''}`)
 }

@@ -9,6 +9,7 @@ import { UserAvatar } from '@/components/shared/UserAvatar'
 import { ProtectedImg } from '@/components/shared/ProtectedMedia'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 import { useTheme } from '@/context/ThemeContext'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -364,6 +365,7 @@ export function GlobalSearch({
   const router = useRouter()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { isAuthenticated, openAuthModal } = useAuthGuard()
 
   const [value, setValue]     = useState('')
   const [focused, setFocused] = useState(false)
@@ -383,7 +385,8 @@ export function GlobalSearch({
     setRecentSearches(loadRecentSearches(currentUserId))
   }, [currentUserId])
 
-  // Auto-focus the input when the mobile overlay opens
+  // Auto-focus the input when the mobile overlay opens (guests get the login
+  // prompt instead — see the input's onFocus handler below).
   useEffect(() => {
     if (variant === 'mobile') inputRef.current?.focus()
   }, [variant])
@@ -497,7 +500,14 @@ export function GlobalSearch({
         type="text"
         value={value}
         onChange={e => setValue(e.target.value)}
-        onFocus={() => setFocused(true)}
+        onFocus={e => {
+          if (!isAuthenticated) {
+            e.currentTarget.blur()
+            openAuthModal('login')
+            return
+          }
+          setFocused(true)
+        }}
         placeholder="Search users, recipes, or reels…"
         className="w-full pl-2 pr-4 py-2.5 bg-transparent text-sm outline-none rounded-2xl font-ui"
         style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}

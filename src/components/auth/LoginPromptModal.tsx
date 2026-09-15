@@ -80,7 +80,7 @@ export function LoginPromptModal({ isOpen, onClose, redirectTo, userName, title,
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => router.push(`/auth/login?next=${encodeURIComponent(redirectTo)}`)}
+                  onClick={() => router.push(`/login?next=${encodeURIComponent(redirectTo)}`)}
                   className="w-full py-3 rounded-xl text-sm font-bold"
                   style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
                 >

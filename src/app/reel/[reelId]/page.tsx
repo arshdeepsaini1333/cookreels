@@ -45,10 +45,11 @@ export default async function ReelPage({ params }: Props) {
   const session    = await getSession()
 
   const reel = await prisma.reel.findUnique({
-    where: { id: reelId, isPublished: true },
+    where: { id: reelId },
     select: {
-      id:     true,
-      userId: true,
+      id:          true,
+      userId:      true,
+      isPublished: true,
       user: {
         select: {
           id:            true,
@@ -67,9 +68,15 @@ export default async function ReelPage({ params }: Props) {
 
   if (!reel) notFound()
 
+  const isOwner = session?.userId === reel.userId
+
+  // Archived reels are only visible to their owner.
+  if (!reel.isPublished && !isOwner) notFound()
+
   // All published reels from this creator for vertical navigation
+  // (the owner also gets their archived ones, so the clicked reel is always in the list).
   const allReels = await prisma.reel.findMany({
-    where:   { userId: reel.userId, isPublished: true },
+    where:   { userId: reel.userId, ...(isOwner ? {} : { isPublished: true }) },
     orderBy: { createdAt: 'desc' },
     take:    60,
     select: {

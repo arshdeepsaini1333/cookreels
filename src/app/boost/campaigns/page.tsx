@@ -9,7 +9,7 @@ export const metadata = {
 
 export default async function CampaignsRoute() {
   const session = await getSession()
-  if (!session) redirect('/auth/login')
+  if (!session) redirect('/login')
 
   return (
     <DashboardLayout username={session.username}>

@@ -19,12 +19,12 @@ export async function GET(req: Request) {
 
   // User denied access or Google returned an error
   if (oauthError) {
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=oauth_cancelled`)
+    return NextResponse.redirect(`${APP_URL}/login?error=oauth_cancelled`)
   }
 
   // CSRF state validation
   if (!code || !state || !storedState || state !== storedState) {
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=oauth_failed`)
+    return NextResponse.redirect(`${APP_URL}/login?error=oauth_failed`)
   }
 
   try {
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${APP_URL}/`)
   } catch (error) {
     console.error('[google/callback]', error)
-    return NextResponse.redirect(`${APP_URL}/auth/login?error=oauth_failed`)
+    return NextResponse.redirect(`${APP_URL}/login?error=oauth_failed`)
   }
 }
 

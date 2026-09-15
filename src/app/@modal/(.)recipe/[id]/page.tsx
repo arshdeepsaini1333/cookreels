@@ -12,7 +12,7 @@ export default async function RecipeModalPage({ params }: Props) {
   const session = await getSession()
 
   const recipe = await prisma.recipe.findUnique({
-    where: { id, isPublished: true },
+    where: { id },
     select: {
       id:          true,
       userId:      true,
@@ -24,6 +24,7 @@ export default async function RecipeModalPage({ params }: Props) {
       description: true,
       servings:    true,
       likeCount:   true,
+      isPublished: true,
       createdAt:   true,
       user: {
         select: {
@@ -42,8 +43,12 @@ export default async function RecipeModalPage({ params }: Props) {
 
   if (!recipe) notFound()
 
-  // ── Private account guard ──────────────────────────────────────────────────
   const isOwner = session?.userId === recipe.userId
+
+  // Archived recipes are only visible to their owner.
+  if (!recipe.isPublished && !isOwner) notFound()
+
+  // ── Private account guard ──────────────────────────────────────────────────
   let canView   = !recipe.user.privateAccount || isOwner
 
   if (!canView && session) {
@@ -64,11 +69,11 @@ export default async function RecipeModalPage({ params }: Props) {
       />
     )
   }
-  // ──────────────────────────────────────────────────────────────────────────
 
-  // Pre-fetch this creator's recipes so the carousel works without a client-side round-trip.
+  // Pre-fetch this creator's recipes so the carousel works without a client-side round-trip
+  // (the owner also gets their archived ones, so the clicked recipe is always in the list).
   const userRecipes = await prisma.recipe.findMany({
-    where:   { userId: recipe.userId, isPublished: true },
+    where:   { userId: recipe.userId, ...(isOwner ? {} : { isPublished: true }) },
     orderBy: { createdAt: 'desc' },
     take:    60,
     select: {

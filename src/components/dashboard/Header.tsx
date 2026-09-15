@@ -11,6 +11,7 @@ import { GlobalSearch } from './GlobalSearch'
 import { useTheme } from '@/context/ThemeContext'
 import { useUnreadNotifications } from '@/hooks/useUnreadNotifications'
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 interface HeaderProps {
   username?: string
@@ -34,11 +35,14 @@ export function Header({
   const mobileDropdownRef = useRef<HTMLDivElement>(null)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  const { unreadCount } = useUnreadNotifications()
+  const { isAuthenticated, openAuthModal } = useAuthGuard()
+  const { unreadCount } = useUnreadNotifications(isAuthenticated)
 
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     // Populate from cache first so avatar appears immediately after hydration
     try {
       const cached = JSON.parse(localStorage.getItem('cr:me') ?? 'null')
@@ -55,7 +59,7 @@ export function Header({
         }
       })
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated])
 
   // Keep avatar in sync when user uploads a new profile photo
   useEffect(() => {
@@ -79,21 +83,23 @@ export function Header({
     setMobileProfileOpen(false)
     localStorage.removeItem('cr:me')
     await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/auth/login')
+    router.push('/login')
   }
 
   const fetchUnreadMessages = useCallback(() => {
+    if (!isAuthenticated) return
     fetch('/api/messages/unread-count')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data) setUnreadMessages(data.count ?? 0) })
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     fetchUnreadMessages()
+    if (!isAuthenticated) return
     const id = setInterval(fetchUnreadMessages, 30_000)
     return () => clearInterval(id)
-  }, [fetchUnreadMessages])
+  }, [fetchUnreadMessages, isAuthenticated])
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -143,7 +149,7 @@ export function Header({
           whileHover={{ scale: 1.06 }}
           whileTap={{ scale: 0.92 }}
           aria-label="Search"
-          onClick={() => setMobileSearchOpen(true)}
+          onClick={() => (isAuthenticated ? setMobileSearchOpen(true) : openAuthModal('login'))}
           className="sm:hidden relative w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200"
           style={{
             background: isDark ? 'rgba(245,197,24,0.12)' : 'rgba(245,197,24,0.10)',
@@ -201,7 +207,8 @@ export function Header({
             <ThemeToggle />
           </div>
 
-          {/* ── Notification Bell ── */}
+          {/* ── Notification Bell — logged-in users only ── */}
+          {isAuthenticated && (
           <div ref={notifRef} className="relative">
             <motion.button
               whileHover={{ scale: 1.06 }}
@@ -267,8 +274,33 @@ export function Header({
               anchorRef={notifRef}
             />
           </div>
+          )}
+
+          {/* Guest: Login / Sign up — desktop */}
+          {!isAuthenticated && (
+            <div className="hidden sm:flex items-center gap-2">
+              <button
+                onClick={() => openAuthModal('login')}
+                className="px-4 py-2 rounded-xl text-sm font-bold transition-opacity hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+              >
+                Log In
+              </button>
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="px-4 py-2 rounded-xl text-sm font-semibold border transition-colors"
+                style={{
+                  borderColor: isDark ? '#343438' : '#E8E8E8',
+                  color: isDark ? '#F5F5F5' : '#1A1A1A',
+                }}
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
 
           {/* Avatar + welcome — desktop */}
+          {isAuthenticated && (
           <div className="hidden sm:flex items-center gap-3">
             <div className="text-right hidden md:block">
               <p className="text-[11px] leading-tight font-ui" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>Welcome back,</p>
@@ -353,8 +385,30 @@ export function Header({
               </AnimatePresence>
             </div>
           </div>
+          )}
+
+          {/* Mobile: guest Login / Sign up */}
+          {!isAuthenticated && (
+            <div className="sm:hidden flex items-center gap-1.5">
+              <button
+                onClick={() => openAuthModal('login')}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold"
+                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+              >
+                Log In
+              </button>
+              <button
+                onClick={() => openAuthModal('signup')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold border"
+                style={{ borderColor: isDark ? '#343438' : '#E8E8E8', color: isDark ? '#F5F5F5' : '#1A1A1A' }}
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
 
           {/* Mobile: avatar with profile dropdown */}
+          {isAuthenticated && (
           <div ref={mobileDropdownRef} className="sm:hidden relative">
             <motion.button
               whileTap={{ scale: 0.92 }}
@@ -435,6 +489,7 @@ export function Header({
               )}
             </AnimatePresence>
           </div>
+          )}
 
         </div>
       </div>

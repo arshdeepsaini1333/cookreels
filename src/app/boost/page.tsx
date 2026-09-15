@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import BoostLandingPage from '@/components/dashboard/BoostLandingPage'
@@ -10,7 +9,14 @@ export const metadata = {
 
 export default async function BoostRoute() {
   const session = await getSession()
-  if (!session) redirect('/auth/login')
+
+  if (!session) {
+    return (
+      <DashboardLayout isAuthenticated={false}>
+        <BoostLandingPage />
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout username={session.username}>

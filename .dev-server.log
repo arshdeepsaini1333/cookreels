@@ -1,0 +1,106 @@
+
+> cookreels@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.2:3000
+- Environments: .env
+✓ Ready in 665ms
+
+ GET /login 200 in 1391ms (next.js: 599ms, proxy.ts: 8ms, application-code: 785ms)
+ GET /login 200 in 50ms (next.js: 5ms, proxy.ts: 4ms, application-code: 41ms)
+ GET /signup 200 in 69ms (next.js: 22ms, proxy.ts: 3ms, application-code: 44ms)
+ GET /auth/login 307 in 93ms (next.js: 23ms, proxy.ts: 3ms, application-code: 67ms)
+ GET /auth/signup 307 in 82ms (next.js: 23ms, proxy.ts: 3ms, application-code: 57ms)
+ GET /auth/login?next=/boost 307 in 57ms (next.js: 4ms, proxy.ts: 3ms, application-code: 50ms)
+ GET /login 200 in 76ms (next.js: 5ms, proxy.ts: 3ms, application-code: 68ms)
+ GET /signup 200 in 37ms (next.js: 7ms, proxy.ts: 4ms, application-code: 25ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior
+⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `prisma.reel.findUnique()` invocation:
+
+
+
+    at zr.handleRequestError (src\generated\prisma\runtime\client.js:69:8286)
+    at zr.handleAndLogRequestError (src\generated\prisma\runtime\client.js:69:7581)
+    at zr.request (src\generated\prisma\runtime\client.js:69:7288)
+    at async a (src\generated\prisma\runtime\client.js:79:6862)
+    at async ReelPage (src\app\reel\[reelId]\page.tsx:47:16)
+  67 | ...
+  68 | ...
+> 69 | ...t u=s?{modelName:s,...t.meta}:t.meta;throw new b.PrismaClientKnownRequestError(l,{code:...
+     |                                               ^
+  70 | ...
+  71 | ...
+  72 | ... {
+  code: 'ETIMEDOUT',
+  meta: { modelName: 'Reel' },
+  clientVersion: '7.8.0',
+  digest: '2306790680'
+}
+ GET /reel/b6af7433-9ec7-4aef-bc9e-3d65ce8753d7 500 in 28.8s (next.js: 2.5s, proxy.ts: 235ms, application-code: 26.0s)
+[browser] Uncaught PrismaClientKnownRequestError: 
+Invalid `prisma.reel.findUnique()` invocation:
+
+
+
+    at zr.handleRequestError (src\generated\prisma\runtime\client.js:69:8286)
+    at zr.handleAndLogRequestError (src\generated\prisma\runtime\client.js:69:7581)
+    at zr.request (src\generated\prisma\runtime\client.js:69:7288)
+    at a (src\generated\prisma\runtime\client.js:79:6862)
+    at ReelPage (src\app\reel\[reelId]\page.tsx:47:16)
+  67 | ...
+  68 | ...
+> 69 | ...t u=s?{modelName:s,...t.meta}:t.meta;throw new b.PrismaClientKnownRequestError(l,{code:...
+     |                                               ^
+  70 | ...
+  71 | ...
+  72 | ...
+ GET /reel/b6af7433-9ec7-4aef-bc9e-3d65ce8753d7 200 in 2.4s (next.js: 17ms, proxy.ts: 4ms, application-code: 2.4s)
+ GET / 200 in 183ms (next.js: 40ms, proxy.ts: 5ms, application-code: 138ms)
+ GET /api/reels/trending 200 in 3.6s (next.js: 368ms, application-code: 3.2s)
+ GET /api/recipes/recommended 200 in 3.7s (next.js: 203ms, application-code: 3.5s)
+ GET /explore 200 in 147ms (next.js: 83ms, proxy.ts: 6ms, application-code: 57ms)
+[browser] Detected `scroll-behavior: smooth` on the `<html>` element. To disable smooth scrolling during route transitions, add `data-scroll-behavior="smooth"` to your <html> element. Learn more: https://nextjs.org/docs/messages/missing-data-scroll-behavior (chrome-extension://fmkadmapgofadopljbjfkapdkoienihi/build/installHook.js:1:168574)
+ GET /api/explore?tab=all&page=0 200 in 3.3s (next.js: 74ms, application-code: 3.2s)
+ GET /api/explore?tab=all&page=0 200 in 483ms (next.js: 6ms, application-code: 476ms)
+ GET /reels 200 in 2.3s (next.js: 73ms, proxy.ts: 6ms, application-code: 2.2s)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/events 401 in 1035ms (next.js: 1004ms, application-code: 31ms)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/save 200 in 1294ms (next.js: 1253ms, application-code: 41ms)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/save 200 in 38ms (next.js: 23ms, application-code: 16ms)
+ GET /api/reels/26540c79-7210-431d-80ce-866279190f9e/save 200 in 48ms (next.js: 25ms, application-code: 23ms)
+ GET /api/reels/26540c79-7210-431d-80ce-866279190f9e/events 401 in 52ms (next.js: 25ms, application-code: 27ms)
+ GET /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/save 200 in 111ms (next.js: 20ms, application-code: 91ms)
+ GET /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/events 401 in 32ms (next.js: 19ms, application-code: 13ms)
+ GET /api/reels/feed?cursor=eyJwcmlvcml0eSI6NCwiY3JlYXRlZEF0IjoiMjAyNi0wNi0xMVQxMDo1Nzo1MC42MTBaIiwiaWQiOiI1YzU5ZmQwMS01ZmZiLTQ1ZDQtOGFmOC02YTA2NWZiMDllNDgifQ&limit=5 200 in 504ms (next.js: 98ms, application-code: 406ms)
+ POST /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/like 401 in 1269ms (next.js: 1246ms, application-code: 23ms)
+ GET /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/comments 200 in 2.1s (next.js: 1245ms, application-code: 838ms)
+ GET /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/comments 200 in 824ms (next.js: 18ms, application-code: 806ms)
+ POST /api/reels/50e4f222-54c2-4341-a2f6-3c5b75c10c19/comments 401 in 48ms (next.js: 19ms, application-code: 28ms)
+ GET /api/reels/57e45f29-0350-4e55-9cee-89e8c28db050/save 200 in 38ms (next.js: 22ms, application-code: 16ms)
+ GET /api/reels/57e45f29-0350-4e55-9cee-89e8c28db050/events 401 in 48ms (next.js: 27ms, application-code: 21ms)
+ GET /categories 200 in 169ms (next.js: 95ms, proxy.ts: 6ms, application-code: 68ms)
+ GET /api/content?type=recipe&category=dinner&limit=30 200 in 3.8s (next.js: 80ms, application-code: 3.8s)
+ GET /api/content?type=recipe&limit=32&category=all 200 in 3.9s (next.js: 143ms, application-code: 3.8s)
+ GET /api/categories 200 in 343ms (next.js: 87ms, application-code: 256ms)
+ GET /api/content?type=recipe&limit=9&category=all 200 in 736ms (next.js: 7ms, application-code: 728ms)
+ GET /api/content?type=recipe&category=dinner&limit=30 200 in 763ms (next.js: 9ms, application-code: 755ms)
+ GET /api/categories 200 in 257ms (next.js: 8ms, application-code: 249ms)
+ GET /api/content?type=recipe&limit=32&category=all 200 in 990ms (next.js: 10ms, application-code: 981ms)
+ GET /api/content?type=recipe&limit=9&category=all 200 in 742ms (next.js: 6ms, application-code: 736ms)
+ GET /api/content?type=reel&limit=8&category=all 200 in 6.3s (next.js: 157ms, application-code: 6.1s)
+ GET /api/content?type=recipe&category=breakfast&limit=30 200 in 6.3s (next.js: 128ms, application-code: 6.2s)
+ GET /api/content?type=recipe&category=snacks&limit=30 200 in 6.3s (next.js: 59ms, application-code: 6.3s)
+ GET /api/content?type=recipe&category=lunch&limit=30 200 in 6.3s (next.js: 98ms, application-code: 6.2s)
+ GET /api/content?type=reel&limit=8&category=all 200 in 720ms (next.js: 5ms, application-code: 715ms)
+ GET /api/content?type=recipe&category=breakfast&limit=30 200 in 752ms (next.js: 7ms, application-code: 745ms)
+ GET /api/content?type=recipe&category=snacks&limit=30 200 in 767ms (next.js: 25ms, application-code: 742ms)
+ GET /api/content?type=recipe&category=lunch&limit=30 200 in 761ms (next.js: 41ms, application-code: 720ms)
+ GET /friends 200 in 122ms (next.js: 61ms, proxy.ts: 7ms, application-code: 55ms)
+ GET /messages 200 in 120ms (next.js: 72ms, proxy.ts: 6ms, application-code: 43ms)
+ GET /boost 200 in 72ms (next.js: 38ms, proxy.ts: 4ms, application-code: 30ms)
+ GET /reels 200 in 2.0s (next.js: 12ms, proxy.ts: 7ms, application-code: 2.0s)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/save 200 in 28ms (next.js: 14ms, application-code: 14ms)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/save 200 in 24ms (next.js: 8ms, application-code: 16ms)
+ GET /api/reels/0321a0c7-3876-4150-a4ce-5d3cd28c29fc/events 401 in 42ms (next.js: 24ms, application-code: 18ms)

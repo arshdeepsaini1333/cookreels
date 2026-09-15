@@ -12,6 +12,8 @@ import {
 import { useTheme } from '@/context/ThemeContext'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 import { AddContentModal } from '@/components/shared/AddContentModal'
+import { GuestProfileCard } from '@/components/dashboard/GuestProfileCard'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 /* ─── Types ───── */
 
@@ -353,6 +355,7 @@ function SearchFilters({
 }) {
   const { theme } = useTheme()
   const dark = theme === 'dark'
+  const { isAuthenticated, openAuthModal } = useAuthGuard()
   const [showSuggestions, setShowSuggestions] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -366,7 +369,14 @@ function SearchFilters({
           type="text"
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={(e) => {
+            if (!isAuthenticated) {
+              e.currentTarget.blur()
+              openAuthModal('login')
+              return
+            }
+            setShowSuggestions(true)
+          }}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 160)}
           placeholder={
             contentType === 'recipe'
@@ -849,7 +859,7 @@ interface TopCreator {
 
 const CREATOR_AVATAR_EMOJIS = ['👨‍🍳', '👩‍🍳', '🧑‍🍳', '👨‍🍳', '👩‍🍳']
 
-function DiscoverySidebar() {
+function DiscoverySidebar({ userId }: { userId?: string }) {
   const { theme } = useTheme()
   const dark = theme === 'dark'
   const router = useRouter()
@@ -858,16 +868,19 @@ function DiscoverySidebar() {
   const [creatorsLoading, setCreatorsLoading] = useState(true)
 
   useEffect(() => {
+    if (!userId) { setCreatorsLoading(false); return }
     fetch('/api/top-creators')
       .then(r => r.json())
       .then(d => setCreators(Array.isArray(d) ? d : []))
       .catch(() => {})
       .finally(() => setCreatorsLoading(false))
-  }, [])
+  }, [userId])
 
   return (
     <aside className="hidden xl:flex flex-col gap-5 w-60 flex-none self-start sticky top-[72px]">
-      {/* Top Creators */}
+      {!userId ? (
+        <GuestProfileCard />
+      ) : (
       <div className="rounded-2xl bg-white dark:bg-[#2B2B2D] border border-zinc-200/60 dark:border-[#343438] p-4 shadow-sm">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
@@ -928,6 +941,7 @@ function DiscoverySidebar() {
           }
         </div>
       </div>
+      )}
 
       {/* Seasonal Picks promo card */}
       <div
@@ -1035,6 +1049,7 @@ export function CategoriesPage({ username, userId }: { username?: string; userId
   const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
   const [addModalType, setAddModalType] = useState<'reel' | 'recipe'>('recipe')
+  const { requireAuth } = useAuthGuard()
 
   useEffect(() => {
     fetch('/api/categories')
@@ -1081,20 +1096,20 @@ export function CategoriesPage({ username, userId }: { username?: string; userId
           onContentType={setContentType}
         />
 
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="font-heading text-xl sm:text-2xl font-black text-zinc-800 dark:text-zinc-100 tracking-tight">
+              {sectionLabel}
+            </h2>
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
+              {isFiltered ? filteredSubtitle : 'Reels and recipes mixed for you'}
+            </p>
+          </div>
+        </div>
+
         <div className="flex gap-6 items-start">
           <div className="flex-1 min-w-0 space-y-10">
             <section>
-              <div className="flex items-end justify-between mb-5">
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-black text-zinc-800 dark:text-zinc-100 tracking-tight">
-                    {sectionLabel}
-                  </h2>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">
-                    {isFiltered ? filteredSubtitle : 'Reels and recipes mixed for you'}
-                  </p>
-                </div>
-              </div>
-
               <MixedGrid query={debouncedQuery} activeTab={activeTab} contentType={contentType} />
             </section>
 
@@ -1108,11 +1123,11 @@ export function CategoriesPage({ username, userId }: { username?: string; userId
             )}
           </div>
 
-          <DiscoverySidebar />
+          <DiscoverySidebar userId={userId} />
         </div>
       </div>
 
-      <FloatingFAB onAction={(type) => { setAddModalType(type); setShowAddModal(true) }} />
+      <FloatingFAB onAction={(type) => requireAuth(() => { setAddModalType(type); setShowAddModal(true) })} />
 
       {userId && (
         <AddContentModal

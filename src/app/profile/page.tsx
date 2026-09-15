@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 
 export default async function Page() {
   const session = await getSession()
-  if (!session) redirect('/auth/login')
+  if (!session) redirect('/login')
 
   let user = null
   try {
@@ -13,10 +13,10 @@ export default async function Page() {
       select: { username: true },
     })
   } catch {
-    redirect('/auth/login')
+    redirect('/login')
   }
 
-  if (!user) redirect('/auth/login')
+  if (!user) redirect('/login')
 
   redirect(`/user/${user.username}`)
 }

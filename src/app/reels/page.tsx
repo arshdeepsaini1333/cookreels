@@ -20,25 +20,26 @@ export default async function Page({
   if (reelId) redirect(`/reel/${reelId}`)
 
   const session = await getSession()
-  if (!session) redirect('/auth/login')
 
   let initialReels: FeedReel[] = []
   let initialHasMore = true
   let initialCursor: string | null = null
   try {
-    const data = await fetchReelsFeed(session.userId, 1, 5)
+    // '' is a safe sentinel for guests: it can never match a real user id, so
+    // the feed's own-content/follow/block/report filters just become no-ops.
+    const data = await fetchReelsFeed(session?.userId ?? '', 1, 5)
     initialReels  = data.reels
     initialHasMore = data.hasMore
     initialCursor  = data.nextCursor
   } catch { /* fallback: client will fetch */ }
 
   return (
-    <DashboardLayout username={session.username}>
+    <DashboardLayout username={session?.username} isAuthenticated={!!session}>
       <ReelsPage
         initialReels={initialReels}
         initialHasMore={initialHasMore}
         initialCursor={initialCursor}
-        currentUserId={session.userId}
+        currentUserId={session?.userId}
       />
     </DashboardLayout>
   )

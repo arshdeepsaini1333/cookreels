@@ -26,13 +26,13 @@ export function GuestBanner() {
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <Link
-          href={`/auth/login${next}`}
+          href={`/login${next}`}
           className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-white/20 text-white transition-colors hover:bg-white/10"
         >
           Log In
         </Link>
         <Link
-          href={`/auth/signup${next}`}
+          href={`/signup${next}`}
           className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-opacity hover:opacity-90"
           style={{ background: '#F5C518', color: '#1A1A1A' }}
         >

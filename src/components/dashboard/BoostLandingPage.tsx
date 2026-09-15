@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '@/context/ThemeContext'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 import {
   ArrowRight, Sparkles, MapPin, Smartphone, Tv, Film, Target,
   Globe, ChevronDown, Users, Rocket, BarChart2, ShoppingBag,
@@ -321,10 +322,16 @@ function FaqAccordionItem({
 
 export default function BoostLandingPage() {
   const { theme } = useTheme()
+  const router = useRouter()
+  const { requireAuth } = useAuthGuard()
   const isDark = theme === 'dark'
   const [openFaq, setOpenFaq] = useState<number | null>(null)
   const [videoPlaying, setVideoPlaying] = useState(false)
   const [openMobileRow, setOpenMobileRow] = useState<number | null>(null)
+
+  function goTo(href: string) {
+    requireAuth(() => router.push(href))
+  }
 
   const cardStyle: React.CSSProperties = {
     background: isDark ? 'rgba(43,43,45,0.60)' : 'rgba(255,255,255,0.85)',
@@ -345,6 +352,10 @@ export default function BoostLandingPage() {
 
   const crBorder   = 'rgba(245,197,24,0.45)'
   const geoBorder  = 'rgba(125,187,145,0.45)'
+  const FEATURE_COL_WIDTH = 190  // sticky "Feature" column, fixed width
+  const MIN_COL_WIDTH     = 140  // shrink floor for the other 4 flexible columns
+  const HIGHLIGHT_FLEX    = 1.35 // CookReels / Geofencing — our own products, get more room
+  const OTHER_FLEX        = 0.8  // Meta / Google — competitors, get a bit less
   const crColBg    = isDark ? 'rgba(245,197,24,0.045)' : 'rgba(245,197,24,0.028)'
   const geoColBg   = isDark ? 'rgba(125,187,145,0.045)' : 'rgba(125,187,145,0.025)'
 
@@ -415,13 +426,12 @@ export default function BoostLandingPage() {
             </div>
 
             <div className="flex items-center gap-2.5 flex-shrink-0">
-              <Link href="/boost/create">
-                <motion.span whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.97 }}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap"
-                  style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', boxShadow: '0 4px 18px rgba(245,197,24,0.38)', fontFamily: poppins }}>
-                  <Plus size={14} /> New Campaign
-                </motion.span>
-              </Link>
+              <motion.span whileHover={{ scale: 1.04, y: -1 }} whileTap={{ scale: 0.97 }}
+                onClick={() => goTo('/boost/create')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold cursor-pointer whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A', boxShadow: '0 4px 18px rgba(245,197,24,0.38)', fontFamily: poppins }}>
+                <Plus size={14} /> New Campaign
+              </motion.span>
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 onClick={() => scrollTo('why')}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer whitespace-nowrap"
@@ -445,36 +455,36 @@ export default function BoostLandingPage() {
             ] as const).map(link => {
               const Icon = link.icon
               return (
-                <Link key={link.label} href={link.href}>
-                  <motion.div
-                    whileHover={{ scale: 1.03, y: -2 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="flex items-center gap-3 px-3.5 py-3 rounded-xl cursor-pointer transition-colors"
-                    style={{
-                      background: isDark ? 'rgba(30,30,31,0.70)' : 'rgba(0,0,0,0.03)',
-                      border: `1px solid ${borderColor}`,
-                    }}
-                    onMouseEnter={e => {
-                      const el = e.currentTarget as HTMLDivElement
-                      el.style.borderColor = `${link.color}40`
-                      el.style.background  = isDark ? `${link.color}10` : `${link.color}08`
-                    }}
-                    onMouseLeave={e => {
-                      const el = e.currentTarget as HTMLDivElement
-                      el.style.borderColor = borderColor
-                      el.style.background  = isDark ? 'rgba(30,30,31,0.70)' : 'rgba(0,0,0,0.03)'
-                    }}
-                  >
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${link.color}15`, border: `1px solid ${link.color}28` }}>
-                      <Icon size={14} style={{ color: link.color }} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold leading-none truncate" style={{ color: textPrimary }}>{link.label}</p>
-                      <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>{link.sub}</p>
-                    </div>
-                  </motion.div>
-                </Link>
+                <motion.div
+                  key={link.label}
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => goTo(link.href)}
+                  className="flex items-center gap-3 px-3.5 py-3 rounded-xl cursor-pointer transition-colors"
+                  style={{
+                    background: isDark ? 'rgba(30,30,31,0.70)' : 'rgba(0,0,0,0.03)',
+                    border: `1px solid ${borderColor}`,
+                  }}
+                  onMouseEnter={e => {
+                    const el = e.currentTarget as HTMLDivElement
+                    el.style.borderColor = `${link.color}40`
+                    el.style.background  = isDark ? `${link.color}10` : `${link.color}08`
+                  }}
+                  onMouseLeave={e => {
+                    const el = e.currentTarget as HTMLDivElement
+                    el.style.borderColor = borderColor
+                    el.style.background  = isDark ? 'rgba(30,30,31,0.70)' : 'rgba(0,0,0,0.03)'
+                  }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${link.color}15`, border: `1px solid ${link.color}28` }}>
+                    <Icon size={14} style={{ color: link.color }} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold leading-none truncate" style={{ color: textPrimary }}>{link.label}</p>
+                    <p className="text-[10px] mt-0.5 truncate" style={{ color: textMuted }}>{link.sub}</p>
+                  </div>
+                </motion.div>
               )
             })}
           </div>
@@ -647,19 +657,19 @@ export default function BoostLandingPage() {
             {/* ── Desktop scrollable table (hidden below md) ─────────────── */}
             <div className="overflow-x-auto hidden md:block" style={{ WebkitOverflowScrolling: 'touch' }}
               role="region" aria-label="Platform comparison table — scroll to see all columns">
-              <div style={{ minWidth: 920 }}>
+              <div style={{ minWidth: FEATURE_COL_WIDTH + 4 * MIN_COL_WIDTH }}>
 
                 {/* Column headers */}
                 <div className="flex items-stretch"
                   style={{ background: isDark ? 'rgba(28,28,29,0.55)' : 'rgba(246,246,246,0.80)', borderBottom: `1px solid ${borderColor}` }}>
                   {/* Feature sticky */}
                   <div className="flex-shrink-0 px-4 py-3 flex items-center"
-                    style={{ width: 170, position: 'sticky', left: 0, zIndex: 20, background: headerSticky, borderRight: `1px solid ${borderColor}` }}>
+                    style={{ width: FEATURE_COL_WIDTH, position: 'sticky', left: 0, zIndex: 20, background: headerSticky, borderRight: `1px solid ${borderColor}` }}>
                     <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: textMuted }}>Feature</span>
                   </div>
                   {/* CookReels */}
-                  <div className="flex-shrink-0 px-4 py-3 flex flex-col justify-center"
-                    style={{ width: 220, background: isDark ? 'rgba(245,197,24,0.07)' : 'rgba(245,197,24,0.045)', borderLeft: `2px solid ${crBorder}`, borderRight: `2px solid ${crBorder}`, borderTop: `2px solid ${crBorder}`, boxShadow: '0 0 28px rgba(245,197,24,0.08)' }}>
+                  <div className="px-4 py-3 flex flex-col justify-center"
+                    style={{ flex: HIGHLIGHT_FLEX, minWidth: MIN_COL_WIDTH, background: isDark ? 'rgba(245,197,24,0.07)' : 'rgba(245,197,24,0.045)', borderLeft: `2px solid ${crBorder}`, borderRight: `2px solid ${crBorder}`, borderTop: `2px solid ${crBorder}`, boxShadow: '0 0 28px rgba(245,197,24,0.08)' }}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-sm font-bold" style={{ color: '#F5C518', fontFamily: poppins }}>CookReels</span>
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: '#F5C518', color: '#1A1A1A' }}>★ Boost</span>
@@ -667,18 +677,18 @@ export default function BoostLandingPage() {
                     <p className="text-[10px]" style={{ color: textMuted }}>Food-First Platform</p>
                   </div>
                   {/* Meta */}
-                  <div className="flex-1 px-4 py-3 flex flex-col justify-center" style={{ minWidth: 140, borderLeft: `1px solid ${borderColor}` }}>
+                  <div className="px-4 py-3 flex flex-col justify-center" style={{ flex: OTHER_FLEX, minWidth: MIN_COL_WIDTH, borderLeft: `1px solid ${borderColor}` }}>
                     <span className="text-xs font-bold" style={{ color: textPrimary }}>Meta Ads</span>
                     <span className="text-[10px] mt-0.5" style={{ color: textMuted }}>Social Media</span>
                   </div>
                   {/* Google */}
-                  <div className="flex-1 px-4 py-3 flex flex-col justify-center" style={{ minWidth: 140, borderLeft: `1px solid ${borderColor}` }}>
+                  <div className="px-4 py-3 flex flex-col justify-center" style={{ flex: OTHER_FLEX, minWidth: MIN_COL_WIDTH, borderLeft: `1px solid ${borderColor}` }}>
                     <span className="text-xs font-bold" style={{ color: textPrimary }}>Google Ads</span>
                     <span className="text-[10px] mt-0.5" style={{ color: textMuted }}>Search & Display</span>
                   </div>
                   {/* Geofencing */}
-                  <div className="flex-shrink-0 px-4 py-3 flex flex-col justify-center"
-                    style={{ width: 200, background: isDark ? 'rgba(125,187,145,0.07)' : 'rgba(125,187,145,0.04)', borderLeft: `2px solid ${geoBorder}`, borderRight: `2px solid ${geoBorder}`, borderTop: `2px solid ${geoBorder}`, boxShadow: '0 0 28px rgba(125,187,145,0.06)' }}>
+                  <div className="px-4 py-3 flex flex-col justify-center"
+                    style={{ flex: HIGHLIGHT_FLEX, minWidth: MIN_COL_WIDTH, background: isDark ? 'rgba(125,187,145,0.07)' : 'rgba(125,187,145,0.04)', borderLeft: `2px solid ${geoBorder}`, borderRight: `2px solid ${geoBorder}`, borderTop: `2px solid ${geoBorder}`, boxShadow: '0 0 28px rgba(125,187,145,0.06)' }}>
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-sm font-bold" style={{ color: '#7DBB91', fontFamily: poppins }}>Geofencing</span>
                       <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold" style={{ background: '#7DBB91', color: '#1A1A1A' }}>★ New</span>
@@ -696,23 +706,23 @@ export default function BoostLandingPage() {
                       style={{ borderBottom: isLast ? 'none' : `1px solid ${borderColor}`, background: isAlt ? rowAltBg : 'transparent' }}>
                       {/* Feature sticky */}
                       <div className="flex-shrink-0 px-4 py-4 flex items-start"
-                        style={{ width: 170, position: 'sticky', left: 0, zIndex: 10, background: isAlt ? stickyAlt : stickyEven, borderRight: `1px solid ${borderColor}` }}>
+                        style={{ width: FEATURE_COL_WIDTH, position: 'sticky', left: 0, zIndex: 10, background: isAlt ? stickyAlt : stickyEven, borderRight: `1px solid ${borderColor}` }}>
                         <span className="text-xs font-semibold leading-snug" style={{ color: textPrimary }}>{row.feature}</span>
                       </div>
                       {/* CookReels */}
-                      <div className="flex-shrink-0 px-4 py-4" style={{ width: 220, background: crColBg, borderLeft: `2px solid ${crBorder}`, borderRight: `2px solid ${crBorder}`, borderBottom: isLast ? `2px solid ${crBorder}` : undefined }}>
+                      <div className="px-4 py-4" style={{ flex: HIGHLIGHT_FLEX, minWidth: MIN_COL_WIDTH, background: crColBg, borderLeft: `2px solid ${crBorder}`, borderRight: `2px solid ${crBorder}`, borderBottom: isLast ? `2px solid ${crBorder}` : undefined }}>
                         <TableCell value={row.cookreels} isDark={isDark} variant="cr" />
                       </div>
                       {/* Meta */}
-                      <div className="flex-1 px-4 py-4" style={{ minWidth: 140, borderLeft: `1px solid ${borderColor}` }}>
+                      <div className="px-4 py-4" style={{ flex: OTHER_FLEX, minWidth: MIN_COL_WIDTH, borderLeft: `1px solid ${borderColor}` }}>
                         <TableCell value={row.meta} isDark={isDark} />
                       </div>
                       {/* Google */}
-                      <div className="flex-1 px-4 py-4" style={{ minWidth: 140, borderLeft: `1px solid ${borderColor}` }}>
+                      <div className="px-4 py-4" style={{ flex: OTHER_FLEX, minWidth: MIN_COL_WIDTH, borderLeft: `1px solid ${borderColor}` }}>
                         <TableCell value={row.google} isDark={isDark} />
                       </div>
                       {/* Geofencing */}
-                      <div className="flex-shrink-0 px-4 py-4" style={{ width: 200, background: geoColBg, borderLeft: `2px solid ${geoBorder}`, borderRight: `2px solid ${geoBorder}`, borderBottom: isLast ? `2px solid ${geoBorder}` : undefined }}>
+                      <div className="px-4 py-4" style={{ flex: HIGHLIGHT_FLEX, minWidth: MIN_COL_WIDTH, background: geoColBg, borderLeft: `2px solid ${geoBorder}`, borderRight: `2px solid ${geoBorder}`, borderBottom: isLast ? `2px solid ${geoBorder}` : undefined }}>
                         <TableCell value={row.geofencing} isDark={isDark} variant="geo" />
                       </div>
                     </div>
@@ -776,13 +786,12 @@ export default function BoostLandingPage() {
               })}
             </div>
             <div className="mt-6 flex justify-center">
-              <Link href="/boost/create?platform=cookreels">
-                <motion.span whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold cursor-pointer"
-                  style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800)', color: '#1A1A1A', boxShadow: '0 4px 16px rgba(245,197,24,0.35)', fontFamily: poppins }}>
-                  Launch CookReels Boost <ArrowRight size={14} />
-                </motion.span>
-              </Link>
+              <motion.span whileHover={{ scale: 1.03, y: -1 }} whileTap={{ scale: 0.97 }}
+                onClick={() => goTo('/boost/create?platform=cookreels')}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800)', color: '#1A1A1A', boxShadow: '0 4px 16px rgba(245,197,24,0.35)', fontFamily: poppins }}>
+                Launch CookReels Boost <ArrowRight size={14} />
+              </motion.span>
             </div>
           </div>
         </FadeUp>
@@ -944,21 +953,20 @@ export default function BoostLandingPage() {
 
             {/* ── 3. CTA Button ────────────────────────────────────────────── */}
             <div className="flex justify-center">
-              <Link href="/boost/create?platform=geofencing">
-                <motion.span
-                  whileHover={{ scale: 1.04, y: -2 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold cursor-pointer"
-                  style={{
-                    background: 'linear-gradient(135deg, #7DBB91, #5BA070)',
-                    color: '#fff',
-                    boxShadow: '0 6px 24px rgba(125,187,145,0.35)',
-                    fontFamily: poppins,
-                  }}
-                >
-                  Launch Geofencing Campaign <ArrowRight size={15} />
-                </motion.span>
-              </Link>
+              <motion.span
+                whileHover={{ scale: 1.04, y: -2 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => goTo('/boost/create?platform=geofencing')}
+                className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold cursor-pointer"
+                style={{
+                  background: 'linear-gradient(135deg, #7DBB91, #5BA070)',
+                  color: '#fff',
+                  boxShadow: '0 6px 24px rgba(125,187,145,0.35)',
+                  fontFamily: poppins,
+                }}
+              >
+                Launch Geofencing Campaign <ArrowRight size={15} />
+              </motion.span>
             </div>
           </div>
         </FadeUp>
@@ -1233,22 +1241,20 @@ export default function BoostLandingPage() {
                 reach with precision Geofencing campaigns across mobile, video, connected TV, display and social channels.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <Link href="/boost/create?platform=cookreels">
-                  <motion.span role="button" aria-label="Launch CookReels Boost"
-                    whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }}
-                    className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-sm font-bold cursor-pointer"
-                    style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800)', color: '#1A1A1A', boxShadow: '0 6px 24px rgba(245,197,24,0.40)', fontFamily: poppins }}>
-                    Launch CookReels Boost <ArrowRight size={14} />
-                  </motion.span>
-                </Link>
-                <Link href="/boost/create?platform=geofencing">
-                  <motion.span role="button" aria-label="Launch Geofencing Campaign"
-                    whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }}
-                    className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-sm font-bold cursor-pointer"
-                    style={{ background: 'linear-gradient(135deg, #7DBB91, #5BA070)', color: '#fff', boxShadow: '0 6px 24px rgba(125,187,145,0.35)', fontFamily: poppins }}>
-                    Launch Geofencing Campaign <ArrowRight size={14} />
-                  </motion.span>
-                </Link>
+                <motion.span role="button" aria-label="Launch CookReels Boost"
+                  whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }}
+                  onClick={() => goTo('/boost/create?platform=cookreels')}
+                  className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-sm font-bold cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #F5C518, #FFB800)', color: '#1A1A1A', boxShadow: '0 6px 24px rgba(245,197,24,0.40)', fontFamily: poppins }}>
+                  Launch CookReels Boost <ArrowRight size={14} />
+                </motion.span>
+                <motion.span role="button" aria-label="Launch Geofencing Campaign"
+                  whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }}
+                  onClick={() => goTo('/boost/create?platform=geofencing')}
+                  className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-sm font-bold cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #7DBB91, #5BA070)', color: '#fff', boxShadow: '0 6px 24px rgba(125,187,145,0.35)', fontFamily: poppins }}>
+                  Launch Geofencing Campaign <ArrowRight size={14} />
+                </motion.span>
               </div>
             </div>
           </div>

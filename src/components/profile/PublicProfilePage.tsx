@@ -470,7 +470,7 @@ export function PublicProfilePage({
 
   const handleFollow = useCallback(async () => {
     if (!currentUserId) {
-      router.push(`/auth/login?next=${encodeURIComponent(`/user/${rawUsername}`)}`)
+      router.push(`/login?next=${encodeURIComponent(`/user/${rawUsername}`)}`)
       return
     }
     if (followPending) return

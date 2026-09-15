@@ -14,6 +14,8 @@ import { AddContentModal } from '@/components/shared/AddContentModal'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
 import { mediaUrl } from '@/lib/mediaUrl'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { GuestProfileCard } from '@/components/dashboard/GuestProfileCard'
 
 /* ─── Types ───────────────────────────────────────────────── */
 
@@ -504,6 +506,7 @@ function ReelModal({
 }) {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { isAuthenticated, requireAuth } = useAuthGuard()
 
   const safeIdx = Math.max(0, Math.min(index, reels.length - 1))
   const reel    = reels[safeIdx]
@@ -621,6 +624,7 @@ function ReelModal({
   }
 
   async function toggleLike() {
+    if (!isAuthenticated) { requireAuth(toggleLike); return }
     if (!isReal || likePending) return
     const id = (reel as TrendingReelItem).id
     setLikePending(true)
@@ -637,6 +641,7 @@ function ReelModal({
 
   async function postComment(e: React.FormEvent) {
     e.preventDefault()
+    if (!isAuthenticated) { requireAuth(() => postComment(e)); return }
     const text = newComment.trim()
     if (!text || !isReal || submitting) return
     const id = (reel as TrendingReelItem).id
@@ -658,6 +663,7 @@ function ReelModal({
   }
 
   async function toggleFollow() {
+    if (!isAuthenticated) { requireAuth(toggleFollow); return }
     if (followPending || !isReal) return
     const userId = (reel as TrendingReelItem).user.id
     if (!userId) return
@@ -1730,12 +1736,18 @@ function QuoteCard() {
 
 /* ─── Right Sidebar ───────────────────────────────────────── */
 
-function RightSidebar({ username, profileStats }: { username: string; profileStats?: { posts: number; followers: number; following: number } }) {
+function RightSidebar({ username, userId, profileStats }: { username: string; userId?: string; profileStats?: { posts: number; followers: number; following: number } }) {
   return (
     <aside className="hidden lg:block w-60 xl:w-64 flex-shrink-0">
       <div className="sticky top-6 space-y-4">
-        <ProfileCard username={username} stats={profileStats} />
-        <RecentFriends />
+        {userId ? (
+          <>
+            <ProfileCard username={username} stats={profileStats} />
+            <RecentFriends />
+          </>
+        ) : (
+          <GuestProfileCard />
+        )}
         <QuoteCard />
       </div>
     </aside>
@@ -1744,18 +1756,66 @@ function RightSidebar({ username, profileStats }: { username: string; profileSta
 
 /* ─── Main export ─────────────────────────────────────────── */
 
+const HOME_LOGIN_PROMPT_KEY    = 'cr:home-login-prompt-shown'
+const SCROLL_PROMPT_THRESHOLD  = 3    // number of distinct scroll gestures
+const SCROLL_IDLE_MS           = 150  // gap that marks one scroll gesture as "finished"
+const TIME_PROMPT_DELAY_MS     = 4000 // auto-prompt after this long on the page
+
 export function DashboardCards({ username = 'Chef', userId = '', currentUserAvatar, profileStats }: DashboardCardsProps) {
   const [showAddModal, setShowAddModal] = useState(false)
+  const { requireAuth, openAuthModal } = useAuthGuard()
+
+  // Guests browsing the homepage get a login nudge — either after a few
+  // seconds or after a few scrolls, whichever comes first — once per
+  // browser session.
+  useEffect(() => {
+    if (userId) return
+    if (typeof window !== 'undefined' && sessionStorage.getItem(HOME_LOGIN_PROMPT_KEY)) return
+
+    let fired = false
+    function trigger() {
+      if (fired) return
+      fired = true
+      main?.removeEventListener('scroll', onScroll)
+      clearTimeout(timeTimer)
+      sessionStorage.setItem(HOME_LOGIN_PROMPT_KEY, '1')
+      openAuthModal('login')
+    }
+
+    const timeTimer = setTimeout(trigger, TIME_PROMPT_DELAY_MS)
+
+    const main = document.querySelector('main')
+    let scrollCount = 0
+    let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+    function onScroll() {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        scrollCount += 1
+        if (scrollCount >= SCROLL_PROMPT_THRESHOLD) trigger()
+      }, SCROLL_IDLE_MS)
+    }
+
+    main?.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      main?.removeEventListener('scroll', onScroll)
+      if (idleTimer) clearTimeout(idleTimer)
+      clearTimeout(timeTimer)
+    }
+  }, [userId, openAuthModal])
 
   return (
     <>
       <div className="flex gap-5 xl:gap-7 pb-8">
         <div className="flex-1 min-w-0 space-y-10">
-          <HeroSection username={username} onAddRecipe={() => setShowAddModal(true)} />
+          <HeroSection
+            username={username}
+            onAddRecipe={() => (userId ? setShowAddModal(true) : requireAuth(() => setShowAddModal(true)))}
+          />
           <TrendingReels />
           <RecommendedSection currentUserName={username} currentUserAvatar={currentUserAvatar} currentUserId={userId} />
         </div>
-        <RightSidebar username={username} profileStats={profileStats} />
+        <RightSidebar username={username} userId={userId} profileStats={profileStats} />
       </div>
       {userId && (
         <AddContentModal open={showAddModal} onClose={() => setShowAddModal(false)} userId={userId} />

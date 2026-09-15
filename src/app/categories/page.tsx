@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout'
 import { CategoriesPage } from '@/components/dashboard/CategoriesPage'
@@ -10,11 +9,10 @@ export const metadata = {
 
 export default async function CategoriesRoute() {
   const session = await getSession()
-  if (!session) redirect('/auth/login')
 
   return (
-    <DashboardLayout username={session.username}>
-      <CategoriesPage username={session.username} userId={session.userId} />
+    <DashboardLayout username={session?.username} isAuthenticated={!!session}>
+      <CategoriesPage username={session?.username} userId={session?.userId} />
     </DashboardLayout>
   )
 }

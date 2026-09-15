@@ -10,6 +10,8 @@ import {
   type ExploreReel,
 } from '@/components/shared/ExploreViewer'
 import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
+import { GuestProfileCard } from '@/components/dashboard/GuestProfileCard'
+import { FindPeopleCard } from '@/components/dashboard/FindPeopleCard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -368,7 +370,7 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
   const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
 
       {/* Title */}
       <motion.div
@@ -388,28 +390,31 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
         </p>
       </motion.div>
 
-      {/* Tabs */}
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
-        className="flex gap-2 mb-6 overflow-x-auto pb-1"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className="relative shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors duration-200"
-            style={tab === t.id
-              ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }
-              : { background: 'var(--cr-bg-card)', color: 'var(--cr-text-muted)', border: '1px solid var(--cr-border)' }
-            }
-          >
-            {t.label}
-          </button>
-        ))}
-      </motion.div>
+    {/* Tabs */}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
+      className="flex gap-2 mb-6 overflow-x-auto pb-1"
+      style={{ scrollbarWidth: 'none' }}
+    >
+      {TABS.map(t => (
+        <button
+          key={t.id}
+          onClick={() => setTab(t.id)}
+          className="relative shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-colors duration-200"
+          style={tab === t.id
+            ? { background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }
+            : { background: 'var(--cr-bg-card)', color: 'var(--cr-text-muted)', border: '1px solid var(--cr-border)' }
+          }
+        >
+          {t.label}
+        </button>
+      ))}
+    </motion.div>
+
+    <div className="flex gap-5 xl:gap-7 w-full">
+    <div className={`min-w-0 w-full ${currentUserId ? 'max-w-5xl' : 'lg:w-[80%]'}`}>
 
       {/* Feed */}
       <FeedTab
@@ -418,6 +423,17 @@ export function ExplorePage({ username, currentUserAvatar, currentUserId }: {
         onOpen={openViewer}
         onItemsChange={handleItemsChange}
       />
+    </div>
+
+    {!currentUserId && (
+      <aside className="hidden lg:block lg:w-[20%] flex-shrink-0">
+        <div className="sticky top-6 space-y-4 ml-auto w-full max-w-[280px]">
+          <GuestProfileCard />
+          <FindPeopleCard />
+        </div>
+      </aside>
+    )}
+    </div>
     </div>
   )
 }

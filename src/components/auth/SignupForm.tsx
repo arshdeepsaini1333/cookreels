@@ -238,9 +238,13 @@ function GoogleIcon() {
 
 interface SignupFormProps {
   onSubmit: (data: FormData) => Promise<void>
+  /** Hides the internal "Already have an account? Sign in" link, which navigates to
+   *  a full page — used when an owning component (e.g. AuthModal) renders its own
+   *  non-navigating way to switch to login instead. */
+  hideAltLink?: boolean
 }
 
-export default function SignupForm({ onSubmit }: SignupFormProps) {
+export default function SignupForm({ onSubmit, hideAltLink }: SignupFormProps) {
   const router = useRouter()
   const [formData, setFormData] = useState<FormData>(INITIAL_DATA)
   const [errors, setErrors] = useState<FormErrors>({})
@@ -552,18 +556,20 @@ export default function SignupForm({ onSubmit }: SignupFormProps) {
         </form>
 
         {/* Footer */}
-        <p className="mt-4 text-center text-sm" style={{ color: 'rgba(161,161,170,0.80)' }}>
-          Already have an account?{' '}
-          <Link
-            href="/auth/login"
-            className="font-bold transition-colors"
-            style={{ color: '#F5C518' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#FFD84D' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#F5C518' }}
-          >
-            Sign in
-          </Link>
-        </p>
+        {!hideAltLink && (
+          <p className="mt-4 text-center text-sm" style={{ color: 'rgba(161,161,170,0.80)' }}>
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="font-bold transition-colors"
+              style={{ color: '#F5C518' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#FFD84D' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#F5C518' }}
+            >
+              Sign in
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   )

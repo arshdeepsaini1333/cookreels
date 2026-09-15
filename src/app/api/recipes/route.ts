@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import {prisma} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+import { getSession } from "@/lib/session";
 
 export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
 
@@ -9,7 +15,7 @@ export async function POST(req: Request) {
 
     const recipe = await prisma.recipe.create({
       data: {
-        userId: body.userId,
+        userId: session.userId,
 
         title: body.title,
         description: body.description,

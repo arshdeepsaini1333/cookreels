@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { useTheme } from '@/context/ThemeContext'
 import { UserAvatar } from '@/components/shared/UserAvatar'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 const UNREAD_POLL = 30_000
 
@@ -32,10 +33,13 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
   const pathname = usePathname()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
+  const { isAuthenticated, openAuthModal } = useAuthGuard()
 
   const [me, setMe] = useState<{ firstName: string; lastName: string; profileImage: string | null } | null>(null)
 
   useEffect(() => {
+    if (!isAuthenticated) return
+
     // Populate from cache first so avatar appears immediately after hydration
     try {
       const cached = JSON.parse(localStorage.getItem('cr:me') ?? 'null')
@@ -52,7 +56,7 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
         }
       })
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated])
 
   // Keep avatar in sync when user uploads a new profile photo
   useEffect(() => {
@@ -71,17 +75,19 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
   const [unreadMessages, setUnreadMessages] = useState(0)
 
   const fetchUnread = useCallback(() => {
+    if (!isAuthenticated) return
     fetch('/api/messages/unread-count')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setUnreadMessages(d.count ?? 0) })
       .catch(() => {})
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     fetchUnread()
+    if (!isAuthenticated) return
     const id = setInterval(fetchUnread, UNREAD_POLL)
     return () => clearInterval(id)
-  }, [fetchUnread])
+  }, [fetchUnread, isAuthenticated])
 
   const avatarSrc  = me?.profileImage ?? null
   const avatarName = me ? `${me.firstName} ${me.lastName}` : username
@@ -238,47 +244,75 @@ export function Sidebar({ username = 'Chef' }: SidebarProps) {
 
             <div className="h-px my-1" style={{ background: isDark ? '#343438' : 'rgba(232,232,232,0.80)' }} />
 
-            <Link href="/profile">
-              <motion.div
-                whileHover={{ x: isProfilePage ? 0 : 2 }}
-                whileTap={{ scale: 0.97 }}
-                transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-2xl cursor-pointer transition-colors duration-200 group"
-                style={isProfilePage ? { background: 'linear-gradient(135deg, #F5C518 0%, #FFB800 100%)' } : {}}
-                onMouseEnter={e => {
-                  if (isProfilePage) return
-                  const el = e.currentTarget as HTMLDivElement
-                  el.style.background = isDark ? 'rgba(52,52,56,0.50)' : 'rgba(245,197,24,0.08)'
-                }}
-                onMouseLeave={e => {
-                  if (isProfilePage) return
-                  const el = e.currentTarget as HTMLDivElement
-                  el.style.background = 'transparent'
-                }}
-              >
-                <div className="relative flex-shrink-0">
-                  <UserAvatar
-                    src={avatarSrc}
-                    name={avatarName}
-                    size="md"
-                    loading="eager"
-                    className="ring-2 ring-[#F5C518]/35"
-                  />
-                  <span
-                    className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#7DBB91] rounded-full border-2"
-                    style={{ borderColor: isDark ? '#1E1E1F' : '#F7F1D9' }}
-                  />
+            {isAuthenticated ? (
+              <Link href="/profile">
+                <motion.div
+                  whileHover={{ x: isProfilePage ? 0 : 2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-2xl cursor-pointer transition-colors duration-200 group"
+                  style={isProfilePage ? { background: 'linear-gradient(135deg, #F5C518 0%, #FFB800 100%)' } : {}}
+                  onMouseEnter={e => {
+                    if (isProfilePage) return
+                    const el = e.currentTarget as HTMLDivElement
+                    el.style.background = isDark ? 'rgba(52,52,56,0.50)' : 'rgba(245,197,24,0.08)'
+                  }}
+                  onMouseLeave={e => {
+                    if (isProfilePage) return
+                    const el = e.currentTarget as HTMLDivElement
+                    el.style.background = 'transparent'
+                  }}
+                >
+                  <div className="relative flex-shrink-0">
+                    <UserAvatar
+                      src={avatarSrc}
+                      name={avatarName}
+                      size="md"
+                      loading="eager"
+                      className="ring-2 ring-[#F5C518]/35"
+                    />
+                    <span
+                      className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#7DBB91] rounded-full border-2"
+                      style={{ borderColor: isDark ? '#1E1E1F' : '#F7F1D9' }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: isProfilePage ? '#1A1A1A' : isDark ? '#F5F5F5' : '#1A1A1A' }}>
+                      {username}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: isProfilePage ? '#1A1A1A99' : isDark ? '#71717A' : '#9CA3AF' }}>
+                      View Profile
+                    </p>
+                  </div>
+                </motion.div>
+              </Link>
+            ) : (
+              <div className="px-3 py-2.5 rounded-2xl">
+                <div className="flex items-center gap-3 mb-2.5">
+                  <UserAvatar src={null} name="Guest" size="md" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: isDark ? '#F5F5F5' : '#1A1A1A' }}>Guest</p>
+                    <p className="text-xs truncate" style={{ color: isDark ? '#71717A' : '#9CA3AF' }}>Not logged in</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: isProfilePage ? '#1A1A1A' : isDark ? '#F5F5F5' : '#1A1A1A' }}>
-                    {username}
-                  </p>
-                  <p className="text-xs truncate" style={{ color: isProfilePage ? '#1A1A1A99' : isDark ? '#71717A' : '#9CA3AF' }}>
-                    View Profile
-                  </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openAuthModal('login')}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold"
+                    style={{ background: 'linear-gradient(135deg,#F5C518,#FFB800)', color: '#1A1A1A' }}
+                  >
+                    Log In
+                  </button>
+                  <button
+                    onClick={() => openAuthModal('signup')}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold border"
+                    style={{ borderColor: isDark ? '#343438' : '#E8E8E8', color: isDark ? '#F5F5F5' : '#1A1A1A' }}
+                  >
+                    Sign Up
+                  </button>
                 </div>
-              </motion.div>
-            </Link>
+              </div>
+            )}
           </div>
         </div>
       </aside>

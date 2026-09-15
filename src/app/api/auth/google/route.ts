@@ -19,5 +19,7 @@ export async function GET() {
   })
 
   const url = buildGoogleAuthURL(state)
-  return NextResponse.redirect(url)
+  const res = NextResponse.redirect(url)
+  res.headers.set('Cache-Control', 'no-store')
+  return res
 }

@@ -28,10 +28,12 @@ const RECENT_RECIPES = 15
 const RECENT_REELS   = 10
 
 export async function GET(req: NextRequest) {
+  // Public read — Explore is browsable by guests too. '' is a safe sentinel
+  // for a logged-out viewer: it can never match a real user id, so the
+  // own-content/follow-boost/report/block conditions below just degrade to
+  // "show public, non-banned accounts only".
   const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const uid = session.userId
+  const uid = session?.userId ?? ''
   const tab = req.nextUrl.searchParams.get('tab')
 
   // Shared filter snippets

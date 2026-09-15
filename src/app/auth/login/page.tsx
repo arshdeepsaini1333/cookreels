@@ -1,11 +1,13 @@
-import type { Metadata } from 'next'
-import LoginPage from '@/components/auth/LoginPage'
+import { redirect } from 'next/navigation'
 
-export const metadata: Metadata = {
-  title: 'Login | CookReels',
-  description: 'Sign in to your CookReels account and continue your culinary journey.',
-}
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> }
 
-export default function Page() {
-  return <LoginPage />
+// Old URL — kept as a redirect to the canonical /login so existing links/bookmarks still work.
+export default async function LegacyLoginRedirect({ searchParams }: Props) {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === 'string') params.set(key, value)
+  }
+  const qs = params.toString()
+  redirect(`/login${qs ? `?${qs}` : ''}`)
 }

@@ -4,8 +4,12 @@ import { decodeSession, COOKIE_NAME } from '@/lib/session'
 import { handleAdminProxy, handleAdminSubdomain } from '@/lib/admin/adminProxy'
 import { isAdminHost, isLocalDevHost, hostnameFromHeader } from '@/lib/admin/host'
 
-const protectedRoutes = ['/']
-const authRoutes = ['/auth/login', '/auth/signup']
+// The homepage and other public browsing pages are intentionally NOT listed
+// here — CookReels can be browsed by guests. Only routes with no meaningful
+// guest experience (own profile, boost management sub-pages) redirect, and
+// they do so in their own page.tsx rather than here.
+const protectedRoutes: string[] = []
+const authRoutes = ['/login', '/signup']
 
 // Returned directly (no rewrite/redirect hop) whenever /admin/* is requested
 // on a hostname that must not expose it — a plain 404 response, not routed
@@ -56,7 +60,7 @@ export function proxy(request: NextRequest) {
   )
 
   if (isProtected && !session) {
-    return NextResponse.redirect(new URL('/auth/login', request.url))
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   if (isAuthRoute && session) {

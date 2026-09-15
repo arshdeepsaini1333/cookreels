@@ -155,7 +155,19 @@ function InputField({
 
 // ── LoginForm ────────────────────────────────────────────────────────────────
 
-export default function LoginForm() {
+interface LoginFormProps {
+  /** Where to send the user after a successful login (ignored when `onSuccess` is given). */
+  redirectTo?: string
+  /** When provided (e.g. inside AuthModal), called instead of navigating — the caller
+   *  owns what happens next, so the guest is never bounced off their current page. */
+  onSuccess?: () => void
+  /** Hides the internal "Don't have an account? Sign up" link, which navigates to
+   *  a full page — used when an owning component (e.g. AuthModal) renders its own
+   *  non-navigating way to switch to signup instead. */
+  hideAltLink?: boolean
+}
+
+export default function LoginForm({ redirectTo, onSuccess, hideAltLink }: LoginFormProps = {}) {
   const router = useRouter()
 
   const [formData, setFormData] = useState<FormData>(INITIAL_DATA)
@@ -168,7 +180,9 @@ export default function LoginForm() {
   const [serverError, setServerError] = useState<string | null>(null)
   const [otpState, setOtpState] = useState<{ show: true; email: string; message: string } | { show: false }>({ show: false })
   const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [nextUrl, setNextUrl] = useState('/')
+  const [nextUrl, setNextUrl] = useState(redirectTo ?? '/')
+
+  const finish = () => { onSuccess ? onSuccess() : router.push(nextUrl) }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -179,14 +193,16 @@ export default function LoginForm() {
     else if (err === 'fb_failed') setServerError('Facebook sign-in failed. Please try again.')
     else if (err === 'fb_no_email') setServerError('Your Facebook account has no verified email. Please use another sign-in method.')
 
-    const next = params.get('next')
-    if (next) setNextUrl(next)
+    if (!redirectTo) {
+      const next = params.get('next')
+      if (next) setNextUrl(next)
+    }
 
     const prefillEmail = params.get('email')
     if (prefillEmail) {
       setFormData(prev => ({ ...prev, identifier: prefillEmail }))
     }
-  }, [])
+  }, [redirectTo])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -233,7 +249,8 @@ export default function LoginForm() {
 
       if (res.ok) {
         const data = await res.json().catch(() => ({})) as { isBanned?: boolean }
-        router.push(data.isBanned ? '/banned' : nextUrl)
+        if (data.isBanned) router.push('/banned')
+        else finish()
         return
       }
 
@@ -263,7 +280,7 @@ export default function LoginForm() {
       <OtpModal
         email={otpState.email}
         message={otpState.message}
-        onSuccess={() => router.push(nextUrl)}
+        onSuccess={finish}
         onClose={() => setOtpState({ show: false })}
       />
     )}
@@ -311,7 +328,7 @@ export default function LoginForm() {
           <h2
             className="font-heading text-2xl font-bold mb-1 tracking-tight bg-gradient-to-r from-white via-white/95 to-[#F5C518]/75 bg-clip-text text-transparent"
           >
-            Welcome back
+            Hi Chef
           </h2>
           <p className="text-sm" style={{ color: 'rgba(161,161,170,0.90)' }}>
             Sign in to continue your culinary journey
@@ -494,18 +511,20 @@ export default function LoginForm() {
         </form>
 
         {/* Footer */}
-        <p className="mt-5 text-center text-sm" style={{ color: 'rgba(161,161,170,0.80)' }}>
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/auth/signup"
-            className="font-bold transition-colors"
-            style={{ color: '#F5C518' }}
-            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#FFD84D' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#F5C518' }}
-          >
-            Sign up
-          </Link>
-        </p>
+        {!hideAltLink && (
+          <p className="mt-5 text-center text-sm" style={{ color: 'rgba(161,161,170,0.80)' }}>
+            Don&apos;t have an account?{' '}
+            <Link
+              href="/signup"
+              className="font-bold transition-colors"
+              style={{ color: '#F5C518' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#FFD84D' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#F5C518' }}
+            >
+              Sign up
+            </Link>
+          </p>
+        )}
       </div>
     </div>
     </>

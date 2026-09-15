@@ -7,8 +7,11 @@ import { blockedAuthorFilter } from '@/lib/blocks'
 const CACHE_HEADERS = { 'Cache-Control': 'private, no-store' }
 
 export async function GET() {
+  // Public read — recommended recipes are visible to guests too. '' is a safe
+  // sentinel for a logged-out viewer: it can never match a real user id, so
+  // the report/block exclusions below just become no-ops.
   const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session?.userId ?? ''
 
   const recipes = await prisma.recipe.findMany({
     where: {
@@ -16,8 +19,8 @@ export async function GET() {
       isBanned: false,
       user: { privateAccount: false, isBanned: false },
       NOT: [
-        { reports: { some: { reporterId: session.userId } } },
-        blockedAuthorFilter<Prisma.RecipeWhereInput>(session.userId),
+        { reports: { some: { reporterId: userId } } },
+        blockedAuthorFilter<Prisma.RecipeWhereInput>(userId),
       ],
     },
     orderBy: { createdAt: 'desc' },

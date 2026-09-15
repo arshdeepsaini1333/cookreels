@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation'
 async function handleLogout() {
   'use server'
   await deleteSession()
-  redirect('/auth/login')
+  redirect('/login')
 }
 
 export default function BannedPage() {

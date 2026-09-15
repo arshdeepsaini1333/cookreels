@@ -16,7 +16,7 @@ export async function GET() {
     return NextResponse.json({
       status: 'error',
       problem: 'NOT AUTHENTICATED — session cookie missing or expired',
-      fix: 'Log in again at /auth/login',
+      fix: 'Log in again at /login',
     })
   }
 

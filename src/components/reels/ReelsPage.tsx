@@ -22,6 +22,7 @@ import type { ReelCommentItem } from '@/hooks/useReelComments'
 import type { FeedReel } from '@/lib/reelsFeed'
 import { ShareModal } from '@/components/shared/ShareModal'
 import { ProtectedImg, ProtectedVideo } from '@/components/shared/ProtectedMedia'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export type { FeedReel }
 
@@ -529,6 +530,7 @@ const ReelCard = memo(function ReelCard({
     reel.id, reel.likes, isActive, reel.liked,
   )
   const { saved, toggle: toggleSave } = useReelSave(reel.id, isActive)
+  const { requireAuth, openAuthModal } = useAuthGuard()
 
   // Play / pause based on visibility.
   // Reset to start only on first activation, not on every focus change.
@@ -578,6 +580,7 @@ const ReelCard = memo(function ReelCard({
     if (t.count >= 2) {
       if (t.timer) clearTimeout(t.timer)
       t.count = 0
+      if (!currentUserId) { openAuthModal('login'); return }
       // Double tap → like
       const rect = e.currentTarget.getBoundingClientRect()
       setHeartPos({ x: e.clientX - rect.left, y: e.clientY - rect.top })
@@ -594,7 +597,7 @@ const ReelCard = memo(function ReelCard({
         else          { v.pause(); setPaused(true) }
       }, 280)
     }
-  }, [liked, toggleLike, videoFailed])
+  }, [liked, toggleLike, videoFailed, currentUserId, openAuthModal])
 
   const initial = reel.creator.username[0]?.toUpperCase() ?? '?'
 
@@ -702,7 +705,7 @@ const ReelCard = memo(function ReelCard({
           count={fmt(likeCount)}
           active={liked}
           activeClass="text-red-500"
-          onClick={toggleLike}
+          onClick={() => requireAuth(toggleLike)}
         >
           <motion.div animate={{ scale: liked ? [1, 1.4, 1] : 1 }} transition={{ duration: 0.25 }}>
             <Heart size={20} strokeWidth={liked ? 0 : 1.8} className={liked ? 'fill-red-500 text-red-500' : ''} />
@@ -848,6 +851,7 @@ export function ReelsPage({
   const [activeIdx, setActiveIdx]     = useState(0)
   const [commentOpen, setCommentOpen] = useState(false)
   const [globalMuted, setGlobalMuted] = useState(false)
+  const { requireAuth } = useAuthGuard()
   const [isMobile, setIsMobile]       = useState(
     typeof window !== 'undefined' ? window.innerWidth < 768 : true,
   )
@@ -873,7 +877,7 @@ export function ReelsPage({
   )
 
   const activeReel  = reels[activeIdx]
-  const openComments = useCallback(() => setCommentOpen(true), [])
+  const openComments = useCallback(() => requireAuth(() => setCommentOpen(true)), [requireAuth])
 
   // Suppress DashboardLayout's main scroll on mobile
   useEffect(() => {
