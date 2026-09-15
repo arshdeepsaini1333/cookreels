@@ -553,7 +553,7 @@ export function RecipeViewerModal({
                             <span className="font-bold mr-1.5">{activeUser.username}</span>
                             {detail?.description ? (
                               <>
-                                <span className={!expanded ? 'line-clamp-2' : undefined}>{detail.description}</span>
+                                <span className={`whitespace-pre-line ${!expanded ? 'line-clamp-2' : ''}`}>{detail.description}</span>
                                 {detail.description.length > 80 && (
                                   <button
                                     onClick={() => setExpanded(v => !v)}
@@ -784,7 +784,7 @@ export function RecipeViewerModal({
                             {loadingDetail ? (
                               <div className="space-y-2"><Bone /><Bone w="w-5/6" /><Bone w="w-4/6" /></div>
                             ) : detail?.description ? (
-                              <p className="text-sm leading-relaxed" style={{ color: 'var(--cr-text-2)' }}>
+                              <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: 'var(--cr-text-2)' }}>
                                 {detail.description}
                               </p>
                             ) : null}

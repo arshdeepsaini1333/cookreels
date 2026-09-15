@@ -333,6 +333,12 @@ export default function BoostLandingPage() {
     requireAuth(() => router.push(href))
   }
 
+  function goToExternal(url: string) {
+    requireAuth(() => window.open(url, '_blank', 'noopener,noreferrer'))
+  }
+
+  const GEOFENCING_URL = 'https://www.geofencing.pro'
+
   const cardStyle: React.CSSProperties = {
     background: isDark ? 'rgba(43,43,45,0.60)' : 'rgba(255,255,255,0.85)',
     border: `1px solid ${isDark ? '#343438' : '#E8E8E8'}`,
@@ -956,7 +962,7 @@ export default function BoostLandingPage() {
               <motion.span
                 whileHover={{ scale: 1.04, y: -2 }}
                 whileTap={{ scale: 0.97 }}
-                onClick={() => goTo('/boost/create?platform=geofencing')}
+                onClick={() => goToExternal(GEOFENCING_URL)}
                 className="inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold cursor-pointer"
                 style={{
                   background: 'linear-gradient(135deg, #7DBB91, #5BA070)',
@@ -1250,7 +1256,7 @@ export default function BoostLandingPage() {
                 </motion.span>
                 <motion.span role="button" aria-label="Launch Geofencing Campaign"
                   whileHover={{ scale: 1.04, y: -2 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => goTo('/boost/create?platform=geofencing')}
+                  onClick={() => goToExternal(GEOFENCING_URL)}
                   className="inline-flex items-center gap-2 px-7 py-3 rounded-2xl text-sm font-bold cursor-pointer"
                   style={{ background: 'linear-gradient(135deg, #7DBB91, #5BA070)', color: '#fff', boxShadow: '0 6px 24px rgba(125,187,145,0.35)', fontFamily: poppins }}>
                   Launch Geofencing Campaign <ArrowRight size={14} />
