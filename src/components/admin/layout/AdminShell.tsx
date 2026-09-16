@@ -17,6 +17,7 @@ export function AdminShell({ admin, children }: AdminShellProps) {
   return (
     <div className="flex h-screen" style={{ background: 'var(--cr-bg-main)' }}>
       <AdminSidebar
+        admin={admin}
         collapsed={collapsed}
         onToggleCollapsed={() => setCollapsed(c => !c)}
         mobileOpen={mobileOpen}

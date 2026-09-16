@@ -63,7 +63,11 @@ export function handleAdminSubdomain(request: NextRequest): NextResponse {
   }
 
   if (hadAdminPrefix) {
-    return NextResponse.redirect(new URL(cleanPath, request.url))
+    // Preserve the query string (e.g. ?edit=1) — constructing a fresh URL from
+    // just the pathname would silently drop it.
+    const clean = request.nextUrl.clone()
+    clean.pathname = cleanPath
+    return NextResponse.redirect(clean)
   }
 
   // Authenticated (or headed to /login while signed out) on a clean path —

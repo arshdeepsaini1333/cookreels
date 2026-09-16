@@ -48,7 +48,7 @@ export default async function RecipeModalPage({ params }: Props) {
   // Archived recipes are only visible to their owner.
   if (!recipe.isPublished && !isOwner) notFound()
 
-  // ── Private account guard ──────────────────────────────────────────────────
+  // ── Private account guard ───
   let canView   = !recipe.user.privateAccount || isOwner
 
   if (!canView && session) {

@@ -4,17 +4,20 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChefHat, ChevronsLeft, ChevronsRight, LogOut, X } from 'lucide-react'
 import { ADMIN_NAV_ITEMS } from '@/lib/admin/nav'
+import type { AdminSessionPayload } from '@/lib/admin/session'
 
 interface AdminSidebarProps {
+  admin: AdminSessionPayload
   collapsed: boolean
   onToggleCollapsed: () => void
   mobileOpen: boolean
   onCloseMobile: () => void
 }
 
-export function AdminSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: AdminSidebarProps) {
+export function AdminSidebar({ admin, collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: AdminSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const navItems = ADMIN_NAV_ITEMS.filter(item => !item.restrictedToEmails || item.restrictedToEmails.includes(admin.email.toLowerCase()))
 
   async function handleLogout() {
     await fetch('/api/admin/auth/logout', { method: 'POST' })
@@ -64,7 +67,7 @@ export function AdminSidebar({ collapsed, onToggleCollapsed, mobileOpen, onClose
         </div>
 
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-2.5 py-2">
-          {ADMIN_NAV_ITEMS.map(item => {
+          {navItems.map(item => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`)
             const Icon = item.icon
             return (
