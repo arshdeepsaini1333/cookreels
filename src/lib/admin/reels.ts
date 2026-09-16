@@ -13,6 +13,7 @@ export type AdminReelListFilters = {
 export type AdminReelListItem = {
   id: string
   title: string
+  videoUrl: string
   thumbnailUrl: string | null
   duration: number | null
   isPublished: boolean
@@ -55,6 +56,7 @@ export async function getAdminReels(filters: AdminReelListFilters) {
       select: {
         id: true,
         title: true,
+        videoUrl: true,
         thumbnailUrl: true,
         duration: true,
         isPublished: true,
@@ -73,6 +75,7 @@ export async function getAdminReels(filters: AdminReelListFilters) {
   const items: AdminReelListItem[] = reels.map(r => ({
     id: r.id,
     title: r.title,
+    videoUrl: r.videoUrl,
     thumbnailUrl: r.thumbnailUrl,
     duration: r.duration,
     isPublished: r.isPublished,

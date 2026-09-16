@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { Loader2, AlertCircle, Upload } from 'lucide-react'
 import { uploadToS3 } from '@/lib/uploadTos3'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 
 type Category = { id: string; name: string; slug: string; emoji: string | null; group: string | null }
 
@@ -157,34 +157,33 @@ export function ReelForm({ reelId, initialValues }: ReelFormProps) {
         <textarea rows={4} value={values.description} onChange={e => set('description', e.target.value)} className={inputClass} style={inputStyle} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelClass}>Video</label>
-          <div className="flex items-center gap-3">
-            {values.videoUrl && (
-              <video src={values.videoUrl} className="h-20 w-28 flex-shrink-0 rounded-xl object-cover" muted />
-            )}
-            <label className="flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)', color: 'var(--cr-text-2)' }}>
-              {uploadingVideo ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-              {uploadingVideo ? 'Uploading…' : values.videoUrl ? 'Replace video' : 'Upload video'}
-              <input type="file" accept="video/*" className="hidden" disabled={uploadingVideo} onChange={e => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f) }} />
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <label className={labelClass}>Thumbnail</label>
-          <div className="flex items-center gap-3">
-            {values.thumbnailUrl && (
-              <div className="relative h-20 w-28 flex-shrink-0 overflow-hidden rounded-xl">
-                <Image src={values.thumbnailUrl} alt="Thumbnail" fill className="object-cover" unoptimized />
-              </div>
-            )}
-            <label className="flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)', color: 'var(--cr-text-2)' }}>
-              {uploadingThumb ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-              {uploadingThumb ? 'Uploading…' : 'Upload image'}
-              <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={e => { const f = e.target.files?.[0]; if (f) handleThumbUpload(f) }} />
-            </label>
+      <div>
+        <label className={labelClass}>Cover</label>
+        <div className="flex items-start gap-4">
+          {values.videoUrl && (
+            <div className="relative h-32 w-24 flex-shrink-0 overflow-hidden rounded-xl" style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)' }}>
+              <ReelThumbnail videoUrl={values.videoUrl} thumbnailUrl={values.thumbnailUrl || null} />
+            </div>
+          )}
+          <div className="flex flex-1 flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)', color: 'var(--cr-text-2)' }}>
+                {uploadingVideo ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {uploadingVideo ? 'Uploading…' : values.videoUrl ? 'Replace video' : 'Upload video'}
+                <input type="file" accept="video/*" className="hidden" disabled={uploadingVideo} onChange={e => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f) }} />
+              </label>
+              <span className="text-xs text-[var(--cr-text-muted)]">Video</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'var(--cr-bg-card)', border: '1px solid var(--cr-border)', color: 'var(--cr-text-2)' }}>
+                {uploadingThumb ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+                {uploadingThumb ? 'Uploading…' : values.thumbnailUrl ? 'Replace thumbnail' : 'Upload custom thumbnail'}
+                <input type="file" accept="image/*" className="hidden" disabled={uploadingThumb} onChange={e => { const f = e.target.files?.[0]; if (f) handleThumbUpload(f) }} />
+              </label>
+              <span className="text-xs text-[var(--cr-text-muted)]">
+                {values.thumbnailUrl ? 'Custom image' : 'Falls back to a video frame'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

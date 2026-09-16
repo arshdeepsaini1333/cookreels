@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import { Heart, Eye, MessageCircle, PenLine } from 'lucide-react'
 import { PageHeader } from '@/components/admin/ui/PageHeader'
 import { Forbidden } from '@/components/admin/ui/Forbidden'
+import { ReelThumbnail } from '@/components/shared/ReelThumbnail'
 import { DataTable, type DataTableColumn } from '@/components/admin/tables/DataTable'
 import { ContentStatusBadges } from '@/components/admin/ui/ContentStatusBadges'
 import { ReelFilters } from '@/components/admin/reels/ReelFilters'
@@ -50,13 +50,9 @@ export default async function AdminReelsPage({ searchParams }: PageProps) {
       header: 'Reel',
       render: r => (
         <Link href={`/admin/reels/${r.id}`} className="flex items-center gap-3 hover:text-[var(--cr-accent)]">
-          {r.thumbnailUrl ? (
-            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg">
-              <Image src={r.thumbnailUrl} alt={r.title} fill className="object-cover" unoptimized />
-            </div>
-          ) : (
-            <div className="h-10 w-10 flex-shrink-0 rounded-lg" style={{ background: 'var(--cr-accent-soft)' }} />
-          )}
+          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-lg" style={{ background: 'var(--cr-accent-soft)' }}>
+            <ReelThumbnail videoUrl={r.videoUrl} thumbnailUrl={r.thumbnailUrl} />
+          </div>
           <div className="min-w-0">
             <p className="truncate font-semibold">{r.title}</p>
             <p className="truncate text-xs text-[var(--cr-text-muted)]">
